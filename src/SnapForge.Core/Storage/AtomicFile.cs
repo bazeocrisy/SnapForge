@@ -24,7 +24,7 @@ public static class AtomicFile
         string temp = Path.Combine(directory, $".{Path.GetFileName(full)}.{Guid.NewGuid():N}{TempSuffix}");
         try
         {
-            using (var file = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920, FileOptions.WriteThrough))
+            using (var file = new FileStream(temp, FileMode.CreateNew, FileAccess.Write, FileShare.None, 81920))
             {
                 Stream target = WriteDecorator.Value?.Invoke(file) ?? file;
                 write(target);
