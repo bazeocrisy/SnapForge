@@ -46,7 +46,8 @@
                                     <Path Data="{StaticResource IconStar}" Fill="{DynamicResource AccentBrush}" Width="24" Height="24" Stretch="None"
                                           HorizontalAlignment="Right" VerticalAlignment="Top" Margin="2" Visibility="{Binding Favorite, Converter={StaticResource BoolToVis}}" />
                                     <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4" CornerRadius="3" Padding="4,1"
-                                            Background="{DynamicResource WarningBackgroundBrush}" Visibility="{Binding HasWarning, Converter={StaticResource BoolToVis}}">
+                                            Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1"
+                                            Visibility="{Binding HasWarning, Converter={StaticResource BoolToVis}}">
                                         <TextBlock Text="{Binding WarningText}" FontSize="10" Foreground="{DynamicResource WarningBrush}" />
                                     </Border>
                                 </Grid>
@@ -119,16 +120,37 @@
                 <RowDefinition Height="*" />
             </Grid.RowDefinitions>
 
-            <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12,8">
-                <DockPanel LastChildFill="True">
-                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBlock x:Name="SelectionText" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" Margin="12,0" />
-                        <Button x:Name="OpenButton" Content="Open" Click="OnOpenSelected" Margin="2,0" IsEnabled="False" ToolTip="Open in Editor (Enter)" />
-                        <Button x:Name="ExportButton" Content="Export…" Click="OnExport" Margin="2,0" IsEnabled="False" />
-                        <Button x:Name="DeleteButton" Content="Move to Trash" Click="OnDelete" Margin="2,0" IsEnabled="False" ToolTip="Del" />
-                        <Button x:Name="RestoreButton" Content="Restore" Click="OnRestore" Margin="2,0" Visibility="Collapsed" />
-                        <Button x:Name="EmptyTrashButton" Content="Empty Trash…" Click="OnEmptyTrash" Margin="2,0" Visibility="Collapsed" />
-                        <Button x:Name="MoreButton" Content="More ▾" Click="OnMore" Margin="2,0" IsEnabled="False">
+            <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12,6">
+                <WrapPanel VerticalAlignment="Center">
+                    <Grid Width="240" Margin="0,2,8,2" VerticalAlignment="Center">
+                        <TextBox x:Name="SearchBox" TextChanged="OnSearchChanged" AutomationProperties.Name="Search captures"
+                                 ToolTip="Search titles, tags, folders, dates (yyyy-mm-dd) and sizes (e.g. 1920x1080)" />
+                        <TextBlock x:Name="SearchHint" Text="Search captures…" IsHitTestVisible="False" Margin="9,0,0,0" VerticalAlignment="Center"
+                                   Foreground="{DynamicResource MutedTextBrush}" FontSize="13" />
+                    </Grid>
+                    <Button x:Name="SortButton" Content="Sort: Newest ▾" Click="OnSortClick" Margin="0,2,8,2">
+                        <Button.ContextMenu>
+                            <ContextMenu>
+                                <MenuItem Header="Newest first" Tag="NewestFirst" Click="OnSortChosen" />
+                                <MenuItem Header="Oldest first" Tag="OldestFirst" Click="OnSortChosen" />
+                                <MenuItem Header="Recently opened" Tag="RecentlyModified" Click="OnSortChosen" />
+                                <MenuItem Header="Name (A–Z)" Tag="TitleAscending" Click="OnSortChosen" />
+                                <MenuItem Header="Largest first" Tag="LargestFirst" Click="OnSortChosen" />
+                            </ContextMenu>
+                        </Button.ContextMenu>
+                    </Button>
+                    <StackPanel Orientation="Horizontal" Margin="0,2,14,2" VerticalAlignment="Center">
+                        <TextBlock Text="Size" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" Margin="0,0,6,0" />
+                        <Slider x:Name="SizeSlider" Width="110" Minimum="110" Maximum="320" Value="180" SmallChange="10" LargeChange="40" VerticalAlignment="Center"
+                                ValueChanged="OnSizeChanged" AutomationProperties.Name="Thumbnail size" />
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2">
+                        <Button x:Name="OpenButton" Content="Open" Click="OnOpenSelected" Margin="0,0,4,0" IsEnabled="False" ToolTip="Open in Editor (Enter)" />
+                        <Button x:Name="ExportButton" Content="Export…" Click="OnExport" Margin="0,0,4,0" IsEnabled="False" />
+                        <Button x:Name="DeleteButton" Content="Move to Trash" Click="OnDelete" Margin="0,0,4,0" IsEnabled="False" ToolTip="Del" />
+                        <Button x:Name="RestoreButton" Content="Restore" Click="OnRestore" Margin="0,0,4,0" Visibility="Collapsed" />
+                        <Button x:Name="EmptyTrashButton" Content="Empty Trash…" Click="OnEmptyTrash" Margin="0,0,4,0" Visibility="Collapsed" />
+                        <Button x:Name="MoreButton" Content="More ▾" Click="OnMore" Margin="0,0,10,0" IsEnabled="False">
                             <Button.ContextMenu>
                                 <ContextMenu>
                                     <MenuItem Header="_Rename…" Click="OnRename" InputGestureText="F2" />
@@ -142,26 +164,9 @@
                                 </ContextMenu>
                             </Button.ContextMenu>
                         </Button>
+                        <TextBlock x:Name="SelectionText" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
                     </StackPanel>
-                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
-                        <TextBox x:Name="SearchBox" Width="260" TextChanged="OnSearchChanged" AutomationProperties.Name="Search captures"
-                                 ToolTip="Search titles, tags, folders, dates (yyyy-mm-dd) and sizes (e.g. 1920x1080)" />
-                        <Button x:Name="SortButton" Content="Sort: Newest ▾" Click="OnSortClick" Margin="8,0,0,0">
-                            <Button.ContextMenu>
-                                <ContextMenu>
-                                    <MenuItem Header="Newest first" Tag="NewestFirst" Click="OnSortChosen" />
-                                    <MenuItem Header="Oldest first" Tag="OldestFirst" Click="OnSortChosen" />
-                                    <MenuItem Header="Recently opened" Tag="RecentlyModified" Click="OnSortChosen" />
-                                    <MenuItem Header="Name (A–Z)" Tag="TitleAscending" Click="OnSortChosen" />
-                                    <MenuItem Header="Largest first" Tag="LargestFirst" Click="OnSortChosen" />
-                                </ContextMenu>
-                            </Button.ContextMenu>
-                        </Button>
-                        <TextBlock Text="Size" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" Margin="14,0,6,0" />
-                        <Slider x:Name="SizeSlider" Width="110" Minimum="110" Maximum="320" Value="180" SmallChange="10" LargeChange="40" VerticalAlignment="Center"
-                                ValueChanged="OnSizeChanged" AutomationProperties.Name="Thumbnail size" />
-                    </StackPanel>
-                </DockPanel>
+                </WrapPanel>
             </Border>
 
             <ItemsControl Grid.Row="1" x:Name="Rows" ItemTemplateSelector="{StaticResource RowSelector}"

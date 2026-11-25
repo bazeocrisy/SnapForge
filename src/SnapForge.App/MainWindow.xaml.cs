@@ -683,6 +683,7 @@ public partial class MainWindow : Window
     {
         EditorWorkspace.Visibility = Visibility.Visible;
         LibraryPane.Visibility = Visibility.Collapsed;
+        EditorStatusPanel.Visibility = Visibility.Visible;
         _suppressUiEvents = true;
         EditorTab.IsChecked = true;
         _suppressUiEvents = false;
@@ -698,6 +699,8 @@ public partial class MainWindow : Window
 
         EditorWorkspace.Visibility = Visibility.Collapsed;
         LibraryPane.Visibility = Visibility.Visible;
+        EditorStatusPanel.Visibility = Visibility.Collapsed;
+        SetStatus("Library: double-click or Enter opens a capture · F2 rename · Del moves to Trash · right-click for more.");
         _suppressUiEvents = true;
         LibraryTab.IsChecked = true;
         _suppressUiEvents = false;

@@ -108,7 +108,8 @@ internal static class ScreenshotTour
 
     private static void Save(Window window, string path, List<string> log)
     {
-        var root = (FrameworkElement)window.Content;
+        // Render the window's template root (no layout offset), so content margins are not shifted out of frame.
+        var root = (FrameworkElement)VisualTreeHelper.GetChild(window, 0);
         int w = (int)Math.Ceiling(root.ActualWidth), h = (int)Math.Ceiling(root.ActualHeight);
         var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
         var background = new DrawingVisual();

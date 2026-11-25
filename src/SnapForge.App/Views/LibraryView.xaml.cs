@@ -325,6 +325,7 @@ public partial class LibraryView : UserControl
 
     private void OnSearchChanged(object sender, TextChangedEventArgs e)
     {
+        SearchHint.Visibility = SearchBox.Text.Length == 0 ? Visibility.Visible : Visibility.Collapsed;
         _searchDelay.Stop();
         _searchDelay.Start();
     }

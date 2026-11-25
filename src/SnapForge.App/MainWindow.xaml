@@ -487,7 +487,7 @@
         <!-- Status bar -->
         <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,3">
             <DockPanel>
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center" x:Name="EditorStatusPanel">
                     <TextBlock x:Name="SaveStateText" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,16,0" VerticalAlignment="Center" />
                     <TextBlock x:Name="ImageInfo" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
                     <Button Style="{StaticResource ToolbarButton}" Click="OnZoomOut" ToolTip="Zoom out (Ctrl+−)" MinHeight="24" Padding="4,1" AutomationProperties.Name="Zoom out">
