@@ -6,8 +6,10 @@ public enum AnnotationTool
     Arrow,
     Line,
     Rectangle,
+    Highlight,
     Ellipse,
     Text,
     StepMarker,
     Redact,
+    Crop,
 }

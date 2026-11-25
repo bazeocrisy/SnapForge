@@ -86,6 +86,7 @@ internal static class AnnotationNames
         ArrowAnnotation => "arrow",
         LineAnnotation => "line",
         RectangleAnnotation => "rectangle",
+        HighlightAnnotation => "highlight",
         EllipseAnnotation => "ellipse",
         TextAnnotation => "text",
         StepMarkerAnnotation s => $"step {s.Number}",

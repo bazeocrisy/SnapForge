@@ -40,6 +40,8 @@ public sealed class UndoRedoHistory
 
     internal void Clear()
     {
+        // Keep the current state id stable so "dirty" tracking is unaffected by clearing.
+        _baseStateId = CurrentStateId;
         _undo.Clear();
         _redo.Clear();
     }
