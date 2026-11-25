@@ -55,7 +55,7 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: test-results
           path: TestResults
@@ -82,7 +82,7 @@ jobs:
           "### Portable build`n`nSnapForge.exe SHA-256: ``$hash``" | Out-File -Append $env:GITHUB_STEP_SUMMARY
 
       - name: Upload portable build
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v6
         with:
           name: SnapForge-portable-win-x64-dev-${{ github.sha }}
           path: artifacts/portable/SnapForge

@@ -36,6 +36,9 @@ internal sealed class AnnotationCanvas : Canvas
     private TextBox? _textEditor;
     private PointD _textPosition;
     private TextAnnotation? _textOriginal;
+    private ArgbColor _textEditColor;
+    private double _textEditFontSize;
+    private double _textEditStroke;
 
     public AnnotationCanvas()
     {
@@ -64,6 +67,22 @@ internal sealed class AnnotationCanvas : Canvas
     public bool HasSelection => _selectedId is not null && _document?.FindById(_selectedId.Value) is not null;
 
     public bool IsEditingText => _textEditor is not null;
+
+    /// <summary>True while a drag (draw, redact or move) is in progress.</summary>
+    public bool IsInGesture => _dragStart is not null || _moveOriginal is not null;
+
+    /// <summary>Abandons a drag in progress without committing it (before undo/redo/delete change the document).</summary>
+    public void CancelGesture()
+    {
+        if (!IsInGesture)
+        {
+            return;
+        }
+
+        ResetInteraction();
+        ReleaseMouseCapture();
+        InvalidateVisual();
+    }
 
     public static double FontSizeForStroke(double stroke) => stroke switch
     {
@@ -118,6 +137,7 @@ internal sealed class AnnotationCanvas : Canvas
         CurrentColor = color;
         if (_textEditor is not null)
         {
+            _textEditColor = color;
             _textEditor.Foreground = new SolidColorBrush(BitmapConversion.ToMediaColor(color));
         }
 
@@ -133,7 +153,9 @@ internal sealed class AnnotationCanvas : Canvas
         StrokeWidth = width;
         if (_textEditor is not null)
         {
-            _textEditor.FontSize = FontSizeForStroke(width);
+            _textEditFontSize = FontSizeForStroke(width);
+            _textEditStroke = width;
+            _textEditor.FontSize = _textEditFontSize;
         }
 
         if (SelectedAnnotation() is not { } selected)
@@ -155,6 +177,7 @@ internal sealed class AnnotationCanvas : Canvas
 
     public void DeleteSelection()
     {
+        CancelGesture();
         if (SelectedAnnotation() is { } selected)
         {
             _document!.Execute(new RemoveAnnotationCommand(selected));
@@ -206,10 +229,10 @@ internal sealed class AnnotationCanvas : Canvas
         {
             if (text.Length > 0)
             {
-                var annotation = WithMeasuredSize(new TextAnnotation(_textPosition, text, FontSizeForStroke(StrokeWidth))
+                var annotation = WithMeasuredSize(new TextAnnotation(_textPosition, text, _textEditFontSize)
                 {
-                    Color = CurrentColor,
-                    StrokeWidth = StrokeWidth,
+                    Color = _textEditColor,
+                    StrokeWidth = _textEditStroke,
                 });
                 _document.Execute(new AddAnnotationCommand(annotation));
             }
@@ -218,9 +241,20 @@ internal sealed class AnnotationCanvas : Canvas
         {
             _document.Execute(new RemoveAnnotationCommand(original));
         }
-        else if (text != original.Text)
+        else
         {
-            _document.Execute(new ReplaceAnnotationCommand(original, WithMeasuredSize(original with { Text = text }), "Edit text"));
+            // Color and size picked while the editor was open apply to the edited text too.
+            TextAnnotation edited = WithMeasuredSize(original with
+            {
+                Text = text,
+                Color = _textEditColor,
+                FontSize = _textEditFontSize,
+                StrokeWidth = _textEditStroke,
+            });
+            if (edited != original)
+            {
+                _document.Execute(new ReplaceAnnotationCommand(original, edited, "Edit text"));
+            }
         }
 
         InvalidateVisual();
@@ -395,7 +429,7 @@ internal sealed class AnnotationCanvas : Canvas
             Annotation? moved = _moveCurrent;
             ResetInteraction();
             ReleaseMouseCapture();
-            if (moved is not null && moved != original)
+            if (moved is not null && moved != original && _document.FindById(original.Id) == original)
             {
                 _document.Execute(new ReplaceAnnotationCommand(original, moved, "Move"));
             }
@@ -501,6 +535,9 @@ internal sealed class AnnotationCanvas : Canvas
         _selectedId = null;
         double fontSize = existing?.FontSize ?? FontSizeForStroke(StrokeWidth);
         ArgbColor color = existing?.Color ?? CurrentColor;
+        _textEditColor = color;
+        _textEditFontSize = fontSize;
+        _textEditStroke = existing?.StrokeWidth ?? StrokeWidth;
 
         _textEditor = new TextBox
         {

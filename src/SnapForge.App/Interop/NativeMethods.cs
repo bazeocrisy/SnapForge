@@ -147,7 +147,14 @@ internal static unsafe partial class NativeMethods
     public static partial uint GetWindowThreadProcessId(nint hWnd, out uint lpdwProcessId);
 
     [LibraryImport("user32.dll", EntryPoint = "GetWindowLongPtrW")]
-    public static partial nint GetWindowLongPtr(nint hWnd, int nIndex);
+    private static partial nint GetWindowLongPtr64(nint hWnd, int nIndex);
+
+    [LibraryImport("user32.dll", EntryPoint = "GetWindowLongW")]
+    private static partial int GetWindowLong32(nint hWnd, int nIndex);
+
+    /// <summary>GetWindowLongPtrW only exists in 64-bit user32; 32-bit Windows exports GetWindowLongW.</summary>
+    public static nint GetWindowLongPtr(nint hWnd, int nIndex) =>
+        nint.Size == 8 ? GetWindowLongPtr64(hWnd, nIndex) : GetWindowLong32(hWnd, nIndex);
 
     [LibraryImport("user32.dll", EntryPoint = "GetWindowTextW")]
     public static partial int GetWindowText(nint hWnd, char* lpString, int nMaxCount);

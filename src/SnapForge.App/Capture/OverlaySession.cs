@@ -128,12 +128,21 @@ internal sealed class OverlaySession
             _ => string.Empty,
         };
 
-        foreach (MonitorInfo monitor in layout.Monitors)
+        try
         {
-            var image = BitmapConversion.ToFrozenBitmap(_snapshot.Image.Crop(layout.ToBitmapSpace(monitor.Bounds)));
-            var window = new SelectionOverlayWindow(this, monitor.Bounds, image, hint);
-            _windows.Add(window);
-            window.Show();
+            foreach (MonitorInfo monitor in layout.Monitors)
+            {
+                var image = BitmapConversion.ToFrozenBitmap(_snapshot.Image.Crop(layout.ToBitmapSpace(monitor.Bounds)));
+                var window = new SelectionOverlayWindow(this, monitor.Bounds, image, hint);
+                _windows.Add(window);
+                window.Show();
+            }
+        }
+        catch
+        {
+            // Never leave topmost full-screen overlays behind if one of them fails to open.
+            Finish(null);
+            throw;
         }
 
         (int X, int Y) cursor = ScreenCaptureService.GetCursorPosition();

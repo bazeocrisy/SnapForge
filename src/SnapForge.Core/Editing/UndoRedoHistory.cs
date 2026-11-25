@@ -9,6 +9,7 @@ public sealed class UndoRedoHistory
     private readonly Stack<(IEditCommand Command, long StateId)> _redo = new();
     private readonly int _capacity;
     private long _nextStateId = 1;
+    private long _baseStateId;
 
     public UndoRedoHistory(int capacity = DefaultCapacity)
     {
@@ -28,8 +29,11 @@ public sealed class UndoRedoHistory
 
     public string? RedoDescription => _redo.Count > 0 ? _redo.Peek().Command.Description : null;
 
-    /// <summary>Identifies the document state; 0 is the freshly captured image.</summary>
-    public long CurrentStateId => _undo.Last?.Value.StateId ?? 0;
+    /// <summary>
+    /// Identifies the document state; 0 is the freshly captured image. When old steps are evicted the oldest
+    /// reachable state is no longer the fresh capture, so it keeps the id of the last evicted step.
+    /// </summary>
+    public long CurrentStateId => _undo.Last?.Value.StateId ?? _baseStateId;
 
     internal void Execute(IEditCommand command, EditorDocument document)
     {
@@ -39,6 +43,7 @@ public sealed class UndoRedoHistory
         while (_undo.Count > _capacity)
         {
             // The oldest step becomes permanent; the document state itself is unaffected.
+            _baseStateId = _undo.First!.Value.StateId;
             _undo.RemoveFirst();
         }
     }

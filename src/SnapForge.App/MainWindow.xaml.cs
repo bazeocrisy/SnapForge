@@ -69,10 +69,36 @@ public partial class MainWindow : Window
     protected override void OnClosing(CancelEventArgs e)
     {
         base.OnClosing(e);
+        if (_busy)
+        {
+            // A capture or save is in progress; closing now could leave overlays or a partial temp file.
+            e.Cancel = true;
+            return;
+        }
+
         Editor.CommitTextEdit();
         if (!e.Cancel && !ConfirmDiscard("close SnapForge"))
         {
             e.Cancel = true;
+        }
+    }
+
+    protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
+    {
+        base.OnDpiChanged(oldDpi, newDpi);
+        if (_document is null)
+        {
+            return;
+        }
+
+        // "100 %" means actual pixels on the current monitor, which just changed.
+        if (_fitMode)
+        {
+            ApplyFitZoom();
+        }
+        else
+        {
+            SetZoom(ZoomTransform.ScaleX, fitMode: false);
         }
     }
 
@@ -273,6 +299,7 @@ public partial class MainWindow : Window
 
     private void Undo()
     {
+        Editor.CancelGesture();
         Editor.CommitTextEdit();
         string? what = _document?.History.UndoDescription;
         if (_document?.Undo() == true)
@@ -283,6 +310,7 @@ public partial class MainWindow : Window
 
     private void Redo()
     {
+        Editor.CancelGesture();
         Editor.CommitTextEdit();
         string? what = _document?.History.RedoDescription;
         if (_document?.Redo() == true)

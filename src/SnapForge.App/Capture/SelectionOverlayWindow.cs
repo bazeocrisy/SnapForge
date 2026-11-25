@@ -188,12 +188,15 @@ internal sealed class SelectionOverlayWindow : Window
     protected override void OnMouseLeftButtonUp(MouseButtonEventArgs e)
     {
         base.OnMouseLeftButtonUp(e);
+
+        // Complete the gesture first: releasing capture raises LostMouseCapture synchronously, which would
+        // otherwise abandon the drag before it is evaluated.
+        _session.OnPointerUp();
         if (IsMouseCaptured)
         {
             ReleaseMouseCapture();
         }
 
-        _session.OnPointerUp();
         e.Handled = true;
     }
 

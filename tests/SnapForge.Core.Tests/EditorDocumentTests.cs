@@ -193,4 +193,21 @@ public class EditorDocumentTests
         Assert.Same(top, d.HitTest(new PointD(10, 15), 2));
         Assert.Null(d.HitTest(new PointD(40, 15), 2));
     }
+
+    [Fact]
+    public void Document_stays_dirty_after_undoing_everything_once_history_overflowed()
+    {
+        var d = new EditorDocument(new PixelBuffer(10, 10), historyCapacity: 2);
+        for (int i = 0; i < 3; i++)
+        {
+            d.Execute(new AddAnnotationCommand(Line(i)));
+        }
+
+        while (d.Undo())
+        {
+        }
+
+        Assert.Single(d.Annotations);
+        Assert.True(d.IsDirty);
+    }
 }
