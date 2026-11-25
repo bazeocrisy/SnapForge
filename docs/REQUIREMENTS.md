@@ -1,5 +1,8 @@
 # Product requirements
 
+> **Note (2026-11-25):** for new work see the proposed master list [PRODUCT-REQUIREMENTS.md](PRODUCT-REQUIREMENTS.md)
+> (Gate A, awaiting approval). This file remains the record of milestones 1–2; its IDs map to BL-* there.
+
 Version: milestone 2 (interface redesign and persistent Capture Library), 2026-11-25. Status column: **Done**
 (implemented and covered by automated tests or the acceptance checklist), **Partial**, **Planned** (not implemented —
 not shown as working in the UI).

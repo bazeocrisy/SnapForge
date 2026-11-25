@@ -224,6 +224,32 @@ Use a capture that has some text on it. Tools are on the left; colour and size a
 | PV7 | Settings → Retention: tick "Permanently delete captures in the Trash for more than 30 days". | Saved; "Apply retention now" reports what it did. |
 | PV8 | Unplug the network / turn on airplane mode and use SnapForge normally. | Everything works (SnapForge never needs the internet). |
 
+## Part 13 — Milestone 3 (proposed; NOT yet testable)
+
+> These checks describe features that are **not built yet**. They are listed so the owner can approve what "done"
+> will mean. Do not run them on the current build. Requirement IDs: [PRODUCT-REQUIREMENTS.md](PRODUCT-REQUIREMENTS.md).
+> Mark each result as tested on a **real Windows PC**; CI results are reported separately.
+
+| ID | Do this | You should see | Req |
+|----|---------|----------------|-----|
+| M3-P1 | Open the capture panel. | One compact horizontal panel: menus File/Edit/View/Help; left rail All-in-One / Image / Video (only Image active; the others say "Not available yet"); Selection/Effects/Share; four switches; big round Capture button with your hotkey under it; Presets, +, Open SnapForge Editor. | CAP-UI-01…11 |
+| M3-P2 | Use only the keyboard: Tab through the panel, Space to toggle, Enter to capture, Esc to close. | Every control is reachable and shows focus. | CAP-UI-13 |
+| M3-P3 | Turn on Windows high contrast; open the panel. | Readable, uses system colours. | CAP-UI-12, NFR-A11Y-03 |
+| M3-P4 | Windows 11: Settings → Accessibility → Keyboard → "Use the Print screen key to open screen capture" **on**, then **off**; press Print Screen each time. | On: SnapForge explains the key is taken and how to change it. Off: SnapForge captures. | CAP-HK-01 |
+| M3-W1 | Settings → Widget → enable. | A small tab appears at the top centre of the main screen. Your current window keeps focus. | WID-01/02/09 |
+| M3-W2 | Hover the tab; then move away. Switch to click mode and repeat. | Hover mode: expands with Capture / Editor / Library / Presets, collapses when you leave. Click mode: only expands on click. | WID-03/05 |
+| M3-W3 | Drag the widget to the left edge, then the right edge, then a second monitor with different scaling. Restart SnapForge. | It snaps to each edge, stays sharp, and returns to the last place after restart. | WID-04/08 |
+| M3-W4 | Turn on auto-hide; turn topmost off/on; take a capture. | Behaves as set; the widget is never in the captured image. | WID-06/07/10 |
+| M3-D1 | Drag one tray thumbnail to the desktop. | A PNG with a readable name appears; the capture stays in SnapForge. | DND-01/03/05/06 |
+| M3-D2 | Select 3 items in the Library; drag them into an Explorer folder. | Three PNG files. | DND-02 |
+| M3-D3 | Drag a capture with a redaction into Word, PowerPoint, OneNote, an Outlook email, a Teams chat and a browser upload page. Record each result. | Each target receives an image; the redacted area is solid; nothing editable is attached. Note any app that refuses. | DND-11, PRIV-DND-01/02 |
+| M3-D4 | Settings → Drag and drop → JPEG; drag again. | A .jpg is produced. | DND-04 |
+| M3-D5 | Start a drag and press Esc; drop back onto the tray to reorder. | No files created; the tray order changes only for the reorder. | DND-08/09 |
+| M3-D6 | Drag a PNG from Explorer into the Library. | It is imported as a new capture. | DND-10 |
+| M3-S1 | Settings → Startup → Launch with Windows; sign out and in. | SnapForge starts in the notification area. | SET-01 |
+| M3-S2 | Run SnapForge from a standard (non-administrator) Windows account. | Everything above works. | NFR-SEC-04 |
+| M3-S3 | Turn on Narrator; move through the panel and the widget. | Each control's name and state are announced. | NFR-A11Y-02 |
+
 ---
 
 ## When you're done

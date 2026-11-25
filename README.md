@@ -72,6 +72,7 @@ The Windows projects compile on Linux/macOS (`EnableWindowsTargeting`) but run o
 
 ## Documentation
 
+* **Milestone 3 Gate A (proposed, awaiting approval):** [forensic audit](docs/SNAGIT-FORENSIC-AUDIT.md) · [feature parity matrix](docs/FEATURE-PARITY-MATRIX.md) · [master requirements](docs/PRODUCT-REQUIREMENTS.md) · [UI specification](docs/UI-SPECIFICATION.md) · [roadmap](docs/DEVELOPMENT-ROADMAP.md) · [source registry](docs/SOURCE-REGISTRY.md)
 * [Architecture and decisions](docs/ARCHITECTURE.md)
 * [Requirements and acceptance criteria](docs/REQUIREMENTS.md)
 * [Security and privacy model](docs/SECURITY.md)

@@ -17,7 +17,7 @@ every milestone. Requirement IDs are defined in [PRODUCT-REQUIREMENTS.md](PRODUC
 | M6 — offline intelligent tools | Offline OCR (Windows.Media.Ocr), grab text, OCR library search, smart redaction of detected text patterns (offline only), background removal only if an offline, licence-compatible model exists | M5 accepted | Licence review of every model |
 | M7 — documentation/templates | Combine images, step templates, captions, reusable templates, PDF output | M6 accepted | — |
 | M8 — video/audio | Screen recording (MP4 via Media Foundation), mic/system audio, webcam, pause/resume, trim, GIF, still extraction | M7 accepted | Codec licensing review |
-| M9 — enterprise/release readiness | Code signing, MSI/MSIX, silent install/uninstall, policy settings, SBOM, accessibility conformance review, controlled updates | Owner decisions D-1…D-5 | Release candidate (still no publication without approval) |
+| M9 — enterprise/release readiness | Code signing, MSI/MSIX, silent install/uninstall, policy settings, SBOM, accessibility conformance review, controlled updates | Owner decisions Q-12 (audit §7) | Release candidate (still no publication without approval) |
 
 ## M3 Gate B work breakdown (for approval)
 
@@ -29,7 +29,7 @@ every milestone. Requirement IDs are defined in [PRODUCT-REQUIREMENTS.md](PRODUC
    a private per-user temp folder; delayed cleanup; JPEG option; filename pattern; reorder-vs-export distinction.
 4. **Drag privacy** (PRIV-DND-01…08): exports only flattened, redacted pixels; no `.sfcap`, no base image, metadata
    stripped; temp files ACL'd to the user, deleted on a schedule and on exit; pixel-level regression tests.
-5. **Image import** (LIB-IMP-01): drop or open PNG/JPEG/BMP into the Library.
+5. **Image import** (DND-10): drop or open PNG/JPEG/BMP into the Library.
 6. **Scale benchmarks** (PERF-01…06): production durability (no `SkipDiskFlush`) at 100/1 000/5 000/10 000/25 000
    captures where CI time permits; report startup, memory, search, thumbnails, autosave latency, UI responsiveness;
    fix the synchronous start-up index if measurements confirm the risk (DEF-02).

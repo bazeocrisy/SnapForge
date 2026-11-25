@@ -9,10 +9,10 @@ Design rules that apply to every surface:
   (`references/snagit-capture-panel.png` in the owner's handoff package, not committed) is used only as *functional
   layout guidance*: which controls exist and roughly where. No TechSmith artwork, icons, colours, names or text.
 * **No fake controls.** A function that is not implemented is either absent or shown disabled with the label
-  "Not available yet" in its tooltip and automation name (UI-G4). It never looks or behaves as if it worked.
-* **Light, dark and Windows high-contrast themes**, all colours from theme resources (UI-G2).
+  "Not available yet" in its tooltip and automation name (G-02). It never looks or behaves as if it worked.
+* **Light, dark and Windows high-contrast themes**, all colours from theme resources (CAP-UI-12, NFR-A11Y-03).
 * **Keyboard first.** Every command reachable by keyboard; visible focus; access keys on menus; automation names on
-  every icon-only control (UI-G3, NFR-A11Y-*).
+  every icon-only control (NFR-A11Y-01…03).
 * **Per-monitor DPI** (Per-Monitor V2 manifest already present) — layouts tested at 100/125/150/200 % (NFR-DPI-1).
 
 ## 1. Capture control panel (Gate B item 1; requirements CAP-UI-01…CAP-UI-14)
@@ -48,6 +48,7 @@ implemented; only the arrangement differs from the reference. M3 rearranges; it 
 
 | State | Proposal |
 |---|---|
+| Reference | Snagit docks a widget on the top or side edges and opens it on hover (S-CAP-06, DOC search extract); auto-hide, topmost and multi-monitor behaviour are undocumented, so SnapForge defines them here |
 | Collapsed | Small tab (≈ 48×12 logical px) docked to the **top centre** of the primary monitor by default; translucent, theme coloured; no taskbar button; never steals focus (`WS_EX_NOACTIVATE`, `WS_EX_TOOLWINDOW`) |
 | Expanded | On hover (300 ms intent delay) or click: a small strip with **Capture**, **Editor**, **Library**, **Presets ▾** buttons and a tooltip showing the capture hotkey |
 | Docking | Drag along the top, left or right edge of any monitor; snaps to edge; position stored as (monitor device name, edge, offset fraction) so mixed DPI and monitor reordering restore sensibly |
@@ -72,7 +73,7 @@ customisation (More ▸ overflow).
 Today: horizontal scrolling thumbnails, selected indicator, pin, close-without-delete, delete, context menu,
 show/hide, persisted. M3 adds **native drag-out** (DND-01…DND-12): dragging a tile shows a drag image of the
 thumbnail with a count badge for multi-selection; dropping outside the app produces flattened PNG files (copy
-effect); dragging within the tray reorders (only when the drop target is the tray itself). Esc cancels.
+effect — Snagit offers a user-selected drag-out file type since 2024.1.2, S-LIB-03); dragging within the tray reorders (only when the drop target is the tray itself). Esc cancels.
 
 ## 5. Library (existing; M3 adds drag-out and image import)
 
