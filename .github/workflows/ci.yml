@@ -74,6 +74,10 @@ jobs:
           path: TestResults
           retention-days: 14
 
+      # Lock files cover build/test restores. Publishing adds only SDK-implied packages (runtime packs and
+      # Microsoft.NET.ILLink.Tasks, versions dictated by the SDK); the shipped projects reference no packages.
+      # Those cannot be expressed in a build-time lock file, so locked mode is off for this restore only.
+      # Package signature validation (nuget.config: require nuget.org repository signature) still applies.
       - name: Publish portable build (self-contained, single-file exe + WPF native DLLs, win-x64)
         run: >
           dotnet publish src/SnapForge.App/SnapForge.App.csproj -c Release -r win-x64
@@ -82,6 +86,7 @@ jobs:
           -p:EnableCompressionInSingleFile=true
           -p:DebugType=none
           -p:ContinuousIntegrationBuild=true
+          -p:RestoreLockedMode=false
           -o artifacts/portable/SnapForge
 
       - name: Add license, notices, instructions and SHA-256 checksums
