@@ -50,6 +50,7 @@ internal static class ScreenshotTour
             log.Add($"Desktop: {string.Join("; ", layout.Monitors.Select(m => $"{m.DeviceName} {m.Bounds.Width}x{m.Bounds.Height} at {m.DpiScale * 100:0}%"))}");
             foreach (ThemePreference theme in new[] { ThemePreference.Dark, ThemePreference.Light })
             {
+                services.UpdateSettings(x => x with { Theme = theme });
                 ThemeManager.Apply(theme);
                 string suffix = theme == ThemePreference.Dark ? "dark" : "light";
                 double dip = layout.Monitors[0].DpiScale;
@@ -170,6 +171,8 @@ internal static class ScreenshotTour
     /// <summary>Brings the window to the front and saves the screen pixels it covers (plus an optional margin).</summary>
     private static void SaveScreen(Window window, int? margin, string path, List<string> log)
     {
+        // Park the pointer in a corner so no hover state or tooltip from a previous step is captured.
+        Interop.NativeMethods.SetCursorPos(0, 767);
         bool wasTopmost = window.Topmost;
         window.Topmost = true;
         if (window.ShowActivated)
