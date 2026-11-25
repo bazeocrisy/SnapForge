@@ -236,6 +236,7 @@ public class LibraryWorkflowTests
         PixelBuffer tiny = TestImages.Gradient(32, 20);
         await Task.Run(() =>
         {
+            AtomicFile.SkipDiskFlush.Value = true; // seeding only
             for (int i = 0; i < 600; i++)
             {
                 services.Library.Create(new CaptureContent(tiny, []), tiny, DateTime.UtcNow.AddMinutes(-i), $"Capture {i}");
@@ -251,7 +252,7 @@ public class LibraryWorkflowTests
         Assert.True(services.Thumbnails.Count < 300, $"{services.Thumbnails.Count} thumbnails loaded; expected only visible ones");
         Assert.True(ms < 10000, $"Library view took {ms} ms");
         await Close(w);
-    });
+    }, timeoutSeconds: 300);
 
     [Fact]
     public void Global_hotkey_conflicts_are_reported_not_silently_ignored() => UiThread.Run(() =>

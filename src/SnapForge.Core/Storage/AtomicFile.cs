@@ -14,6 +14,9 @@ public static class AtomicFile
     /// <summary>Test hook: wraps the temporary-file stream (used to simulate disk-full and interrupted writes).</summary>
     internal static AsyncLocal<Func<Stream, Stream>?> WriteDecorator { get; } = new();
 
+    /// <summary>Test hook: skip the flush-to-disk (only for seeding large test libraries quickly).</summary>
+    internal static AsyncLocal<bool> SkipDiskFlush { get; } = new();
+
     public static void Write(string path, Action<Stream> write)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(path);
@@ -29,7 +32,7 @@ public static class AtomicFile
                 Stream target = WriteDecorator.Value?.Invoke(file) ?? file;
                 write(target);
                 target.Flush();
-                file.Flush(flushToDisk: true);
+                file.Flush(flushToDisk: !SkipDiskFlush.Value);
             }
 
             File.Move(temp, full, overwrite: true);

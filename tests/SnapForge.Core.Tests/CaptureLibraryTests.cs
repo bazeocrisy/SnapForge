@@ -395,9 +395,17 @@ public class CaptureLibraryTests
         using var dir = new TestDirectory();
         var lib = CaptureLibrary.Open(dir.Path);
         PixelBuffer tiny = PixelBufferTests.Gradient(8, 8);
-        for (int i = 0; i < 1500; i++)
+        AtomicFile.SkipDiskFlush.Value = true; // seeding only; durability is tested elsewhere
+        try
         {
-            lib.Create(new CaptureContent(tiny, []), tiny, Now.AddMinutes(-i), $"Capture {i:D4}");
+            for (int i = 0; i < 1500; i++)
+            {
+                lib.Create(new CaptureContent(tiny, []), tiny, Now.AddMinutes(-i), $"Capture {i:D4}");
+            }
+        }
+        finally
+        {
+            AtomicFile.SkipDiskFlush.Value = false;
         }
 
         var sw = Stopwatch.StartNew();
