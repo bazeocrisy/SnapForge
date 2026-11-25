@@ -667,16 +667,16 @@
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
         <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
         <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
-        <Setter Property="Margin" Value="0,2" />
+        <Setter Property="Margin" Value="0,1" />
         <Setter Property="Template">
             <Setter.Value>
                 <ControlTemplate TargetType="RadioButton">
-                    <Border x:Name="Bd" CornerRadius="8" Padding="4,6" Background="Transparent">
+                    <Border x:Name="Bd" CornerRadius="8" Padding="4,3" Background="Transparent">
                         <StackPanel>
-                            <Border x:Name="IconBg" Width="34" Height="30" CornerRadius="7" HorizontalAlignment="Center">
+                            <Border x:Name="IconBg" Width="34" Height="26" CornerRadius="7" HorizontalAlignment="Center">
                                 <Path x:Name="Icon" Style="{StaticResource IconPath}" Data="{TemplateBinding Tag}" HorizontalAlignment="Center" VerticalAlignment="Center" />
                             </Border>
-                            <TextBlock x:Name="Label" Text="{TemplateBinding Content}" FontSize="11" HorizontalAlignment="Center" Margin="0,3,0,0" />
+                            <TextBlock x:Name="Label" Text="{TemplateBinding Content}" FontSize="11" HorizontalAlignment="Center" Margin="0,1,0,0" />
                         </StackPanel>
                     </Border>
                     <ControlTemplate.Triggers>

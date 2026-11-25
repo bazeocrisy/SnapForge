@@ -162,9 +162,24 @@ public partial class CaptureWidget : Window
     private void MakeNonActivating()
     {
         nint hwnd = new WindowInteropHelper(this).Handle;
+        HwndSource.FromHwnd(hwnd)?.AddHook(RefuseMouseActivation);
         nint ex = NativeMethods.GetWindowLongPtr(hwnd, NativeMethods.GWL_EXSTYLE);
         NativeMethods.SetWindowLongPtr(hwnd, NativeMethods.GWL_EXSTYLE, (nint)((long)ex | NativeMethods.WS_EX_NOACTIVATE | NativeMethods.WS_EX_TOOLWINDOW));
         Reposition();
+    }
+
+    /// <summary>WM_MOUSEACTIVATE → MA_NOACTIVATE: clicks work but never activate the widget.</summary>
+    private static nint RefuseMouseActivation(nint hwnd, int msg, nint wParam, nint lParam, ref bool handled)
+    {
+        const int WM_MOUSEACTIVATE = 0x0021;
+        const int MA_NOACTIVATE = 3;
+        if (msg == WM_MOUSEACTIVATE)
+        {
+            handled = true;
+            return MA_NOACTIVATE;
+        }
+
+        return 0;
     }
 
     private void OnDisplaySettingsChanged(object? sender, EventArgs e) => Dispatcher.BeginInvoke(Reposition);
