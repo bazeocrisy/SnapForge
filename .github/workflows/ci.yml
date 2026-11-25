@@ -23,6 +23,7 @@ env:
   #   actions/checkout        v5 = fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
   #   actions/setup-dotnet    v5 = 26b0ec14cb23fa6904739307f278c14f94c95bf1
   #   actions/upload-artifact v6 = b7c566a772e6b6bfb58ed0dc250532a479d7789f
+  #   actions/download-artifact v6 = 018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
 
 jobs:
   windows:
@@ -118,7 +119,7 @@ jobs:
     timeout-minutes: 15
     steps:
       - name: Download the uploaded artifact (exactly what testers download)
-        uses: actions/download-artifact@v6
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
         with:
           name: ${{ needs.windows.outputs.artifact }}
           path: portable

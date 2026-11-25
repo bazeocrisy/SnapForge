@@ -32,7 +32,10 @@ Captured pixels, window titles (read only to pick windows, never stored), files 
   the files match what CI produced, not who produced them.
 * No build provenance attestation (GitHub artifact attestations need `id-token: write`; availability for this
   repository's plan was not verified).
-* `actions/download-artifact` in the verification job is referenced by tag (`v6`) until its commit SHA is pinned.
+* `actions/download-artifact@v6` targets Node.js 20, which GitHub now runs on Node.js 24 with a deprecation
+  warning; move to a newer major (re-pinned by SHA) when available.
+* Packages restored only at publish time (runtime packs, `Microsoft.NET.ILLink.Tasks`, chosen by the SDK) are not
+  in the lock files; they are still subject to required nuget.org signature validation.
 * Freed memory is not explicitly zeroed (managed runtime); a memory dump taken while SnapForge is running
   or shortly after could contain screenshot data.
 * Window titles of other applications are read into memory during window selection (needed to enumerate

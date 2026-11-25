@@ -69,5 +69,5 @@ Consequences:
 
 | Environment | What ran | Result |
 |-------------|----------|--------|
-| GitHub Actions `windows-2025` (Windows Server 2025, build 10.0.26100 — same build family as Windows 11 24H2) | Build, all automated tests incl. real GDI capture, clipboard and real-input UI tests; self-test of the portable exe with .NET hidden | See latest CI run |
+| GitHub Actions `windows-2025` image (Windows Server 2025 Datacenter, build 10.0.26100 — same build family as Windows 11 24H2), one 1024×768 display at 100 % | Build; 92 core + 24 Windows tests incl. real GDI capture, clipboard and real-input UI tests; portable exe `--self-test` on a second runner with all .NET installations renamed away | All passed (CI run 45677731785, commit df6fb08) |
 | Physical Windows 10 or Windows 11 client PC | **Nothing yet** | Manual acceptance testing pending |
