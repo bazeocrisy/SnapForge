@@ -1,5 +1,7 @@
 <p align="center"><img src="docs/snapforge-icon.png" width="72" alt="SnapForge icon"></p>
 
+<p align="center"><img src="docs/screenshots/editor-dark.jpg" width="640" alt="SnapForge Editor"></p>
+
 # SnapForge
 
 A fast, private screenshot and annotation tool for Windows 10 and 11, built with C#, .NET 10 and WPF.
@@ -74,6 +76,7 @@ The Windows projects compile on Linux/macOS (`EnableWindowsTargeting`) but run o
 * [Requirements and acceptance criteria](docs/REQUIREMENTS.md)
 * [Security and privacy model](docs/SECURITY.md)
 * [Research: capture APIs, dependencies, licensing, naming](docs/RESEARCH.md)
+* [Screenshots of the three workspaces](docs/screenshots/README.md)
 * [Competitive analysis (Snagit as usability reference)](docs/COMPETITIVE-ANALYSIS.md)
 * [Editable capture format v1](docs/CAPTURE-FORMAT.md)
 * [Redaction pipeline review](docs/REDACTION.md)
