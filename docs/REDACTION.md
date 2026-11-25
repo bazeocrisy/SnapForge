@@ -4,12 +4,16 @@ Date: 2026-11-25. Scope: annotations, clipboard, files, metadata, undo history, 
 
 ## Two different things: editing vs. exported output
 
-| | **While editing (reversible)** | **Exported image (irreversible)** |
+| | **Editable copy (reversible)** — Editor, Library, `.sfcap`, backups | **Exported image (irreversible)** — PNG/JPEG, clipboard |
 |--|-------------------------------|-----------------------------------|
-| What happens | Pixels in the redacted area are overwritten with black in the working image, and an opaque black block is placed above every annotation that existed at that moment | The PNG/JPEG file or clipboard image is produced from the redacted working image plus all annotations (including the black blocks) |
-| Can it be undone? | **Yes** — Undo restores the original pixels and removes the block. The originals are held only in memory, inside the undo history | **No** — the file/clipboard image never contains the original pixels or the covered annotations; there is no hidden layer |
-| When does it become permanent? | Never inside the editor | At the moment of Save or Copy |
-| What is *not* changed | Anything you copied or saved **before** redacting | — |
+| What happens | The visible image shows black in the redacted area and an opaque block covers every earlier annotation; the **base image keeps the original pixels** | The output is produced from the visible image plus all annotations (including the blocks) |
+| Can it be undone? | **Yes**, while editing *and after restarting*: the Library stores the base image and the redaction as an object | **No** — the file/clipboard image never contains the original pixels or the covered annotations |
+| Where do originals live? | In memory and **on disk in the Library** (`base.sfpx`), and in any `.sfcap` export or backup ZIP made before sanitizing | Nowhere in the output |
+| How to make it permanent in the Library | **Sanitize** (File → Sanitize, Library → Sanitize, Settings → Sanitize all) | Already permanent |
+| What is *not* changed by sanitizing | Exports, `.sfcap` packages and backups made earlier; Windows clipboard history | — |
+
+The UI warns about the editable state: a banner in the Editor, an "Unsanitized redactions" badge on Library tiles, a
+count in Settings → Privacy, and a confirmation before exporting an unsanitized `.sfcap`.
 
 The status bar states this when the Redact tool is chosen, and warns when a redaction changes after the image
 was already copied or saved.
@@ -31,8 +35,13 @@ was already copied or saved.
 6. **Save** — written to a temporary file in the destination folder, then renamed; on any failure the
    temporary file is deleted. No other temporary files are created.
 7. **Copy** — the same flattened image is placed on the clipboard as a bitmap and as PNG.
-8. **Discard** — when a new capture replaces the current one, or the app closes, the working image and every
-   retained original-pixel block in the undo/redo history are zeroed and dropped.
+8. **Library autosave** — the base image (with originals), the annotations (including redaction regions) and a
+   thumbnail of the *visible* image are written atomically. Thumbnails never contain redacted originals.
+9. **Sanitize** — burns redactions into the base image, rasterizes annotations hidden under a redaction into the image
+   and removes them as objects (so hidden text is not left in `annotations.json`), clears undo history, regenerates
+   the thumbnail, and overwrites the old `base.sfpx` and `thumb.sfpx` with zeros before replacing them.
+10. **Close / evict** — document buffers in memory are zeroed when a capture is closed or evicted from the session
+    cache; the full-desktop capture frame is zeroed right after cropping.
 
 ## Evidence (automated tests)
 
@@ -46,10 +55,17 @@ was already copied or saved.
 | Save leaves no temporary files; failure leaves nothing | `ExportTests.Save_*` |
 | Mask placement, unselectable, undo/redo | `EditorDocumentTests.Redaction_places_unselectable_mask_*` |
 | Undo restores originals in session; overlapping redactions | `EditorDocumentTests.Redaction_permanently_changes_pixels_*`, `Overlapping_redactions_undo_in_order` |
-| Discard wipes retained originals (undo and redo branches) | `EditorDocumentTests.Discard_*` |
+| Discard wipes in-memory buffers | `EditorDocumentTests.Discard_*` |
+| Sanitize removes originals and hidden annotation text from stored files; crash-safe | `CaptureLibraryTests.Sanitize_*`, `Interrupted_sanitize_*`, `LibraryWorkflowTests.Sanitize_*` |
+| Reopened capture re-applies redactions; editable copy keeps originals (documented) | `CaptureLibraryTests.Reopened_annotations_*`, `LibraryWorkflowTests.New_capture_*` |
 | Redaction by real mouse drag covers pixels and earlier arrow | `InteractiveUiTests.Annotations_can_be_drawn_*` |
 
 ## Residual risks (outside SnapForge's control or not yet addressed)
+
+* **Unsanitized library captures keep original pixels on disk** by design (reversible editing). Anyone with access
+  to the user profile, a backup ZIP or an exported `.sfcap` can recover them. Sanitize before sharing editable files.
+* **Overwrite-before-delete is best effort**: SSD wear-levelling, copy-on-write file systems, Volume Shadow Copies,
+  File History, cloud-synced folders and earlier backups can keep old file contents.
 
 * **Earlier exports**: a copy or file made before redacting keeps the original. Windows clipboard history
   (Win+V) and cloud clipboard sync may retain earlier clipboard items; the user must clear them.

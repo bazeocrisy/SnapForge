@@ -172,6 +172,11 @@ jobs:
           if (Test-Path "$out\screenshots.txt") { Get-Content "$out\screenshots.txt" }
           Write-Output "Exit code: $($p.ExitCode)"
           if ($p.ExitCode -ne 0) { throw "Screenshot tour failed." }
+          foreach ($f in Get-ChildItem "$out\preview" -Filter *.jpg) {
+            Write-Output "PREVIEW-BEGIN $($f.Name)"
+            Write-Output ([Convert]::ToBase64String([IO.File]::ReadAllBytes($f.FullName)))
+            Write-Output "PREVIEW-END $($f.Name)"
+          }
 
       - name: Upload screenshots
         if: always()

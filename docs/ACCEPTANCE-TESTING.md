@@ -1,7 +1,7 @@
 # SnapForge — Windows acceptance test (step-by-step guide)
 
 This guide is written for someone who is **not a developer**. You need a Windows 10 or Windows 11 PC,
-about 60–90 minutes, and a GitHub account that can see the SnapForge repository.
+about 2–3 hours (Parts 1–8 cover the original features; Parts 9–12 the new Capture window, Library and privacy features), and a GitHub account that can see the SnapForge repository.
 
 Record your results in **ACCEPTANCE-RESULTS-TEMPLATE.md** (it is in the same download). For every check,
 write **Pass**, **Fail** or **Skipped**, and for a failure write one sentence about what you saw and attach a
@@ -158,6 +158,71 @@ Use a capture that has some text on it. Tools are on the left; colour and size a
 | H2 | Change the display **Scale** in Settings while SnapForge is open, then capture. | Correct, sharp result. |
 | H3 | Unplug a monitor, then capture. | Works with the remaining monitor(s). |
 | H4 | Open **Task Manager**, note SnapForge's memory, take ten captures, check again. | Memory does not keep growing with every capture. |
+
+---
+
+## Part 9 — Capture window, hotkeys and notification area (milestone 2)
+
+| ID | Do this | You should see |
+|----|---------|----------------|
+| W1 | Look at the bottom-right of the taskbar (click ^ if needed). | A SnapForge icon. Left-click it: the SnapForge window comes to the front. Right-click: a menu with Capture, Capture window, Editor, Library, Settings, Exit. |
+| W2 | In SnapForge click the ⚙ next to the orange **Capture** button (or Capture menu → Capture window). | A small "Capture" window with a big Capture button, four selection buttons, options, Delay and Presets. |
+| W3 | Choose **Region**, turn **Preview in Editor** on, click **Capture**, drag a box. | The capture opens in the Editor. |
+| W4 | Turn **Preview in Editor** off and **Copy to clipboard** on, capture again, then paste into Paint. | The Editor does not appear; a Windows notification says it was saved and copied; Paint shows the image. |
+| W5 | Set **Delay** to 3 s and capture. | A round countdown 3-2-1 appears, then the selection screen. Press Esc during the countdown on another try: nothing is captured. |
+| W6 | Turn on **Capture mouse pointer**, capture full screen. | The mouse pointer is visible in the image. |
+| W7 | Close SnapForge's main window with ✕. | A notification says SnapForge is still running. Pressing the capture hotkey still works. Exit from the icon's right-click menu really quits. |
+| W8 | Press **Print Screen** (default hotkey). | Capture starts. **If nothing happens or SnapForge says the key is in use**, Windows is using it for the Snipping Tool: Settings → Accessibility → Keyboard → turn off "Use the Print screen key to open screen capture", restart SnapForge, try again. Record which case you saw. |
+| W9 | Settings → Hotkeys: click the box, press **Ctrl+Shift+F9**. Press Ctrl+Shift+F9 anywhere. | The box shows the new hotkey with a ✓; pressing it starts a capture. |
+| W10 | In the Capture window, right-click a preset → Set hotkey… → enter the same Ctrl+Shift+F9. | SnapForge reports the conflict ("Already used by another SnapForge action" or similar) instead of silently ignoring it. |
+| W11 | Click "+ Save current as preset", name it. Use it via its **Capture** button. Right-click → Rename, then Delete. | Each step works; the preset list updates. |
+| W12 | Start SnapForge a second time (double-click the exe again). | No second copy appears; the existing window comes to the front. |
+
+## Part 10 — Editor redesign
+
+| ID | Do this | You should see |
+|----|---------|----------------|
+| N1 | Look at the Editor. | Menu bar at the top, orange Capture button with Editor/Library tabs, a row of tools with labels, the image in the middle, Quick Styles and Tool Properties on the right, Recent Captures along the bottom, zoom and size in the bottom bar. |
+| N2 | Drag the divider between image and right panel; then click the panel button (top-right of the toolbar). | The panel resizes; then hides; click again to show. View menu → Show Recent Captures hides/shows the tray. |
+| N3 | **Highlight** tool (H): drag over text. | A translucent yellow/colored box. |
+| N4 | **Crop** tool (C): drag around part of the image. | Outside area dims while dragging; after release only the selected part remains. Ctrl+Z restores it. |
+| N5 | Click a Quick Style, draw an arrow. Click "+ Save current", name it; right-click it → Add to favorites. | The arrow uses that style; the new style appears; favorites move to the front with a star. |
+| N6 | Select an arrow (Select tool) and change color and thickness in Tool Properties. | The selected arrow changes; each change can be undone. |
+| N7 | View → Theme → Light, then Dark, then "Use Windows setting". | All windows switch theme immediately and stay legible (menus, tray, Library, Capture window, Settings). |
+| N8 | Use only the keyboard: Alt opens the menus, arrow keys move, Enter chooses; Tab moves through toolbar, panel and tray; letter keys (V A L R E H T N X C) choose tools. | Everything is reachable without a mouse (report anything that is not). |
+
+## Part 11 — Capture Library and Recent Captures Tray
+
+| ID | Do this | You should see |
+|----|---------|----------------|
+| LB1 | Take 5 captures. Click the **Library** tab. | All 5 appear as thumbnails under "Today", newest first. The sidebar shows counts and where the library is stored. |
+| LB2 | Close SnapForge completely (icon → Exit), start it again, open the Library. | All captures are still there. |
+| LB3 | Double-click one. | It opens in the Editor with its annotations still editable (move an arrow). |
+| LB4 | Library: drag the **Size** slider; use **Sort**. | Thumbnails resize; order changes. |
+| LB5 | Right-click a capture → Rename…, Tags… ("bug, ui"), Move to folder… ("Project"), Toggle favorite. | The sidebar lists the tag and folder; clicking them, or Favorites, filters the grid. |
+| LB6 | Type part of a name or tag in **Search**. | Only matching captures remain. |
+| LB7 | Ctrl+click and Shift+click to select several; Export… | Asked for a folder; one PNG per capture is written there. |
+| LB8 | Select one → Move to Trash. Open **Trash** → Restore. Move it to Trash again → Delete permanently… | Restore brings it back; permanent delete asks for confirmation and removes it. |
+| LB9 | Duplicate a capture. | A "(copy)" appears and can be edited independently. |
+| TR1 | In the Editor, look at the tray. Click different thumbnails. | Each opens on the canvas; the current one has an orange border. |
+| TR2 | Make an edit and watch the thumbnail. | A dot appears briefly while saving, then the thumbnail updates with your edit. |
+| TR3 | Right-click a thumbnail → Pin to tray. Restart SnapForge. | It stays pinned at the left after restart. |
+| TR4 | Right-click a thumbnail → Close (keep in Library). | It leaves the tray but is still in the Library. |
+| TR5 | Right-click a thumbnail → Delete capture… | It goes to the Library's Trash and leaves the tray. |
+| TR6 | Take more than 10 captures; scroll the tray with the mouse wheel. | The tray scrolls sideways. |
+
+## Part 12 — Privacy, storage and sanitize
+
+| ID | Do this | You should see |
+|----|---------|----------------|
+| PV1 | First start (or Help → Where are my captures?). | A notice explains captures are saved locally, shows the folder, and how to turn it off. |
+| PV2 | Capture window: turn **Save to Library** off; capture with Preview on. | A banner says "Captured without history"; the Library count does not change; closing that capture asks before discarding it. |
+| PV3 | Redact text in a capture saved to the Library. | A yellow banner warns the Library copy still keeps the originals; the Library tile shows "Unsanitized redactions". Exported PNG (R4 in Part 6) still shows only black. |
+| PV4 | Close SnapForge, restart, reopen that capture, press Ctrl+Z repeatedly / select and remove nothing — instead use File → Sanitize… and confirm. | The banner disappears; the Library tile badge disappears; Ctrl+Z can no longer bring back the text. |
+| PV5 | Settings → Library → **Back up library…**, then on another PC (or after deleting a capture) **Restore from backup…** | The captures come back; existing captures are not duplicated. |
+| PV6 | Settings → Library → **Change location…** → choose an empty folder. | After the move, the Library still lists everything and the old folder is empty. Avoid a OneDrive folder unless you want them uploaded. |
+| PV7 | Settings → Retention: tick "Permanently delete captures in the Trash for more than 30 days". | Saved; "Apply retention now" reports what it did. |
+| PV8 | Unplug the network / turn on airplane mode and use SnapForge normally. | Everything works (SnapForge never needs the internet). |
 
 ---
 

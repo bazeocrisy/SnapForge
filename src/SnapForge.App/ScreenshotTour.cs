@@ -121,8 +121,23 @@ internal static class ScreenshotTour
         rtb.Render(root);
         var encoder = new PngBitmapEncoder();
         encoder.Frames.Add(BitmapFrame.Create(rtb));
-        using FileStream fs = File.Create(path);
-        encoder.Save(fs);
+        using (FileStream fs = File.Create(path))
+        {
+            encoder.Save(fs);
+        }
+
+        // Small JPEG preview (for quick review where the full artifact cannot be downloaded).
+        string previewDir = Path.Combine(Path.GetDirectoryName(path)!, "preview");
+        Directory.CreateDirectory(previewDir);
+        double scale = Math.Min(1.0, 720.0 / w);
+        var small = new TransformedBitmap(rtb, new ScaleTransform(scale, scale));
+        var jpeg = new JpegBitmapEncoder { QualityLevel = 55 };
+        jpeg.Frames.Add(BitmapFrame.Create(small));
+        using (FileStream fs = File.Create(Path.Combine(previewDir, Path.GetFileNameWithoutExtension(path) + ".jpg")))
+        {
+            jpeg.Save(fs);
+        }
+
         log.Add($"{Path.GetFileName(path)} {w}x{h}");
     }
 

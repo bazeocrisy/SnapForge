@@ -8,15 +8,24 @@ SnapForge.sln
 │  ├─ Geometry/              PixelRect (screen/image ints), RectD/PointD (sub-pixel annotation space)
 │  ├─ Imaging/               PixelBuffer (BGRA32), ArgbColor, ImageCompositor (exact source-over blend)
 │  ├─ Capture/               MonitorInfo, ScreenLayout (virtual desktop math), WindowCandidate, WindowPicker
-│  ├─ Annotations/           Immutable annotation records + hit testing, arrow geometry, step numbering
-│  ├─ Editing/               EditorDocument, UndoRedoHistory, commands (add/remove/replace/redact)
-│  └─ Export/                Format detection, save-target resolution, default file names
+│  ├─ Annotations/           Immutable annotation records (+ highlight, redaction mask), hit testing, step numbering
+│  ├─ Editing/               EditorDocument (base + visible image), UndoRedoHistory, commands (add/remove/replace/redact/crop), Sanitize
+│  ├─ Export/                Format detection, save-target resolution, default file names
+│  ├─ Storage/               AtomicFile (crash-resistant writes), PixelCodec (SFPX), AnnotationSerializer, CaptureFormat v1
+│  ├─ Library/               CaptureLibrary (index, CRUD, trash, search, retention, backup, move, sanitize), RecentTray, queries, date grouping
+│  └─ Settings/              AppSettings (capture options, presets, hotkeys, quick styles, theme), HotkeyGesture
 ├─ src/SnapForge.App         net10.0-windows WPF executable ("SnapForge.exe")
 │  ├─ Interop/               LibraryImport P/Invoke (user32, gdi32, dwmapi, shcore), dark title bar
 │  ├─ Capture/               ScreenCaptureService (GDI), OverlaySession + SelectionOverlayWindow
 │  ├─ Rendering/             AnnotationRenderer (shared by screen and export), ImageExporter, BitmapConversion
-│  ├─ Editor/                AnnotationCanvas (tools, mouse gestures, inline text editing)
-│  └─ Themes/                Dark theme, control styles, icon geometries
+│  ├─ Editor/                AnnotationCanvas (tools, mouse gestures, inline text editing, crop preview)
+│  ├─ Services/              AppServices (settings, library, tray), LibraryWriter (serialized background writes),
+│  │                         ThumbnailCache (LRU, lazy), EditorSession, CaptureController (delay, hide, snapshot, overlay)
+│  ├─ Views/                 LibraryView, CaptureWindow, SettingsWindow, view models
+│  ├─ Interop/               … + ShellIntegration (notification icon, RegisterHotKey)
+│  ├─ Themes/                Palette.Dark / Palette.Light (swapped at run time), Controls (styles, icons), ThemeManager
+│  ├─ MainWindow             Shell: menu, Capture button, Editor/Library tabs, toolbar, canvas, properties panel, tray, status bar
+│  ├─ SelfTest / ScreenshotTour   --self-test and --screenshots diagnostics (temporary library only)
 ├─ tests/SnapForge.Core.Tests   xUnit, runs on Linux and Windows
 └─ tests/SnapForge.App.Tests    xUnit, Windows only: rendering/export pixels, encoders, clipboard,
                                 real GDI capture, main-window smoke test
@@ -38,6 +47,20 @@ SnapForge.sln
 | D10 | **No runtime NuGet packages** | Smaller attack surface, no licensing obligations beyond .NET, no paid components. |
 | D11 | **Portable build = self-contained single-file win-x64 exe** | Runs on a clean Windows 10/11 machine without installing .NET; no installer, registry or admin rights. |
 
+## Milestone 2 decisions
+
+| # | Decision | Why |
+|---|----------|-----|
+| D12 | **Folder-per-capture storage** (manifest + base pixels + annotations + meta + thumbnail) instead of one container file | Small files (annotations, metadata) can be rewritten atomically on every autosave without rewriting a large image; a damaged file affects one capture. A single-file `.sfcap` ZIP exists for export/import. |
+| D13 | **Base image + redaction masks** in the document | Redactions stay reversible in the editable copy (Snagit-like editing) while exports are always burned in; Sanitize is the explicit destructive step. |
+| D14 | **Own pixel container (SFPX: zlib BGRA)** instead of PNG inside the library | Lossless, trivially verifiable, encodable in the platform-independent Core (tested on Linux). |
+| D15 | **Manifest written last with SHA-256 of content files** | Commit point for crash consistency; detects partial or tampered files. |
+| D16 | **Serialized background writer** | Saves never overlap or block the UI; disk errors surface as a banner while edits stay in memory. |
+| D17 | **Virtualized row-of-tiles library grid + LRU thumbnail cache** | WPF has no virtualizing wrap panel; rows of tiles in a VirtualizingStackPanel keep thousands of captures responsive and load thumbnails only when visible. |
+| D18 | **Notification icon and hotkeys via Win32 (Shell_NotifyIcon, RegisterHotKey)** | No WinForms dependency, no keyboard hooks; conflicts are detectable. |
+| D19 | **Runtime theme switching via a swapped palette dictionary** | All control styles use DynamicResource; light, dark or follow Windows. |
+| D20 | **Default library in %LOCALAPPDATA%** | Not Documents/Pictures, which are frequently redirected to OneDrive (automatic upload). |
+
 ## Capture flow
 
 1. User picks a mode (toolbar, start screen or Ctrl+1…4). Unsaved edits prompt for confirmation.
@@ -47,7 +70,9 @@ SnapForge.sln
 4. *All screens*: the snapshot is the result. Otherwise `OverlaySession` opens one overlay per monitor
    showing the frozen frame, dimmed, with a highlight for the drag rectangle / hovered window / hovered display.
 5. The selected physical rectangle is clipped to the virtual desktop and cropped from the snapshot.
-6. The crop is loaded into a new `EditorDocument`; the main window returns.
+6. The crop becomes a new `EditorSession`: by default it is written to the Library in the background and added to
+   the Recent Captures Tray; optionally copied to the clipboard; shown in the Editor if "Preview in Editor" is on.
+7. Every edit schedules a debounced autosave (1.2 s) through the LibraryWriter.
 
 ## Coordinate systems
 
