@@ -7,7 +7,7 @@ verified hands-on.** All SnapForge facts are OBS (code read) unless marked CI.
 **Approval state of every row: _Proposed — awaiting owner approval_.** Nothing here authorises development.
 
 Legend
-* **SnapForge**: ✅ Done (implemented + automated tests) · ◐ Partial · ✗ Missing · ⊕ Exceeds reference · ≠ Different by design
+* **SnapForge**: ✅ Done (implemented + automated tests) · ◐ Partial · ✗ Missing · ⊕ Exceeds reference — **confirmed** (both sides evidenced) · ⊕? Exceeds — **plausible only** (Snagit side rests on absence of documentation) · ≠ Different by design · n/a
 * **Pri**: P1 must (next milestone) · P2 should · P3 could · — not planned / out of scope
 * **MS**: target milestone (see [DEVELOPMENT-ROADMAP.md](DEVELOPMENT-ROADMAP.md)); "M3" = Gate B proposal
 * Requirement IDs (Req) link to [PRODUCT-REQUIREMENTS.md](PRODUCT-REQUIREMENTS.md).
@@ -19,7 +19,7 @@ Legend
 | FP-CAP-01 | Capture modes All-in-One / Image / Video | Three tabs | S-CAP-01/02 DOC | ◐ Image only; no mode switcher | P1 (layout) | M3 | CAP-UI-02 |
 | FP-CAP-02 | Region selection with crosshairs | Orange crosshairs, drag; 2026.0.0 "simplified crosshairs" | S-CAP-02, S-CAP-22 DOC | ✅ freeze-frame overlay per monitor, real-mouse tests (CI) | — | done | BL-CAP-01 |
 | FP-CAP-03 | Window selection by hover | Dashed border, click | S-CAP-03/04 DOC | ✅ hover highlight + click (`WindowPicker`) | — | done | BL-CAP-02 |
-| FP-CAP-04 | Full screen / single monitor | Fullscreen selection | S-CAP-02 DOC | ✅ Display (one monitor) and Full screen (all) ⊕ | — | done | BL-CAP-03 |
+| FP-CAP-04 | Full screen / single monitor | Fullscreen selection | S-CAP-02 DOC | ✅ Display (one monitor) and Full screen (all) — parity (exceeds claim withdrawn: Snagit monitor choice not researched) | — | done | BL-CAP-03 |
 | FP-CAP-05 | Magnifier during selection (M toggles) | "Show magnifier" preference | S-CAP-06/07 DOC | ✗ | P2 | M5 | CAP-ADV-01 |
 | FP-CAP-06 | Exact width/height entry during selection | Width/Height fields in All-in-One toolbar | S-CAP-02/26 DOC | ✗ (size shown, not editable) | P2 | M5 | CAP-ADV-02 |
 | FP-CAP-07 | Fixed region (+ Set position) | Selection Properties → Fixed region | S-CAP-03/29 DOC (2021.4; current UNVERIFIED) | ✗ | P2 | M5 | CAP-ADV-03 |
@@ -31,24 +31,24 @@ Legend
 | FP-CAP-13 | Scrolling capture, manual (panoramic) | User scrolls, Done | S-CAP-05 DOC | ✗ | P2 | M5 | CAP-ADV-09 |
 | FP-CAP-14 | Interval (time-lapse) capture, discard identical | Min interval 3 s since 2026.3.1 | S-CAP-03/10 DOC | ✗ | P3 | M5 | CAP-ADV-10 |
 | FP-CAP-15 | Clipboard as capture source | Selection type "Clipboard" | S-CAP-03 DOC | ✗ | P2 | M5 | CAP-ADV-11 |
-| FP-CAP-16 | Printer capture (virtual printer) | Installs as printer (current status UNVERIFIED) | S-CAP-06 DOC/UNVERIFIED | ✗ | — | — | (not planned: needs driver install, admin) |
-| FP-CAP-17 | Object capture | Only Snagit 10/11 | S-CAP-32 DOC (historical) | ✗ | — | — | not planned |
+| FP-CAP-16 | Printer capture (virtual printer) | Installs as printer (current status UNVERIFIED) | S-CAP-06 DOC/UNVERIFIED | ✗ | — | — | CAP-LEG-01 |
+| FP-CAP-17 | Object capture | Only Snagit 10/11 | S-CAP-32 DOC (historical) | ✗ | — | — | CAP-LEG-02 |
 | FP-CAP-18 | Cursor capture | Cursor kept as editable vector object | S-CAP-03/04 DOC | ◐ cursor drawn into pixels (not movable) | P2 | M4 | ED-OBJ-20 |
-| FP-CAP-19 | Time delay with on-screen countdown | Countdown bottom-right | S-CAP-03 DOC | ✅ delays 0/1/2/3/5/10 s with countdown window; ◐ no custom value | P1 (picker) | M3 | CAP-UI-08 |
+| FP-CAP-19 | Time delay with on-screen countdown | Countdown bottom-right | S-CAP-03 DOC | ✅ delays 0/1/2/3/5/10 s with countdown window; ◐ no custom value | P1 (picker) | M3 | CAP-UI-09 |
 | FP-CAP-20 | Preview in Editor toggle | Yes | S-CAP-04 DOC | ✅ | — | done | BL-CAP-04 |
 | FP-CAP-21 | Copy to Clipboard toggle | Yes | S-CAP-04 DOC | ✅ | — | done | BL-CAP-05 |
-| FP-CAP-22 | Save to Library / capture without history | Library autosave can be turned off (Editor Prefs → Library) | S-LIB-11/12 DOC | ✅ per-capture switch + presets ⊕ | — | done | BL-LIB-01 |
-| FP-CAP-23 | Selection / Effects / Share dropdowns | Present in Image tab | S-CAP-04/28 DOC; layout I-05 OBS | ◐ Selection tiles only; no Effects/Share | P1 | M3 | CAP-UI-03/04 |
+| FP-CAP-22 | Save to Library / capture without history | Library autosave can be turned off (Editor Prefs → Library) | S-LIB-11/12 DOC | ✅ per-capture switch + presets — parity (Snagit also allows autosave off) | — | done | BL-LIB-01 |
+| FP-CAP-23 | Selection / Effects / Share dropdowns | Present in Image tab | S-CAP-04/28 DOC; layout I-05 OBS | ◐ Selection tiles only; no Effects/Share | P1 | M3 | CAP-UI-03/04/05 |
 | FP-CAP-24 | Share → File with format/folder at capture time | Share = File + gear | S-LIB-33 DOC | ✗ | P2 | M3 (optional) / M4 | EXP-05 |
 | FP-CAP-25 | Presets: create, hotkey per preset, rename, delete | Add Preset, Add Hotkey | S-CAP-09 DOC | ✅ | — | done | BL-CAP-06 |
 | FP-CAP-26 | Preset export/import (.snagpresets equivalent) | File → Export All / Import | S-CAP-09/21 DOC | ✗ | P2 | M4 | SET-05 |
 | FP-CAP-27 | Global hotkey, default Print Screen; conflict handling | Print Screen; Win11 Snipping Tool may own it; "override" option | S-CAP-07/19 DOC | ✅ Print Screen default; conflict reported when `RegisterHotKey` fails. ◐ real Win11 behaviour UNVERIFIED (DEF-08) | P1 (verify) | M3 | CAP-HK-01 |
 | FP-CAP-28 | Hide own windows during capture | Preference (2024.1.0+) | S-CAP-06/14 DOC | ✅ always hides (180 ms settle); not configurable ≠ | — | done | BL-CAP-07 |
-| FP-CAP-29 | Capture window chrome: File/Edit/View/Help, reset, Open Editor | Menus, reset icon, Open Editor link (reference image) | I-05 OBS; menu contents UNVERIFIED | ◐ links (Open Editor/Library/Settings); no menus, no reset | P1 | M3 | CAP-UI-01/09/11 |
+| FP-CAP-29 | Capture window chrome: File/Edit/View/Help, reset, Open Editor | Menus, reset icon, Open Editor link (reference image) | I-05 OBS; menu contents UNVERIFIED | ◐ links (Open Editor/Library/Settings); no menus, no reset | P1 | M3 | CAP-UI-01/10/12 |
 | FP-CAP-30 | Compact horizontal capture panel | ≈740×240 single row (reference image) | I-05 OBS | ✗ tall vertical panel ≈360×710 (I-06) | P1 | M3 | CAP-UI-01 |
-| FP-CAP-31 | Large Capture button + shortcut text under it | Circular button, "Print Screen" beneath | I-05 OBS | ✅ large rectangular button + hotkey text; ◐ shape/position | P1 | M3 | CAP-UI-05 |
+| FP-CAP-31 | Large Capture button + shortcut text under it | Circular button, "Print Screen" beneath | I-05 OBS | ✅ large rectangular button + hotkey text; ◐ shape/position | P1 | M3 | CAP-UI-06 |
 | FP-CAP-32 | Windows Graphics Capture backend | n/a (implementation detail) | — | ✗ GDI BitBlt (documented decision, docs/WINDOWS-GRAPHICS-CAPTURE.md) | P3 | M5 | CAP-ADV-12 |
-| FP-CAP-33 | Multi-monitor, mixed DPI | Supported | INFER | ✅ Per-Monitor V2, virtual desktop; ◐ only single-monitor CI; real mixed-DPI untested | P1 (verify) | M3 | NFR-DPI-1 |
+| FP-CAP-33 | Multi-monitor, mixed DPI | Supported | INFER | ✅ Per-Monitor V2, virtual desktop; ◐ only single-monitor CI; real mixed-DPI untested | P1 (verify) | M3 | NFR-DPI-01/02 |
 
 ## 2. Desktop capture widget
 
@@ -76,7 +76,7 @@ Legend
 | FP-ED-08 | Highlighter | Highlighter tool | S-ED-30 DOC | ✅ rectangle highlight (fixed opacity) | — | done | BL-ED-02 |
 | FP-ED-09 | Crop | Crop tool | S-ED-33 DOC | ✅ reversible until sanitize | — | done | BL-ED-03 |
 | FP-ED-10 | Cut Out (remove band) | Cut Out tool | S-ED-34 DOC | ✗ | P2 | M4 | ED-TOOL-03 |
-| FP-ED-11 | Blur / Pixelate / Solid | Blur tool; TechSmith warns blur/pixelate reversible | S-ED-08/09 DOC | ◐ solid redaction only ⊕ (irreversible on export, sanitize); ✗ blur/pixelate | P1 | M4 | ED-TOOL-04, PRIV-DND-05 |
+| FP-ED-11 | Blur / Pixelate / Solid | Blur tool; TechSmith warns blur/pixelate reversible | S-ED-08/09 DOC | ◐ solid redaction only (opaque, flattened on export, Sanitize); ✗ blur/pixelate | P1 | M4 | ED-TOOL-04, PRIV-DND-05 |
 | FP-ED-12 | Smart Redact (detect emails, cards, faces…) | 2025.0.0+, on-device per TechSmith | S-ED-08/10 DOC | ✗ | P2 | M6 | AI-02 |
 | FP-ED-13 | Grab Text (OCR) / Edit Text | ABBYY → Microsoft OCR default 2026.4.0 | S-ED-12/14 DOC | ✗ | P2 | M6 | AI-01 |
 | FP-ED-14 | Simplify | 2026.1.0 Auto Simplify | S-ED-20 DOC | ✗ | P3 | M6 | AI-04 |
@@ -119,7 +119,7 @@ Legend
 | FP-OBJ-15 | Duplicate object | Customisable item | S-ED-24 DOC | ✗ | P1 | M4 | ED-OBJ-13 |
 | FP-OBJ-16 | Copy objects between captures | UNVERIFIED | — | ✗ | P2 | M4 | ED-OBJ-14 |
 | FP-OBJ-17 | Step renumbering on delete | UNVERIFIED in Snagit | — | ◐ `StepNumbering` gives next number; renumbering behaviour to be specified | P2 | M4 | ED-TOOL-02 |
-| FP-OBJ-18 | Flatten / Flatten All | Ctrl+T / Ctrl+Shift+T (conflicting) | S-ED-22/23 DOC | ≠ Sanitize capture (whole-capture, irreversible, explicit) ⊕ for privacy; ✗ per-object flatten | P2 | M4 | ED-OBJ-15 |
+| FP-OBJ-18 | Flatten / Flatten All | Ctrl+T / Ctrl+Shift+T (conflicting) | S-ED-22/23 DOC | ≠ Sanitize capture (whole-capture, irreversible, explicit); ✗ per-object flatten | P2 | M4 | ED-OBJ-15 |
 | FP-OBJ-19 | Undo/redo | Ctrl+Z/Y | S-ED-22 DOC | ✅ (not persisted across reopen) | — | done | BL-ED-06 |
 | FP-OBJ-20 | Arrow-key nudge | UNVERIFIED for editor | — | ✗ | P1 | M4 | ED-OBJ-16 |
 | FP-OBJ-21 | Quick Styles (per tool), save "+", delete | Per tool | S-ED-05/06 DOC | ◐ one shared style list (colour+width), save, favourite, delete | P1 | M4 | ED-QS-01 |
@@ -154,33 +154,33 @@ Legend
 | FP-TR-05 | Thumbnail size S/M/L | Right-click → Thumbnail Size | S-LIB-01 DOC | ✗ | P2 | M4 | TR-02 |
 | FP-TR-06 | Show/hide tray | Show/Hide Recent | S-LIB-01 DOC | ✅ | — | done | BL-TR-04 |
 | FP-TR-07 | Clear tray on editor close (pref) | Windows preference | S-LIB-01 DOC | ◐ "Close all unpinned" command; no preference | P3 | M4 | TR-03 |
-| FP-TR-08 | Multi-select (Ctrl+click) | Yes | S-LIB-16 DOC | ✗ | P1 | M3 | DND-02 |
-| FP-TR-09 | **Drag out to other apps** with chosen file type | 2024.1.2: preference for drag-out file type | S-LIB-03, S-LIB-02 DOC; data format UNVERIFIED | ✗ (no drag/drop code anywhere) | **P1** | **M3** | DND-01…12 |
-| FP-TR-10 | Drag tray image onto canvas (combine) | Yes | S-LIB-01 DOC | ✗ | P3 | M7 | DOC-01 |
+| FP-TR-08 | Multi-select (Ctrl+click) | Yes | S-LIB-16 DOC | ✗ | P1 | M3 | DND-03 |
+| FP-TR-09 | **Drag out to other apps** with chosen file type | 2024.1.2: preference for drag-out file type | S-LIB-03, S-LIB-02 DOC; data format UNVERIFIED | ✗ (no drag/drop code anywhere) | **P1** | **M3** | DND-01…12, PRIV-DND-01…04 |
+| FP-TR-10 | Drag tray image onto canvas (combine) | Yes | S-LIB-01 DOC | ✗ | P3 | M7 | TR-04 |
 | FP-TR-11 | Tooltips | UNVERIFIED | — | ◐ title shown under tile | P2 | M3 | TR-01 |
 
 ## 7. Library
 
 | ID | Capability | Snagit (Windows) | Src · Ev | SnapForge today | Pri | MS | Req |
 |---|---|---|---|---|---|---|---|
-| FP-LIB-01 | Automatic library of all captures | SNAGX in Documents\Snagit | S-LIB-11, S-CAP-06 DOC | ✅ `%LOCALAPPDATA%\SnapForge\Library`, versioned open format (docs/CAPTURE-FORMAT.md) ⊕ documented | — | done | BL-LIB-01 |
+| FP-LIB-01 | Automatic library of all captures | SNAGX in Documents\Snagit | S-LIB-11, S-CAP-06 DOC | ✅ `%LOCALAPPDATA%\SnapForge\Library`, versioned format documented in docs/CAPTURE-FORMAT.md — ⊕? openness plausible (no published SNAGX specification found; absence, not proof) | — | done | BL-LIB-01 |
 | FP-LIB-02 | Search | File name + filters date/tags/app/website | S-LIB-04 DOC | ◐ title/tag search; ✗ app/website metadata | P2 | M5 | LIB-META-01 |
 | FP-LIB-03 | Tags | Manual, visible only in Snagit | S-LIB-04 DOC | ✅ | — | done | BL-LIB-02 |
-| FP-LIB-04 | Favorites | **Mac only** | S-LIB-04 DOC | ✅ ⊕ on Windows | — | done | BL-LIB-03 |
-| FP-LIB-05 | Folders | Not found (UNVERIFIED) | S-LIB-04 | ✅ virtual folders ⊕ | — | done | BL-LIB-04 |
+| FP-LIB-04 | Favorites | **Mac only** | S-LIB-04 DOC | ✅ ⊕ on Windows (DOC: Snagit favorites are Mac-only) | — | done | BL-LIB-03 |
+| FP-LIB-05 | Folders | Not found (UNVERIFIED) | S-LIB-04 | ✅ virtual folders — ⊕? plausible (no Snagit folder feature found; absence, not proof) | — | done | BL-LIB-04 |
 | FP-LIB-06 | Date browsing | Year/month/day (restored 2022.1.7) | S-LIB-04 DOC | ✅ date groups | — | done | BL-LIB-05 |
-| FP-LIB-07 | Trash / recovery | Not found; "cannot recover deleted files" | S-LIB-07 DOC (limited) | ✅ Trash + restore + secure-ish delete ⊕ | — | done | BL-LIB-06 |
-| FP-LIB-08 | Retention / auto-delete | None found | S-LIB-14 DOC | ✅ retention policy ⊕ | — | done | BL-LIB-07 |
+| FP-LIB-07 | Trash / recovery | Not found; "cannot recover deleted files" | S-LIB-07 DOC (limited) | ✅ Trash + restore; permanent delete overwrites before removal but is best effort on SSDs — ⊕? plausible (no Snagit trash found; Windows Recycle Bin behaviour unknown) | — | done | BL-LIB-06 |
+| FP-LIB-08 | Retention / auto-delete | None found | S-LIB-14 DOC | ≠ optional retention policy (Snagit keeps captures until the user deletes them, S-LIB-14) — a different choice, not a superiority claim | — | done | BL-LIB-07 |
 | FP-LIB-09 | Move library location (merge if exists) | Choose location; merge | S-LIB-05 DOC | ✅ move; ≠ refuses non-empty target (no merge) | P3 | M4 | LIB-05 |
-| FP-LIB-10 | Backup / restore | Legacy .snagarchive; now folder copy | S-LIB-07 DOC | ✅ ZIP backup/restore with validation ⊕ | — | done | BL-LIB-08 |
+| FP-LIB-10 | Backup / restore | Legacy .snagarchive; now folder copy | S-LIB-07 DOC | ✅ ZIP backup/restore with validation — ⊕? plausible (current Snagit backup appears to be a folder copy: INFER) | — | done | BL-LIB-08 |
 | FP-LIB-11 | Import images (PNG/JPEG) | Not documented on Windows | S-LIB-06 DOC (SNAG/MP4/GIF only) | ✗ only `.sfcap` import | P1 | M3 | DND-10 |
-| FP-LIB-12 | Drag out of Library | Same preference as tray | S-LIB-02/03 DOC | ✗ | P1 | M3 | DND-01…12 |
+| FP-LIB-12 | Drag out of Library | Same preference as tray | S-LIB-02/03 DOC | ✗ | P1 | M3 | DND-02 |
 | FP-LIB-13 | Batch export/convert | Batch Export wizard | S-LIB-15 DOC | ◐ multi-select export | P2 | M7 | LIB-BATCH-01 |
 | FP-LIB-14 | OCR / full-text search | Not documented | S-LIB-04 DOC | ✗ | P3 | M6 | AI-06 |
 | FP-LIB-15 | Details (metadata view) | Right-click → Details | S-LIB-04 DOC | ◐ size/date shown on tile | P2 | M4 | LIB-06 |
 | FP-LIB-16 | Thumbnail size | — | — | ✅ slider | — | done | BL-LIB-09 |
 | FP-LIB-17 | Migration of Snagit `.snagx` | Format unpublished (ZIP claim non-official) | S-LIB-11 DOC, S-LIB-13 UNVERIFIED | ✗ | P3 | investigate | MIG-01 |
-| FP-LIB-18 | Scale (10k+ captures) | n/a | — | ◐ core index test 1 500 with flush bypass for seeding; UI test 600; synchronous start-up index (DEF-01/02) | **P1** | **M3** | PERF-01…06 |
+| FP-LIB-18 | Scale (10k+ captures) | n/a | — | ◐ core index test 1 500 with flush bypass for seeding; UI test 600; synchronous start-up index (DEF-01/02) | **P1** | **M3** | PERF-01…07 |
 
 ## 8. Documentation / templates
 
@@ -211,15 +211,15 @@ Legend
 |---|---|---|---|---|---|---|---|
 | FP-EXP-01 | PNG, JPEG | Yes | S-LIB-28 DOC | ✅ (JPEG quality fixed 92) | — | done | BL-EXP-01 |
 | FP-EXP-02 | BMP, GIF, TIFF, WebP | BMP/GIF/TIF; WebP since 2022.1.1 | S-LIB-28/30 DOC | ✗ | P2 | M4 | EXP-01 |
-| FP-EXP-03 | ICO, PSD, TGA, WMF, CUR, EPS | Yes | S-LIB-28 DOC | ✗ | — | — | not planned (niche/licensing) |
+| FP-EXP-03 | ICO, PSD, TGA, WMF, CUR, EPS | Yes | S-LIB-28 DOC | ✗ | — | — | EXP-07 |
 | FP-EXP-04 | HEIF | Mac only (Windows UNVERIFIED) | S-LIB-29 DOC | ✗ | — | investigate | EXP-02 |
 | FP-EXP-05 | PDF | Export only | S-LIB-28 DOC | ✗ | P2 | M7 | EXP-03 |
-| FP-EXP-06 | Native editable format | SNAGX (unpublished) | S-LIB-11 DOC | ✅ `.sfcap` documented ⊕ | — | done | BL-EXP-02 |
+| FP-EXP-06 | Native editable format | SNAGX (unpublished) | S-LIB-11 DOC | ✅ `.sfcap` documented — ⊕? plausible (no SNAGX specification found) | — | done | BL-EXP-02 |
 | FP-EXP-07 | Clipboard | Yes | S-LIB-31 DOC | ✅ | — | done | BL-EXP-03 |
 | FP-EXP-08 | Print | Printer destination, Ctrl+P | S-LIB-31, S-ED-22 DOC | ✗ | P2 | M4 | EXP-04 |
 | FP-EXP-09 | Descriptive automatic filenames | From source context; can be turned off | S-LIB-02/31 DOC | ◐ default title from date/time | P1 | M3 | DND-05, EXP-06 |
 | FP-EXP-10 | Office / email / browser interop | Share destinations | S-LIB-32/37 DOC | ✗ (drag-out in M3 is the offline route) | P1 | M3 | DND-11 |
-| FP-EXP-11 | Cloud destinations (Drive, Dropbox, Slack, Teams, YouTube…) | Many; vary by version | S-LIB-32/37/49 DOC | ✗ ≠ offline-first; only optional, opt-in later | — | owner decision | Q-07 |
+| FP-EXP-11 | Cloud destinations (Drive, Dropbox, Slack, Teams, YouTube…) | Many; vary by version | S-LIB-32/37/49 DOC | ✗ ≠ offline-first; only optional, opt-in later | — | owner decision | EXP-08 |
 
 ## 11. Settings
 
@@ -230,21 +230,21 @@ Legend
 | FP-SET-03 | High contrast | VPAT: poor in Snagit | S-CAP-24 DOC | ✗ not verified (DEF-07) | P1 | M3 | NFR-A11Y-03 |
 | FP-SET-04 | Hotkeys tab with Restore Defaults | Yes | S-CAP-07 DOC | ◐ hotkey recorder; no restore-defaults | P2 | M4 | SET-03 |
 | FP-SET-05 | Update checks (Standard/Delayed) | Yes | S-CAP-06 DOC | ✗ ≠ no network; controlled updates later (M9) | — | M9 | ENT-07 |
-| FP-SET-06 | Usage data | Send usage data / anonymous / none | S-CAP-06 DOC | ≠ no telemetry at all ⊕ | — | done | BL-SEC-01 |
+| FP-SET-06 | Usage data | Send usage data / anonymous / none | S-CAP-06 DOC | ⊕ no telemetry at all — confirmed: Snagit usage-data choices (DOC) vs no network code in SnapForge (OBS) | — | done | BL-SEC-01 |
 | FP-SET-07 | Reset to defaults | Advanced tab | S-CAP-06 DOC | ✗ | P2 | M4 | SET-04 |
 | FP-SET-08 | Settings/preset export/import | Presets only; admin `/e` registry export | S-CAP-21/23 DOC | ✗ | P2 | M4 | SET-05 |
 | FP-SET-09 | Drag-and-drop file type | Advanced tab | S-CAP-06, S-LIB-03 DOC | ✗ | P1 | M3 | DND-04 |
 | FP-SET-10 | Keep editor running in background / close to tray | Advanced tab | S-CAP-06 DOC | ✅ close to notification area | — | done | BL-SET-02 |
 | FP-SET-11 | Capture sounds | UNVERIFIED | — | ✗ | P3 | M4 | SET-06 |
-| FP-SET-12 | Window position memory | UNVERIFIED | — | ◐ panel width; capture window position not remembered | P1 | M3 | CAP-UI-10 |
+| FP-SET-12 | Window position memory | UNVERIFIED | — | ◐ panel width; capture window position not remembered | P1 | M3 | CAP-UI-11 |
 
 ## 12. Security, privacy, enterprise, accessibility
 
 | ID | Capability | Snagit (Windows) | Src · Ev | SnapForge today | Pri | MS | Req |
 |---|---|---|---|---|---|---|---|
-| FP-SEC-01 | Offline operation, no account | Subscription; internet check every 90 days; account not needed for MSI | S-LIB-39/42/44 DOC | ✅ ⊕ no network code at all (grep: no HttpClient/WebRequest/sockets) | — | done | BL-SEC-01 |
-| FP-SEC-02 | Telemetry | Opt-out choices | S-CAP-06 DOC | ✅ none ⊕ | — | done | BL-SEC-01 |
-| FP-SEC-03 | Irreversible redaction guidance | Blur reversible; flatten to remove | S-ED-08/09 DOC | ✅ opaque masks, exports flattened, Sanitize, warnings ⊕ | — | done | BL-PRIV-01 |
+| FP-SEC-01 | Offline operation, no account | Subscription; internet check every 90 days; account not needed for MSI | S-LIB-39/42/44 DOC | ✅ ⊕ confirmed: Snagit needs an online licence check every 90 days (DOC); SnapForge has no network code (OBS grep) | — | done | BL-SEC-01 |
+| FP-SEC-02 | Telemetry | Opt-out choices | S-CAP-06 DOC | ✅ ⊕ none — confirmed (DOC vs OBS) | — | done | BL-SEC-01 |
+| FP-SEC-03 | Irreversible redaction guidance | Blur reversible; flatten to remove | S-ED-08/09 DOC | ✅ parity — opaque masks, flattened exports, explicit Sanitize, warnings (Snagit also documents solid redaction + flatten; exceeds claim withdrawn) | — | done | BL-PRIV-01 |
 | FP-SEC-04 | Encryption at rest | Not documented | S-LIB (none) | ✗ | P3 | M9 | ENT-05 |
 | FP-SEC-05 | Metadata stripping on export | n/a | — | ✅ JPEG metadata test (CI) | — | done | BL-PRIV-02 |
 | FP-SEC-06 | Supply chain (pinned actions, lock files, signatures, checksums) | n/a | — | ✅ CI audit (docs/SECURITY.md) | — | done | BL-SEC-02 |
@@ -252,30 +252,36 @@ Legend
 | FP-SEC-08 | Code signing | Signed vendor binaries (INFER) | — | ✗ owner decision D-3 | — | M9 | ENT-02 |
 | FP-SEC-09 | MSI/MSIX, silent install/uninstall, transforms, Intune/SCCM | MSI + Deployment Tool; Intune Win32 | S-LIB-34/37/40 DOC | ✗ portable only | — | M9 | ENT-01/04 |
 | FP-SEC-10 | Standard-user operation | INFER per-machine MSI | — | ✅ portable, per-user data, no admin (CI runs as admin; UNVERIFIED as standard user) | P1 (verify) | M3 | NFR-SEC-04 |
-| FP-SEC-11 | Accessibility conformance | 2025 VPAT: "Does Not Support" for use without vision | S-CAP-24 DOC | ◐ automation names, keyboard; ✗ screen-reader pass, ✗ high contrast | P1 | M3+ | NFR-A11Y-01…05 |
-| FP-SEC-12 | Disable AI features (admin) | Article exists | S-LIB-46 DOC | n/a (no AI) | — | M6 | AI-07 |
+| FP-SEC-11 | Accessibility conformance | 2025 VPAT: "Does Not Support" for use without vision | S-CAP-24 DOC | ◐ automation names, keyboard; ✗ screen-reader pass, ✗ high contrast | P1 | M3+ | NFR-A11Y-01…03 |
+| FP-SEC-12 | Disable AI features (admin) | Article exists | S-LIB-46 DOC | n/a — SnapForge has no AI features yet (AI-07 when M6 adds them) | — | M6 | AI-07 |
 
-## Summary counts (baseline 3018841)
+## Summary counts (baseline 3018841, after Gate A corrections)
 
-Computed mechanically from the first status symbol in each row's "SnapForge today" cell (⊕ counted as done;
-FP-SEC-12 "n/a" excluded).
+Computed mechanically from the first status symbol in each row's "SnapForge today" cell (⊕ and ⊕? counted as
+done; "n/a" counted separately). The earlier table summed to 182 because FP-SEC-12 ("n/a") was silently excluded;
+it now has its own column, so the columns add up to the 183 rows.
 
-| Area | Rows | ✅/⊕ done | ◐ partial | ✗ missing | ≠ different |
-|---|---|---|---|---|---|
-| Capture | 33 | 12 | 5 | 16 | 0 |
-| Desktop capture widget | 7 | 0 | 0 | 7 | 0 |
-| Editor tools | 31 | 5 | 5 | 20 | 1 |
-| Object properties and management | 25 | 3 | 5 | 16 | 1 |
-| Effects | 10 | 0 | 0 | 10 | 0 |
-| Recent Captures tray | 11 | 4 | 2 | 5 | 0 |
-| Library | 18 | 10 | 4 | 4 | 0 |
-| Documentation / templates | 4 | 0 | 0 | 4 | 0 |
-| Video | 9 | 0 | 0 | 9 | 0 |
-| Export / share | 11 | 3 | 1 | 7 | 0 |
-| Settings | 12 | 2 | 2 | 7 | 1 |
-| Security, privacy, enterprise, accessibility | 12 | 6 | 1 | 4 | 0 |
-| **Total** | **183** | **45** | **25** | **109** | **3** |
+| Area | Rows | ✅/⊕ done | ◐ partial | ✗ missing | ≠ different | n/a |
+|---|---|---|---|---|---|---|
+| Capture | 33 | 12 | 5 | 16 | 0 | 0 |
+| Desktop capture widget | 7 | 0 | 0 | 7 | 0 | 0 |
+| Editor tools | 31 | 5 | 5 | 20 | 1 | 0 |
+| Object properties and management | 25 | 3 | 5 | 16 | 1 | 0 |
+| Effects | 10 | 0 | 0 | 10 | 0 | 0 |
+| Recent Captures tray | 11 | 4 | 2 | 5 | 0 | 0 |
+| Library | 18 | 9 | 4 | 4 | 1 | 0 |
+| Documentation / templates | 4 | 0 | 0 | 4 | 0 | 0 |
+| Video | 9 | 0 | 0 | 9 | 0 | 0 |
+| Export / share | 11 | 3 | 1 | 7 | 0 | 0 |
+| Settings | 12 | 3 | 2 | 7 | 0 | 0 |
+| Security, privacy, enterprise, accessibility | 12 | 6 | 1 | 4 | 0 | 1 |
+| **Total** | **183** | **45** | **25** | **109** | **3** | **1** |
 
-Headline: SnapForge's **storage, Library, privacy and offline posture meet or exceed** the reference; **capture
-breadth, editor depth, effects, widget, drag-out and video** are the gaps. Several "missing" rows are deliberately
-not planned (printer/object capture, niche formats, cloud destinations) and are marked "—" in the Pri column.
+Of the rows counted as done, the "exceeds" claims were revalidated (see SNAGIT-FORENSIC-AUDIT.md §3a): **4 confirmed**
+(favorites on Windows, no telemetry ×2, offline/no licence check), **5 plausible only** (rest on the absence of Snagit
+documentation), **6 withdrawn** (parity or different, not superior).
+
+Headline: SnapForge's **offline and no-telemetry posture is confirmed to exceed** the reference; its Library and
+storage features are **at least at parity**, with some advantages plausible but unproven. **Capture breadth, editor
+depth, effects, widget, drag-out and video** are the gaps. Rows marked "—" in Pri are kept in the roadmap backlog
+(not dropped) — see DEVELOPMENT-ROADMAP.md coverage appendix.

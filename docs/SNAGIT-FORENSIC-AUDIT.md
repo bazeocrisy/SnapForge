@@ -68,6 +68,41 @@ Positive findings (verified): no network APIs in `src/` (no `HttpClient`, `WebRe
 claim holds; crash-safe write path with tests for interrupted saves and sanitize; exports flattened with metadata
 checks; supply-chain controls present in CI; per-monitor V2 DPI manifest present.
 
+## 3a. Revalidation of "SnapForge exceeds Snagit" claims (Gate A correction, 2026-11-25)
+
+A claim is **Confirmed** only when both sides are evidenced (Snagit: DOC extract stating the behaviour; SnapForge:
+OBS/CI). **Plausible** means the Snagit side rests on *absence* of documentation in search extracts, which is not
+proof. **Withdrawn** means the evidence shows parity or merely a different choice.
+
+| Row | Claim | Snagit evidence | SnapForge evidence | Verdict |
+|---|---|---|---|---|
+| FP-SEC-01 | Works fully offline, no account or licence check | DOC S-LIB-39/42: online licence check at least every 90 days | OBS: no network API in `src/` | **Confirmed** |
+| FP-SEC-02, FP-SET-06 | No telemetry | DOC S-CAP-06: usage-data choices | OBS: no network code | **Confirmed** |
+| FP-LIB-04 | Favorites on Windows | DOC S-LIB-04: favorites "Mac only" | CI: `Views_search_and_sort` | **Confirmed** (DOC is an extract; re-verify under RES-01) |
+| FP-LIB-01, FP-EXP-06 | Editable format is documented | No SNAGX specification found; non-official ZIP claim (S-LIB-13) | OBS: docs/CAPTURE-FORMAT.md | **Plausible** |
+| FP-LIB-05 | Folders | No Snagit folder feature found | CI tests | **Plausible** |
+| FP-LIB-07 | Trash with restore | No in-app trash found; Recycle Bin behaviour unknown | CI: `Trash_restore_and_permanent_delete`; permanent delete is best effort on SSDs | **Plausible** |
+| FP-LIB-10 | Backup/restore | Current backup appears to be a folder copy (INFER) | CI: backup tests | **Plausible** |
+| FP-LIB-08 | Retention policy | DOC S-LIB-14: captures kept until the user deletes them | CI: `Usage_and_retention` | **Withdrawn** → different by design |
+| FP-CAP-04 | Display + Full screen | Snagit monitor selection not researched | CI | **Withdrawn** → parity |
+| FP-CAP-22 | Capture without history | DOC S-LIB-12: autosave can be turned off | CI | **Withdrawn** → parity |
+| FP-ED-11, FP-SEC-03 | Safer redaction | DOC S-ED-08/09: solid shapes + flatten recommended; exports flattened | CI redaction tests | **Withdrawn** → parity |
+| FP-OBJ-18 | Sanitize better than flatten | DOC S-ED-22: Flatten All is permanent | CI | **Withdrawn** → different |
+
+Corrected headline: only SnapForge's **offline / no-telemetry posture** (and favorites on Windows) is confirmed to
+exceed the reference. Library and storage are **at parity**; some advantages are plausible but unproven.
+
+## 3b. Gate A correction log (owner review, 2026-11-25)
+
+| Owner item | Correction |
+|---|---|
+| 183 rows vs category counts totalling 182 | FP-SEC-12 ("n/a") had been excluded from the count. Summary now has an n/a column; columns total 183 |
+| Unique IDs and traceable evidence | Requirements regenerated from one structured list: 223 requirements, duplicate check passes, every ranged ID (e.g. "ED-TOOL-01…11") expanded into individual rows, each with Source, Ev and Verification columns; every matrix row's references resolve |
+| Documented vs assumed vs verified | Ev column (OWNER/DOC/OBS/INFER/UNVERIFIED) on every requirement; Verification column names the test/CI job or says "gap"/"manual" |
+| Revalidate "exceeds" claims | §3a: 4 confirmed, 5 plausible, 6 withdrawn |
+| Preserve all capabilities in roadmap | Every one of the 183 matrix rows is mapped to a requirement and milestone; "not planned" rows kept as **Backlog** requirements (CAP-LEG-01/02, EXP-07/08) — DEVELOPMENT-ROADMAP.md coverage appendix |
+| Owner decisions | Widget enabled and topmost by default (WID-01/07); Windows 11 first (PD-03); signing before release (PD-04) |
+
 ## 4. Menu-by-menu and surface-by-surface gap analysis
 
 ### 4.1 Capture panel
@@ -178,8 +213,8 @@ keyboard- and Narrator-operable (NFR-A11Y-01…03).
 | Q-01 | Allow `www.techsmith.com`, `support.techsmith.com`, `assets.techsmith.com`, `learn.microsoft.com` in this environment's network policy (or supply PDFs/screenshots) so DOC items can be re-verified? | All Snagit facts are extracts | Yes, before M4 planning; not blocking M3 |
 | Q-02 | Approve the M3 scope in DEVELOPMENT-ROADMAP.md (panel, widget, drag-out, import, privacy, benchmarks)? | Gate B start | Approve as written |
 | Q-03 | Video and All-in-One shown **disabled** in the rail (labelled "Not available yet"), or hidden until built? | G-02 | Disabled + labelled, matching the reference layout |
-| Q-04 | Widget enabled by default for new installs? | First-run experience | Off by default; offered on first run |
-| Q-05 | Widget topmost by default? | Focus/full-screen apps | On, with auto-hide off; owner to confirm |
+| Q-04 | Widget enabled by default for new installs? | First-run experience | **Decided by owner: enabled** |
+| Q-05 | Widget topmost by default? | Focus/full-screen apps | **Decided by owner: on** |
 | Q-06 | Drag-out default PNG; filename pattern `<title> <yyyy-MM-dd HHmmss>.png`? | DND-04/05 | Yes |
 | Q-07 | Any cloud share destinations ever (opt-in), or strictly none? | G-03 | Strictly none until M9 decision |
 | Q-08 | Keep single-letter tool keys or switch to Ctrl+1–9 by toolbar position (Snagit style)? | Muscle memory vs current tests | Keep letters; add Ctrl+1–9 as aliases in M4 if Capture shortcuts move |

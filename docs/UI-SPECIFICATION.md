@@ -44,7 +44,7 @@ implemented; only the arrangement differs from the reference. M3 rearranges; it 
 * Hidden during capture (already implemented for all SnapForge windows).
 * Minimum size enforced; at 200 % scaling the panel must still fit a 1366×768 screen.
 
-## 2. Persistent capture widget (Gate B item 2; WID-01…WID-16)
+## 2. Persistent capture widget (Gate B item 2; WID-01…WID-12)
 
 | State | Proposal |
 |---|---|

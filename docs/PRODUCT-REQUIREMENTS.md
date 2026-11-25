@@ -1,164 +1,357 @@
-# SnapForge master product requirements (Gate A)
+# SnapForge master product requirements
 
-Status: **Proposed — awaiting owner approval.** This document becomes the master requirements list once approved.
-It supersedes [REQUIREMENTS.md](REQUIREMENTS.md) for new work; REQUIREMENTS.md stays as the record of what M1/M2
-delivered (its IDs C*, E*, L*, AC* remain valid and are mapped below as BL-*).
+Status: **master list** (Gate A corrected 2026-11-25; Gate B approved with owner decisions). Generated from one
+structured list, so every row has a **unique ID** (checked mechanically: 223 requirements, 0 duplicates) and every
+parity-matrix row maps to at least one requirement (checked: 183 matrix rows, 0 dangling references).
+[REQUIREMENTS.md](REQUIREMENTS.md) stays as the record of milestones 1–2; its IDs map to the BL-* rows.
 
-Every requirement has: **ID · Source** (registry ID or owner instruction) **· Status · Priority · Milestone ·
-Acceptance criteria · Evidence · Approval**. Sources: [SOURCE-REGISTRY.md](SOURCE-REGISTRY.md). Parity rows:
+Columns: **ID · Requirement · Source** (registry ID, owner instruction, or audit finding) **· Ev** (evidence class of
+the *basis* for the requirement: OWNER = owner instruction, DOC = vendor documentation seen only as a search
+extract, OBS = auditor observation of SnapForge, INFER = assumption, UNVERIFIED = conflicting/weak) **· Status ·
+Pri · MS · Acceptance · Verification** (named automated test, CI job, or "manual"; "gap" = not yet verified)
+**· Approval · FP** (parity rows). Sources: [SOURCE-REGISTRY.md](SOURCE-REGISTRY.md). Parity:
 [FEATURE-PARITY-MATRIX.md](FEATURE-PARITY-MATRIX.md).
 
-* **Status**: Implemented (baseline, automated tests) · Partial · Not started · Not planned
-* **Priority**: P1 must · P2 should · P3 could
-* **Approval**: _Proposed_ (all rows today) → Approved / Rejected / Deferred by the owner
-* "OWNER" in Source = the owner's milestone-3 instructions (I-05, `CLAUDE-PROMPT.md`).
+Approval states: *Approved — global rule* · *Approved — product decision* · *Approved — Gate B* (authorised for
+milestone 3) · *Delivered M1/M2 — under independent review* · *Proposed — not authorised* (later milestones; nothing
+here authorises work beyond milestone 3).
 
-## 0. Global rules (apply to every milestone)
 
-| ID | Requirement | Source | Acceptance criteria | Approval |
-|---|---|---|---|---|
-| G-01 | Preserve all existing functionality and user data; no destructive migration | OWNER | All baseline tests pass; existing libraries/settings open unchanged; settings schema changes are additive with version bump and tested upgrade | Proposed |
-| G-02 | No fake controls: unavailable features are absent or disabled and labelled "Not available yet" | OWNER, M1 rule | UI test enumerates every command; each is either functional (has a test) or disabled with that label | Proposed |
-| G-03 | Offline and local: no accounts, subscription, ads, automatic upload, sync or telemetry | OWNER | No network API in code (CI grep gate), no outbound connections observed in a manual network-monitor check | Proposed |
-| G-04 | Original branding; Snagit used as functional reference only | OWNER | Review: no TechSmith names/icons/art/text in UI or assets | Proposed |
-| G-05 | No paid dependencies; licence-compatible (MIT-compatible) only | OWNER | THIRD-PARTY-NOTICES lists every dependency + licence; CI fails on unknown licences (M9 tooling) | Proposed |
-| G-06 | No merge to `main`, no release publication without explicit approval | OWNER | — | Proposed |
-| G-07 | Evidence honesty: CI results are labelled CI; manual Windows results only from a real PC | OWNER | Handoffs separate CI and manual evidence | Proposed |
+## Global rules (8)
 
-## 1. Baseline (implemented at 3018841) — preserved, regression-tested
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| G-01 | Preserve all existing functionality and user data; no destructive migration | OWNER | OWNER | In force | P1 | all | All baseline tests pass; existing libraries/settings open unchanged; settings changes additive with upgrade test | CI test suite each commit | Approved — global rule (owner) | — |
+| G-02 | No fake controls: unavailable features absent or disabled and labelled "Not available yet" | OWNER | OWNER | In force | P1 | all | Every visible command is functional (has a test) or disabled with that label | UI tests per surface | Approved — global rule (owner) | — |
+| G-03 | Offline and local; no accounts, subscription, ads, automatic upload, sync or telemetry | OWNER | OWNER | In force | P1 | all | No network API in src/ (grep gate); manual network check | OBS grep; CI grep step (M3) | Approved — global rule (owner) | — |
+| G-04 | Original SnapForge branding; Snagit used as functional reference only | OWNER | OWNER | In force | P1 | all | No TechSmith names/icons/art/text in UI or assets | Review | Approved — global rule (owner) | — |
+| G-05 | No paid dependencies; MIT-compatible licences only | OWNER | OWNER | In force | P1 | all | THIRD-PARTY-NOTICES lists all dependencies and licences | Review of lock files | Approved — global rule (owner) | — |
+| G-06 | No merge to main, no production release without explicit approval; no scope beyond the approved milestone | OWNER | OWNER | In force | P1 | all | — | — | Approved — global rule (owner) | — |
+| G-07 | Evidence honesty: CI labelled CI; manual results only from a real Windows PC; search extracts never described as direct source inspection | OWNER | OWNER | In force | P1 | all | Handoffs separate CI, manual and documentary evidence | Review | Approved — global rule (owner) | — |
+| G-08 | Do not weaken crash protection (production disk flushing) to improve benchmark or test results | OWNER | OWNER | In force | P1 | all | Benchmarks run with production durability; any test bypass is confined to setup and disclosed | Code review; PERF report | Approved — global rule (owner) | — |
 
-| ID | Requirement (summary) | Maps to | Status | Evidence |
-|---|---|---|---|---|
-| BL-CAP-01…07 | Region, Window, Display, Full screen; Preview in Editor; Copy to clipboard; presets with hotkeys; hide own windows | C1–C7, AC1–AC6 | Implemented | CI real-input tests (InteractiveUiTests), I-03 |
-| BL-ED-01…07 | Arrow, line, rectangle, ellipse, highlight, text, steps, crop; zoom; undo/redo; restore last tool/colour/width | E1–E9 | Implemented | Core + App tests, I-03 |
-| BL-PRIV-01/02 | Opaque redaction irreversible on export; Sanitize; JPEG metadata check; warnings for editable originals | AC9–AC12, docs/REDACTION.md | Implemented | ExportTests, CaptureLibraryTests |
-| BL-LIB-01…09 | Autosave library (opt-out), tags, favorites, virtual folders, date groups, trash/restore, retention, backup/restore, thumbnail size | L1–L20, AC23–AC31 | Implemented | CaptureLibraryTests, LibraryWorkflowTests |
-| BL-TR-01…04 | Persistent tray, pin, close ≠ delete, show/hide | AC27 | Implemented | TrayAndSettingsTests, LibraryWorkflowTests |
-| BL-EXP-01…03 | PNG/JPEG export, `.sfcap` editable package, clipboard | AC7, AC8 | Implemented | ExportTests |
-| BL-SET-01/02 | Light/Dark/System theme; close to notification area; single instance | — | Implemented | UiSmokeTests |
-| BL-SEC-01/02 | No network/telemetry; supply-chain controls (pinned actions, lock files, signed packages, checksums) | docs/SECURITY.md | Implemented | OBS grep, CI |
+## Product decisions (5)
 
-## 2. Milestone 3 (Gate B proposal) — detailed
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| PD-01 | Keep "SnapForge" as working name pending naming clearance | OWNER | OWNER | Decided | P1 | — | No rename without approval | — | Approved — product decision (owner, 2026-11-25) | — |
+| PD-02 | Keep existing copyright line provisionally | OWNER | OWNER | Decided | P1 | — | LICENSE unchanged | — | Approved — product decision (owner, 2026-11-25) | — |
+| PD-03 | Prioritise Windows 11; evaluate Windows 10 compatibility separately | OWNER | OWNER | Decided | P1 | M3+ | Acceptance runs on Windows 11 first; Windows 10 evaluated in its own report | docs/COMPATIBILITY.md | Approved — product decision (owner, 2026-11-25) | — |
+| PD-04 | Trusted code signing required before any public release | OWNER | OWNER | Decided | P1 | M9 | Release checklist blocks unsigned builds | — | Approved — product decision (owner, 2026-11-25) | — |
+| PD-05 | Free, offline core functionality without paid dependencies | OWNER | OWNER | Decided | P1 | all | = G-03, G-05 | — | Approved — product decision (owner, 2026-11-25) | — |
 
-### 2.1 Capture control panel (CAP-UI)
+## Research (2)
 
-| ID | Requirement | Source | Status | Pri | Acceptance criteria | Evidence today | Approval |
-|---|---|---|---|---|---|---|---|
-| CAP-UI-01 | Compact horizontal panel (≤ 760×260 logical px at 100 %) with File/Edit/View/Help menus | OWNER; I-05 OBS | Not started (vertical panel exists) | P1 | Window renders within bounds at 100/150/200 %; menus reachable with Alt; screenshot at Gate C | I-06 (vertical) | Proposed |
-| CAP-UI-02 | Left rail: All-in-One, Image, Video; only Image enabled, others disabled "Not available yet" | OWNER; S-CAP-01 DOC | Not started | P1 | UI test: Image selected by default; other two `IsEnabled=false`, tooltip + automation name contain "Not available yet" | — | Proposed |
-| CAP-UI-03 | Selection dropdown: Region, Window, Display, Full screen | OWNER; FP-CAP-23 | Partial (tiles) | P1 | Each item triggers the existing capture mode (reuse real-input tests) | InteractiveUiTests | Proposed |
-| CAP-UI-04 | Effects and Share dropdowns; Share offers only working destinations (None, Library, Clipboard, Folder if EXP-05 approved); Effects disabled until M4 | OWNER; FP-CAP-23 | Not started | P1 | Selecting each Share item produces the documented result in a test; Effects dropdown disabled + labelled | — | Proposed |
-| CAP-UI-05 | Large circular Capture button with assigned hotkey text beneath; warning state when hotkey failed to register | OWNER; I-05 | Partial | P1 | Button is default (Enter); text equals current gesture or "No hotkey"; conflict state shown in test with a pre-registered hotkey | ShellIntegration conflict reporting | Proposed |
-| CAP-UI-06 | Switches: Preview in Editor, Copy to Clipboard, Cursor, Time Delay | OWNER; S-CAP-04 DOC | Implemented (vertical) | P1 | Each switch persists in settings and is honoured by a capture (existing tests extended) | CaptureWindow | Proposed |
-| CAP-UI-07 | Save to Library switch preserved | OWNER | Implemented | P1 | Off → capture produces no library files (existing test) | LibraryWorkflowTests | Proposed |
-| CAP-UI-08 | Time Delay chevron opens duration picker (1–60 s, presets 1/3/5/10) | OWNER; S-CAP-03 DOC | Partial (0–10 fixed) | P1 | Values persist; countdown shown; Esc cancels during countdown | CountdownWindow | Proposed |
-| CAP-UI-09 | Reset button restores panel defaults, with Undo toast | OWNER; I-05 | Not started | P2 | Reset then Undo returns previous options exactly | — | Proposed |
-| CAP-UI-10 | Remembers position per monitor; clamps on-screen | INFER | Not started | P1 | Unit test of clamp logic with monitor-layout fixtures | — | Proposed |
-| CAP-UI-11 | Footer: Presets flyout, "+" save preset, Open SnapForge Editor, Open Library | OWNER; S-CAP-09 DOC | Partial | P1 | Each command works via keyboard and mouse in UI test | CaptureWindow | Proposed |
-| CAP-UI-12 | Light/dark/high-contrast themes | OWNER | Partial (no HC) | P1 | Renders with each theme; HC uses system colours (manual check) | ThemeManager | Proposed |
-| CAP-UI-13 | Keyboard: Enter captures, Esc closes, access keys for dropdowns, Space toggles | NFR-A11Y | Partial | P1 | Keyboard-only UI test covers every control | — | Proposed |
-| CAP-UI-14 | Rename misleading preset "Menu capture (3 s delay, cursor)" to "Region with 3 s delay and cursor" (DEF-03) | Audit | Not started | P1 | Existing users' preset renamed only if unchanged from default; test | AppSettings.Defaults | Proposed |
-| CAP-HK-01 | Print Screen default verified on Windows 11 with Snipping Tool setting on/off | S-CAP-07/19 DOC | Partial | P1 | Manual result recorded both ways; UI explains conflict and how to fix | DEF-08 | Proposed |
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| RES-01 | Revalidate the source registry against original TechSmith/Microsoft pages when access is granted | OWNER | OWNER | Blocked (hosts still denied 2026-11-25) | P1 | M3 (when access) | Each DOC row re-checked and marked DOC-direct or corrected | SOURCE-REGISTRY revalidation log | Approved — Gate B (owner, 2026-11-25) | — |
+| RES-02 | Label search-engine extracts as such; never as direct inspection | OWNER | OWNER | In force | P1 | all | Evidence class column on every claim | Review | Approved — global rule (owner) | — |
 
-### 2.2 Persistent capture widget (WID)
+## Baseline (M1/M2) (37)
 
-| ID | Requirement | Source | Status | Pri | Acceptance criteria | Approval |
-|---|---|---|---|---|---|---|
-| WID-01 | Widget can be enabled/disabled (Settings → Widget); default **off** pending Q-04 | OWNER; S-CAP-06 DOC | Not started | P1 | Toggle shows/hides immediately and persists | Proposed |
-| WID-02 | Collapsed tab docked top-centre of primary monitor by default | OWNER | Not started | P1 | Position test on fixture layouts; screenshot | Proposed |
-| WID-03 | Expands on hover (≥ 300 ms intent) or click (configurable); collapses on leave | OWNER; S-CAP-06 DOC | Not started | P1 | Real-input UI test: hover expands, leave collapses; click mode ignores hover | Proposed |
-| WID-04 | Dock to top, left or right edge of any monitor by dragging; snaps | OWNER; S-CAP-06 DOC | Not started | P1 | Core dock-model unit tests; drag UI test | Proposed |
-| WID-05 | Buttons: Capture, Editor, Library, Presets ▾ | OWNER | Not started | P1 | Each button test | Proposed |
-| WID-06 | Auto-hide option | OWNER | Not started | P1 | Hidden until edge touched; test | Proposed |
-| WID-07 | Topmost option | OWNER | Not started | P1 | Window style flag test | Proposed |
-| WID-08 | Remembers monitor + edge + offset; survives monitor removal and mixed DPI | OWNER | Not started | P1 | Unit tests with layout changes; manual mixed-DPI check | Proposed |
-| WID-09 | Never steals focus (non-activating tool window, no taskbar button) | OWNER | Not started | P1 | Test: foreground window unchanged after hover/expand | Proposed |
-| WID-10 | Hidden during capture; never appears in captured pixels | OWNER | Not started | P1 | Capture test asserts widget region pixels ≠ widget colours | Proposed |
-| WID-11 | Accessible: keyboard reachable from notification-area menu, automation names | NFR-A11Y | Not started | P1 | Automation tree test | Proposed |
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| BL-CAP-01 | Region capture by drag, freeze-frame, multi-monitor | REQUIREMENTS.md C1 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Region_drag_completes_with_exact_rectangle; Drag_across_monitors_with_negative_coordinates_is_exact | Delivered M1/M2 — under independent review | FP-CAP-02 |
+| BL-CAP-02 | Window capture by hover + click | REQUIREMENTS.md C2 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Window_mode_click_returns_the_window_under_the_cursor; Window_picker_prefers_frontmost_window | Delivered M1/M2 — under independent review | FP-CAP-03 |
+| BL-CAP-03 | Display (one monitor) and Full screen (all monitors) | REQUIREMENTS.md C3 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Display_mode_click_returns_the_monitor_bounds; Snapshot_image_matches_virtual_desktop_and_is_opaque | Delivered M1/M2 — under independent review | FP-CAP-04 |
+| BL-CAP-04 | Preview in Editor option | REQUIREMENTS.md C4 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Main_window_loads_edits_and_exports | Delivered M1/M2 — under independent review | FP-CAP-20 |
+| BL-CAP-05 | Copy to clipboard option | REQUIREMENTS.md C5 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Clipboard_receives_bitmap_and_png | Delivered M1/M2 — under independent review | FP-CAP-21 |
+| BL-CAP-06 | Capture presets with per-preset hotkeys | REQUIREMENTS.md C6 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Settings_round_trip_and_defaults; Hotkey_conflicts_are_detected_within_snapforge | Delivered M1/M2 — under independent review | FP-CAP-25 |
+| BL-CAP-07 | SnapForge windows hidden during capture | REQUIREMENTS.md C7 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | (no automated pixel test; CaptureController.cs) — gap | Delivered M1/M2 — under independent review | FP-CAP-28 |
+| BL-ED-01 | Arrow, line, rectangle, ellipse, text, step tools | REQUIREMENTS.md E1 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Every_annotation_type_renders; Annotations_can_be_drawn_selected_moved_undone_and_deleted_with_the_mouse | Delivered M1/M2 — under independent review | FP-ED-03 |
+| BL-ED-02 | Highlight tool | REQUIREMENTS.md E2 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Highlight_annotation_hit_testing_and_degenerate | Delivered M1/M2 — under independent review | FP-ED-08 |
+| BL-ED-03 | Crop (reversible until sanitize) | REQUIREMENTS.md E3 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Crop_cuts_images_shifts_annotations_clips_masks_and_undoes | Delivered M1/M2 — under independent review | FP-ED-09 |
+| BL-ED-04 | Zoom in/out/fit/actual | REQUIREMENTS.md E4 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | (manual; UI menu) — gap | Delivered M1/M2 — under independent review | FP-ED-31 |
+| BL-ED-05 | Stroke width and colour | REQUIREMENTS.md E5 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Annotations_round_trip_with_ids_and_styles | Delivered M1/M2 — under independent review | FP-OBJ-03 |
+| BL-ED-06 | Undo/redo | REQUIREMENTS.md E6 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Add_undo_redo_round_trip; History_capacity_drops_oldest_steps | Delivered M1/M2 — under independent review | FP-OBJ-19 |
+| BL-ED-07 | Restore last tool/colour/width | REQUIREMENTS.md E7 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Settings_round_trip_and_defaults | Delivered M1/M2 — under independent review | FP-OBJ-24 |
+| BL-PRIV-01 | Opaque redaction, flattened exports, Sanitize, warnings | REQUIREMENTS.md AC9–AC12 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Redacted_pixels_are_exactly_black_in_the_export; Sanitize_removes_original_pixels_from_the_library_copy | Delivered M1/M2 — under independent review | FP-SEC-03 |
+| BL-PRIV-02 | No metadata in PNG/JPEG exports | REQUIREMENTS.md AC12 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Png_contains_no_text_or_exif_metadata; Jpeg_contains_no_exif_or_xmp_metadata | Delivered M1/M2 — under independent review | FP-SEC-05 |
+| BL-LIB-01 | Automatic library (opt-out per capture), versioned documented format | REQUIREMENTS.md L1 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | New_capture_is_saved_automatically_and_survives_restart_with_editable_annotations; Capture_without_history_is_not_written_to_the_library | Delivered M1/M2 — under independent review | FP-CAP-22, FP-LIB-01 |
+| BL-LIB-02 | Tags | REQUIREMENTS.md L5 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Views_search_and_sort | Delivered M1/M2 — under independent review | FP-LIB-03 |
+| BL-LIB-03 | Favorites | REQUIREMENTS.md L6 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Views_search_and_sort | Delivered M1/M2 — under independent review | FP-LIB-04 |
+| BL-LIB-04 | Virtual folders | REQUIREMENTS.md L7 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Views_search_and_sort | Delivered M1/M2 — under independent review | FP-LIB-05 |
+| BL-LIB-05 | Date grouping | REQUIREMENTS.md L8 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Date_grouping_labels | Delivered M1/M2 — under independent review | FP-LIB-06 |
+| BL-LIB-06 | Trash, restore, permanent delete (best-effort overwrite) | REQUIREMENTS.md L9 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Trash_restore_and_permanent_delete | Delivered M1/M2 — under independent review | FP-LIB-07 |
+| BL-LIB-07 | Retention policy and usage report | REQUIREMENTS.md L10 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Usage_and_retention | Delivered M1/M2 — under independent review | FP-LIB-08 |
+| BL-LIB-08 | Backup/restore with entry validation | REQUIREMENTS.md L11 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Backup_and_restore_round_trip_without_overwriting; Restore_rejects_path_traversal_and_foreign_zips | Delivered M1/M2 — under independent review | FP-LIB-10 |
+| BL-LIB-09 | Adjustable thumbnails, lazy loading | REQUIREMENTS.md L12 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Large_library_view_loads_lazily | Delivered M1/M2 — under independent review | FP-LIB-16 |
+| BL-LIB-10 | Move library location | REQUIREMENTS.md L13 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Move_library_to_new_location_and_reject_non_empty_target; Storage_location_change_moves_all_captures | Delivered M1/M2 — under independent review | — |
+| BL-TR-01 | Persistent Recent Captures tray | REQUIREMENTS.md AC27 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Tray_orders_pinned_first_then_most_recent_and_persists | Delivered M1/M2 — under independent review | FP-TR-01 |
+| BL-TR-02 | Pin to tray | REQUIREMENTS.md AC27 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Tray_close_pin_and_delete_behave_as_specified | Delivered M1/M2 — under independent review | FP-TR-02 |
+| BL-TR-03 | Close from tray does not delete | REQUIREMENTS.md AC27 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Tray_close_does_not_delete_and_prune_drops_missing | Delivered M1/M2 — under independent review | FP-TR-03 |
+| BL-TR-04 | Show/hide tray | REQUIREMENTS.md AC27 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Switching_between_editor_and_library_and_search | Delivered M1/M2 — under independent review | FP-TR-06 |
+| BL-EXP-01 | PNG/JPEG export | REQUIREMENTS.md AC7 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Png_round_trip_is_lossless; Jpeg_encodes_with_correct_size_and_close_colors | Delivered M1/M2 — under independent review | FP-EXP-01 |
+| BL-EXP-02 | Editable package .sfcap export/import | REQUIREMENTS.md AC8 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Package_export_import_gets_new_id_and_rejects_unknown_entries | Delivered M1/M2 — under independent review | FP-EXP-06 |
+| BL-EXP-03 | Copy flattened image to clipboard | REQUIREMENTS.md AC7 | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | Clipboard_and_file_exports_share_the_redacted_flattened_image | Delivered M1/M2 — under independent review | FP-EXP-07 |
+| BL-SET-01 | Light/Dark/System theme | REQUIREMENTS.md — | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | (manual) — gap | Delivered M1/M2 — under independent review | FP-SET-02 |
+| BL-SET-02 | Close to notification area; single instance | REQUIREMENTS.md — | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | (manual) — gap | Delivered M1/M2 — under independent review | FP-SET-10 |
+| BL-SEC-01 | No network code, no telemetry | REQUIREMENTS.md docs/SECURITY.md | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | OBS grep 2026-11-25 | Delivered M1/M2 — under independent review | FP-SET-06, FP-SEC-01, FP-SEC-02 |
+| BL-SEC-02 | Supply chain: pinned actions, lock files, signed packages, checksums | REQUIREMENTS.md docs/SECURITY.md | OBS | Implemented | P1 | M1/M2 | Preserved; covered by named tests | CI workflow | Delivered M1/M2 — under independent review | FP-SEC-06 |
 
-### 2.3 Native drag and drop (DND)
+## M3 Capture panel (15)
 
-| ID | Requirement | Source | Status | Pri | Acceptance criteria | Approval |
-|---|---|---|---|---|---|---|
-| DND-01 | Drag from Recent Captures tray and Library to external apps offers `CF_HDROP` file list | OWNER; S-LIB-03 DOC; S-LIB-55 DOC | Not started | P1 | Unit test inspects `DataObject` formats; Explorer drop (CI desktop) creates files | Proposed |
-| DND-02 | Single and multi-selection (Ctrl/Shift-click in tray and Library) | OWNER; S-LIB-16 DOC | Not started (tray) / Implemented (Library multi-select) | P1 | Drag of N items yields N files | Proposed |
-| DND-03 | Files are **flattened** renders (annotations applied, redactions burned in) — PNG by default | OWNER | Not started | P1 | Pixel test: dropped PNG equals export of same capture | Proposed |
-| DND-04 | Optional JPEG (quality setting) in Settings → Drag and drop | OWNER; S-CAP-06 DOC | Not started | P1 | Setting changes extension and encoder; test | Proposed |
-| DND-05 | Meaningful, unique, filesystem-safe filenames (title + date; collision suffix) | OWNER; S-LIB-31 DOC | Not started | P1 | Unit tests: reserved names, invalid chars, long titles, duplicates | Proposed |
-| DND-06 | Copy semantics only (`DragDropEffects.Copy`); library originals never moved or deleted | OWNER | Not started | P1 | Test: library unchanged after drop with Move requested by target | Proposed |
-| DND-07 | Editable originals preserved; `.sfcap`/base images never offered | OWNER | Not started | P1 | Test: data object contains no `.sfcap`, no unredacted base | Proposed |
-| DND-08 | Safe cancellation (Esc, drop outside) and delayed temp cleanup (≥ 60 s after drop, on exit, and stale sweep at start) | OWNER | Not started | P1 | Tests with fake clock; temp folder empty after sweep | Proposed |
-| DND-09 | Reordering inside the tray distinguished from export (drop target = tray → reorder, no files) | OWNER; S-LIB-01 DOC | Not started | P1 | UI test: reorder persists, no temp files created | Proposed |
-| DND-10 | External image import: drop or open PNG/JPEG/BMP into Library or Editor | OWNER | Not started | P1 | Imported image appears in Library; invalid files rejected with message | Proposed |
-| DND-11 | Compatibility evidence table for desktop, Explorer, Outlook, Teams, Word, PowerPoint, OneNote, browser upload — each marked **Tested (manual, real PC)** or **Expected** | OWNER | Not started | P1 | Table in Gate C handoff; no "Tested" without a recorded manual result | Proposed |
-| DND-12 | Drag image shows thumbnail + count badge | UI spec | Not started | P2 | Visual check | Proposed |
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| CAP-UI-01 | Compact horizontal panel (≤ 760×260 logical px at 100 %) with File/Edit/View/Help menus | OWNER; I-05 | OWNER+OBS | Not started | P1 | M3 | Fits bounds at 100/150/200 %; menus via Alt | UI test + real screenshot | Approved — Gate B (owner, 2026-11-25) | FP-CAP-29, FP-CAP-30 |
+| CAP-UI-02 | Mode rail All-in-One / Image / Video; only Image enabled; others disabled "Not available yet" | OWNER; S-CAP-01 | OWNER+DOC | Not started | P1 | M3 | Image selected; other two disabled with label in tooltip + automation name | UI test | Approved — Gate B (owner, 2026-11-25) | FP-CAP-01 |
+| CAP-UI-03 | Selection dropdown: Region, Window, Display, Full screen | OWNER; FP-CAP-23 | OWNER | Partial (tiles) | P1 | M3 | Each item runs the existing capture mode | UI test | Approved — Gate B (owner, 2026-11-25) | FP-CAP-23 |
+| CAP-UI-04 | Effects dropdown disabled ("Not available yet") until effects exist | OWNER; S-CAP-28 | OWNER+DOC | Not started | P1 | M3 | Disabled + labelled | UI test | Approved — Gate B (owner, 2026-11-25) | FP-CAP-23 |
+| CAP-UI-05 | Share dropdown offering only working destinations (None, Library, Clipboard) | OWNER; S-CAP-04 | OWNER+DOC | Not started | P1 | M3 | Each item maps to working options | UI test | Approved — Gate B (owner, 2026-11-25) | FP-CAP-23 |
+| CAP-UI-06 | Large circular Capture button; assigned hotkey text beneath; warning when hotkey not registered | OWNER; I-05 | OWNER+OBS | Partial | P1 | M3 | Enter triggers; text equals gesture or "No hotkey"; conflict state shown | UI test | Approved — Gate B (owner, 2026-11-25) | FP-CAP-31 |
+| CAP-UI-07 | Switches Preview in Editor, Copy to Clipboard, Cursor, Time Delay | OWNER; S-CAP-04 | OWNER+DOC | Implemented (vertical) | P1 | M3 | Persist and honoured | UI test | Approved — Gate B (owner, 2026-11-25) | — |
+| CAP-UI-08 | Save to Library switch preserved | OWNER | OWNER | Implemented | P1 | M3 | Off → no library files | Capture_without_history_is_not_written_to_the_library | Approved — Gate B (owner, 2026-11-25) | — |
+| CAP-UI-09 | Time-delay duration picker (1–60 s) | OWNER; S-CAP-03 | OWNER+DOC | Partial (0–10 fixed) | P1 | M3 | Values persist; countdown shown; Esc cancels | Core + UI test | Approved — Gate B (owner, 2026-11-25) | FP-CAP-19 |
+| CAP-UI-10 | Reset button restores defaults with Undo | OWNER; I-05 | OWNER+OBS | Not started | P2 | M3 | Reset then Undo restores previous options | UI test | Approved — Gate B (owner, 2026-11-25) | FP-CAP-29 |
+| CAP-UI-11 | Remembers position per monitor; clamps on-screen | INFER | INFER | Not started | P1 | M3 | Clamp logic unit-tested | Core test | Approved — Gate B (owner, 2026-11-25) | FP-SET-12 |
+| CAP-UI-12 | Footer: Presets flyout, + save preset, Open SnapForge Editor, Open Library | OWNER; S-CAP-09 | OWNER+DOC | Partial | P1 | M3 | Commands work by keyboard and mouse | UI test | Approved — Gate B (owner, 2026-11-25) | FP-CAP-29 |
+| CAP-UI-13 | Keyboard: Enter captures, Esc closes, access keys, Space toggles | NFR-A11Y-01 | OWNER | Partial | P1 | M3 | Keyboard-only test | UI test | Approved — Gate B (owner, 2026-11-25) | — |
+| CAP-UI-14 | Rename misleading preset "Menu capture (3 s delay, cursor)" (unchanged defaults migrated) | Audit DEF-03 | OBS | Not started | P1 | M3 | New name; migration test | Core test | Approved — Gate B (owner, 2026-11-25) | — |
+| CAP-HK-01 | Print Screen conflict (Windows 11 Snipping Tool) detected and explained | S-CAP-07/19 | DOC | Partial | P1 | M3 | Message names the Windows setting; manual both ways | Global_hotkey_conflicts_are_reported_not_silently_ignored + manual | Approved — Gate B (owner, 2026-11-25) | FP-CAP-27 |
 
-### 2.4 Privacy of drag-out (PRIV-DND)
+## M3 Desktop widget (13)
 
-| ID | Requirement | Source | Status | Pri | Acceptance criteria | Approval |
-|---|---|---|---|---|---|---|
-| PRIV-DND-01 | Drag is an export: same privacy guarantees as File → Export | OWNER | Not started | P1 | Shared code path with export; test | Proposed |
-| PRIV-DND-02 | Never expose hidden original pixels (pixel-level regression: redacted area identical to mask colour) | OWNER | Not started | P1 | Test on redacted capture with known underlying pattern | Proposed |
-| PRIV-DND-03 | Strip metadata (no EXIF/XMP/text chunks beyond required) | OWNER | Not started | P1 | PNG chunk and JPEG segment inspection test | Proposed |
-| PRIV-DND-04 | Temp files in per-user folder under `%LOCALAPPDATA%\SnapForge\Temp\Drag`, user-only ACL inherited, random subfolder per drag | OWNER | Not started | P1 | Test asserts location; ACL check on Windows CI | Proposed |
-| PRIV-DND-05 | Blur/pixelate (when added in M4) never described as irreversible redaction | OWNER; S-ED-08 DOC | Not started | P1 | UI text review; test that blur tool label contains "not secure" | Proposed |
-| PRIV-DND-06 | Cleanup on cancel, on exit, and crash recovery sweep at next start | OWNER | Not started | P1 | Tests | Proposed |
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| WID-01 | Widget enabled by default; can be disabled in Settings | OWNER (decision 2026-11-25) | OWNER | Not started | P1 | M3 | Visible on first start; toggle persists | UI test | Approved — Gate B (owner, 2026-11-25) | FP-WID-01 |
+| WID-02 | Collapsed tab docked top-centre of primary monitor by default | OWNER | OWNER | Not started | P1 | M3 | Default placement unit-tested | Core test | Approved — Gate B (owner, 2026-11-25) | FP-WID-02 |
+| WID-03 | Expands on hover or click (configurable); collapses when not in use | OWNER; S-CAP-06 | OWNER+DOC | Not started | P1 | M3 | Hover/leave and click behaviour | Real-input UI test | Approved — Gate B (owner, 2026-11-25) | FP-WID-02 |
+| WID-04 | Dock to top, left or right edge of any monitor by dragging | OWNER; S-CAP-06 | OWNER+DOC | Not started | P1 | M3 | Dock model tests; drag test | Core + UI test | Approved — Gate B (owner, 2026-11-25) | FP-WID-03 |
+| WID-05 | Buttons Capture, Editor, Library, Presets | OWNER | OWNER | Not started | P1 | M3 | Each works | UI test | Approved — Gate B (owner, 2026-11-25) | — |
+| WID-06 | Auto-hide option (off by default) | OWNER | OWNER | Not started | P2 | M3 | Hidden until edge hover | UI test | Approved — Gate B (owner, 2026-11-25) | FP-WID-04 |
+| WID-07 | Always on top by default; configurable | OWNER (decision 2026-11-25) | OWNER | Not started | P1 | M3 | Topmost flag on by default; setting toggles | UI test | Approved — Gate B (owner, 2026-11-25) | FP-WID-05 |
+| WID-08 | Remembers monitor + edge + offset; survives monitor removal and mixed DPI | OWNER | OWNER | Not started | P1 | M3 | Placement tests incl. removed monitor | Core test + manual | Approved — Gate B (owner, 2026-11-25) | FP-WID-06 |
+| WID-09 | Never steals focus (non-activating, no taskbar button) | OWNER | OWNER | Not started | P1 | M3 | Foreground unchanged after hover/expand | UI test | Approved — Gate B (owner, 2026-11-25) | — |
+| WID-10 | Hidden automatically during capture; never in captured pixels | OWNER | OWNER | Not started | P1 | M3 | Pixel test | UI test | Approved — Gate B (owner, 2026-11-25) | — |
+| WID-11 | Keyboard/assistive access (notification menu entry, automation names) | OWNER | OWNER | Not started | P1 | M3 | Automation tree test | UI test | Approved — Gate B (owner, 2026-11-25) | — |
+| WID-12 | Configurable through Settings (enable, topmost, hover/click, auto-hide, reset position) | OWNER | OWNER | Not started | P1 | M3 | Each setting persists and applies live | UI test | Approved — Gate B (owner, 2026-11-25) | — |
+| SET-01 | Optional launch with Windows (per-user Run key), off by default | OWNER; S-CAP-06 | OWNER+DOC | Not started | P1 | M3 | Toggle writes/removes HKCU Run value; starts in background | Windows test | Approved — Gate B (owner, 2026-11-25) | FP-WID-07, FP-SET-01 |
 
-### 2.5 Scale and performance (PERF)
+## M3 Drag and drop + import (18)
 
-| ID | Requirement | Source | Status | Pri | Acceptance criteria | Approval |
-|---|---|---|---|---|---|---|
-| PERF-01 | Benchmarks with **production durability** (no `SkipDiskFlush`) at 100, 1 000, 5 000, 10 000, 25 000 captures where CI time allows; report startup, memory, search, thumbnail, autosave latency, UI responsiveness | OWNER | Not started | P1 | Benchmark report with machine description; skipped sizes explained | Proposed |
-| PERF-02 | Seeding may bypass flush only if the measured operations do not, and the report says so | OWNER; DEF-01 | Partial | P1 | Code review + report wording | Proposed |
-| PERF-03 | Startup does not block UI for library indexing at 10 000 captures (target: first window < 2 s on CI) | DEF-02 | Not started | P1 | Benchmark | Proposed |
-| PERF-04 | Search over 10 000 records < 100 ms | INFER | Unknown | P2 | Benchmark | Proposed |
-| PERF-05 | Memory: Library at 10 000 records < 400 MB working set | INFER | Unknown | P2 | Benchmark | Proposed |
-| PERF-06 | Autosave latency at 10 000 captures within 2× of 100-capture latency | INFER | Unknown | P2 | Benchmark | Proposed |
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| DND-01 | External drag from Recent Captures tray offers CF_HDROP files | OWNER; S-LIB-03; S-LIB-55 | OWNER+DOC | Not started | P1 | M3 | Drop target receives file list | Real-input UI test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09 |
+| DND-02 | External drag from Library (single and multiple selection) | OWNER | OWNER | Not started | P1 | M3 | N items → N files | Real-input UI test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09, FP-LIB-12 |
+| DND-03 | Multi-selection in the tray (Ctrl/Shift-click) for drag | OWNER; S-LIB-16 | OWNER+DOC | Not started | P1 | M3 | Selection drag yields all selected | UI test | Approved — Gate B (owner, 2026-11-25) | FP-TR-08, FP-TR-09 |
+| DND-04 | PNG by default; configurable JPEG (quality) in Settings | OWNER | OWNER | Not started | P1 | M3 | Extension and encoder follow setting | Test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09, FP-SET-09 |
+| DND-05 | Meaningful, unique, timestamped, filesystem-safe filenames | OWNER | OWNER | Not started | P1 | M3 | Reserved names, invalid chars, long titles, duplicates | Core test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09, FP-EXP-09 |
+| DND-06 | Copy semantics only; library never modified by a drop | OWNER | OWNER | Not started | P1 | M3 | Library unchanged after drop | Test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09 |
+| DND-07 | Never offers editable packages, base images or unredacted data | OWNER | OWNER | Not started | P1 | M3 | Data object formats inspected | Test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09 |
+| DND-08 | Cancellation safe; temp files cleaned (delay, exit, start-up sweep) | OWNER | OWNER | Not started | P1 | M3 | Fake-clock cleanup tests | Core test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09 |
+| DND-09 | Reordering inside the tray distinct from export | OWNER; S-LIB-01 | OWNER+DOC | Not started | P1 | M3 | Reorder persists; no export files | UI test | Approved — Gate B (owner, 2026-11-25) | FP-TR-04, FP-TR-09 |
+| DND-10 | PNG and JPEG import (button and drop) into the Library | OWNER | OWNER | Not started | P1 | M3 | Imported capture appears; invalid rejected | UI test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09, FP-LIB-11 |
+| DND-11 | Compatibility table: Explorer, desktop, Outlook, Teams, Word, PowerPoint, OneNote, browser — Tested (manual) vs Expected | OWNER | OWNER | Not started | P1 | M3 | No "Tested" without recorded manual result | Handoff table | Approved — Gate B (owner, 2026-11-25) | FP-TR-09, FP-EXP-10 |
+| DND-12 | Drag shows a drag image | UI spec | INFER | Not started | P3 | M3 | Visual | Manual | Approved — Gate B (owner, 2026-11-25) | FP-TR-09 |
+| PRIV-DND-01 | Drag is an export: same flattening/redaction path as File → Export | OWNER | OWNER | Not started | P1 | M3 | Shared code path | Test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09 |
+| PRIV-DND-02 | Pixel-level regression: redacted area equals mask colour in dragged file | OWNER | OWNER | Not started | P1 | M3 | Pixel test | Test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09 |
+| PRIV-DND-03 | No metadata in dragged files | OWNER | OWNER | Not started | P1 | M3 | Chunk/segment inspection | Test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09 |
+| PRIV-DND-04 | Temp files in per-user %LOCALAPPDATA%\SnapForge\Temp\Drag, random subfolder per drag | OWNER | OWNER | Not started | P1 | M3 | Location asserted | Test | Approved — Gate B (owner, 2026-11-25) | FP-TR-09 |
+| PRIV-DND-05 | Blur/pixelate never presented as irreversible redaction | OWNER; S-ED-08 | OWNER+DOC | In force (no blur tool yet) | P1 | M3+ | Label review when blur added | Review | Approved — Gate B (owner, 2026-11-25) | FP-ED-11 |
+| PRIV-DND-06 | Imported images: only pixels kept (metadata dropped); size limits | OWNER | OWNER | Not started | P1 | M3 | Import of image with metadata stores none; oversize rejected | Test | Approved — Gate B (owner, 2026-11-25) | — |
 
-### 2.6 Settings and NFRs touched in M3
+## M3 Performance (7)
 
-| ID | Requirement | Source | Status | Pri | Acceptance criteria | Approval |
-|---|---|---|---|---|---|---|
-| SET-01 | Launch with Windows (per-user Run key), off by default | S-CAP-06 DOC; OWNER | Not started | P1 | Toggle writes/removes `HKCU\…\Run` value; test on Windows CI | Proposed |
-| NFR-DPI-1 | Per-monitor DPI correct at 100/125/150/200 % and mixed | OWNER | Partial | P1 | Manual on real multi-monitor PC; CI unit tests for coordinate math | Proposed |
-| NFR-A11Y-01 | Keyboard access to every command | OWNER | Partial | P1 | Keyboard-only UI tests per new surface | Proposed |
-| NFR-A11Y-02 | Narrator/NVDA announce names/roles/states of new controls | OWNER; S-CAP-24 DOC | Not verified | P1 | Manual screen-reader pass recorded | Proposed |
-| NFR-A11Y-03 | Windows high-contrast themes respected | S-CAP-24 DOC | Not verified | P1 | Manual check, screenshots | Proposed |
-| NFR-SEC-04 | Runs as standard (non-admin) user | OWNER | Unverified | P1 | Manual run under standard account | Proposed |
-| DEF-05 | Library sidebar storage path must not clip | Audit | Defect | P2 | Long path renders with ellipsis + tooltip | Proposed |
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| PERF-01 | Benchmarks at 100, 1 000, 5 000, 10 000, 25 000 captures with production flushing | OWNER | OWNER | Not started | P1 | M3 | Report per size: startup, memory, search, thumbnails, autosave, responsiveness | Benchmark job | Approved — Gate B (owner, 2026-11-25) | FP-LIB-18 |
+| PERF-02 | Seeding uses production durability too (no flush bypass anywhere in benchmarks) | OWNER; DEF-01 | OWNER+OBS | Not started | P1 | M3 | Code review | Benchmark source | Approved — Gate B (owner, 2026-11-25) | FP-LIB-18 |
+| PERF-03 | Library initialisation must not block the UI thread | OWNER; DEF-02 | OWNER+OBS | Not started | P1 | M3 | Window responsive while 25 000-capture library indexes | App benchmark | Approved — Gate B (owner, 2026-11-25) | FP-LIB-18 |
+| PERF-04 | Search latency reported; target < 100 ms at 10 000 | INFER | INFER | Unknown | P2 | M3 | Measured | Benchmark | Approved — Gate B (owner, 2026-11-25) | FP-LIB-18 |
+| PERF-05 | Memory reported; target < 400 MB at 10 000 | INFER | INFER | Unknown | P2 | M3 | Measured | Benchmark | Approved — Gate B (owner, 2026-11-25) | FP-LIB-18 |
+| PERF-06 | Autosave latency reported per size | OWNER | OWNER | Unknown | P1 | M3 | Measured | Benchmark | Approved — Gate B (owner, 2026-11-25) | FP-LIB-18 |
+| PERF-07 | Thumbnail loading time reported | OWNER | OWNER | Unknown | P1 | M3 | Measured | Benchmark | Approved — Gate B (owner, 2026-11-25) | FP-LIB-18 |
 
-## 3. Later milestones (summary; detailed criteria written at that milestone's Gate A)
+## M3 Quality / NFR (8)
 
-| ID | Requirement | Source | Status | Pri | MS | Acceptance (summary) | Approval |
-|---|---|---|---|---|---|---|---|
-| ED-OBJ-01 | Resize handles + move for all objects | S-ED-31 DOC | Partial (move) | P1 | M4 | Handle drag tests | Proposed |
-| ED-OBJ-02 | Fill vs outline for shapes/text | S-ED-28/29 | Not started | P1 | M4 | Property round-trip in format | Proposed |
-| ED-OBJ-03 | Colour picker with HEX/RGB + eyedropper | S-ED-38 | Not started | P1 | M4 | Tests | Proposed |
-| ED-OBJ-04 | Object rotation | S-ED-29 | Not started | P2 | M4 | Tests | Proposed |
-| ED-OBJ-05 | Opacity per object | S-ED-25 | Not started | P1 | M4 | Tests | Proposed |
-| ED-OBJ-06 | Arrowheads/end styles | S-ED-25 | Not started | P1 | M4 | Tests | Proposed |
-| ED-OBJ-07 | Shadow | S-ED-29 | Not started | P2 | M4 | Tests | Proposed |
-| ED-OBJ-08 | Font family/style/alignment | S-ED-28 | Not started | P1 | M4 | Tests | Proposed |
-| ED-OBJ-09 | Dash styles | S-ED-46 UNVERIFIED | Not started | P3 | M4 | Tests | Proposed |
-| ED-OBJ-10 | Multi-select, marquee, Ctrl+A, select all of a kind | S-ED-22, S-ED-01 | Not started | P1 | M4 | Tests | Proposed |
-| ED-OBJ-11 | Group/ungroup | S-ED-22 | Not started | P2 | M4 | Tests | Proposed |
-| ED-OBJ-12 | Layering | S-ED-22 | Not started | P1 | M4 | Tests | Proposed |
-| ED-OBJ-13 | Object cut/copy/paste/duplicate | S-ED-22/24 | Not started | P1 | M4 | Tests | Proposed |
-| ED-OBJ-14 | Paste objects between captures (editable) | INFER | Not started | P2 | M4 | Tests | Proposed |
-| ED-OBJ-15 | Per-object flatten | S-ED-22 | Not started | P2 | M4 | Tests | Proposed |
-| ED-OBJ-16 | Arrow-key nudge (1/10 px) | INFER | Not started | P1 | M4 | Tests | Proposed |
-| ED-OBJ-20 | Cursor captured as movable object | S-CAP-03 DOC | Partial (pixels) | P2 | M4 | Format + tests | Proposed |
-| ED-TOOL-01…11 | Callout, step options, cut out, blur/pixelate (labelled not secure), magnify, pen, eraser, stamps (original art), fill, pixel selection, magic wand | S-ED-* | Not started | P1–P3 | M4/M6 | Per-tool tests | Proposed |
-| ED-IMG-01…05 | Resize image, resize canvas, rotate/flip, auto trim, rounded corners | S-ED-35, S-ED-01 | Not started | P1–P3 | M4 | Tests | Proposed |
-| ED-UI-01…03 | Toolbar customisation; position shortcuts; canvas context menu | S-ED-24/22 | Not started | P1–P3 | M4 | Tests | Proposed |
-| ED-QS-01…03 | Per-tool Quick Styles; cross-tool favourites; palettes/themes | S-ED-05/06/07 | Partial | P1–P3 | M4 | Tests | Proposed |
-| ED-FX-01…10 | Border, edges, shadow, perspective/page curl, spotlight, watermark, filters, colour adjust, capture info, effects in presets | S-ED-21/44 | Not started | P2–P3 | M4 | Tests | Proposed |
-| CAP-ADV-01…12 | Magnifier, exact size, fixed region, crosshair keys, repeat last, menu, multi-area, scrolling auto/manual, interval, clipboard source, WGC backend | S-CAP-* | Not started | P2–P3 | M5 | Tests + documented app limits | Proposed |
-| AI-01…07 | Offline OCR/grab text, smart redaction, smart move, simplify, background removal, OCR search, admin disable | S-ED-08…20 | Not started | P2–P3 | M6 | Offline-only; licence review | Proposed |
-| DOC-01/02 | Templates/combine; step recording | S-LIB-16/19 | Not started | P3 | M7 | Tests | Proposed |
-| EXP-01…06 | BMP/GIF/TIFF/WebP; HEIF investigation; PDF; print; capture-time save to folder; filename patterns | S-LIB-28/30/33 | Not started | P2 | M4/M7 | Tests | Proposed |
-| LIB-05/06, LIB-META-01, LIB-BATCH-01, MIG-01 | Library merge on move; details view; app/website metadata; batch export; Snagit `.snagx` migration investigation | S-LIB-04/05/15 | Not started | P2–P3 | M4–M7 | Tests | Proposed |
-| TR-01…03 | Tooltips; thumbnail sizes; clear-on-close preference | S-LIB-01 | Partial | P2–P3 | M3/M4 | Tests | Proposed |
-| SET-03…06 | Restore default hotkeys; reset all settings; settings/preset import-export; sounds | S-CAP-06/07/21 | Not started | P2–P3 | M4 | Tests | Proposed |
-| VID-01…11 | Recording, audio, webcam, pause/resume, countdown, quality, cursor effects, screen draw, trim/combine, video from images, GIF | S-LIB-21…27 | Not started | — | M8 | Codec licensing review first | Proposed |
-| ENT-01…07 | MSI/MSIX, signing, SBOM, silent deploy/uninstall + Intune, encryption option, policy settings, controlled updates | S-LIB-34…41 | Not started | — | M9 | Owner decisions | Proposed |
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| NFR-DPI-01 | Multi-monitor operation (capture, panel, widget) | OWNER | OWNER | Partial (CI single monitor) | P1 | M3 | Manual on real multi-monitor PC; unit tests for coordinate math | Core tests + manual | Approved — Gate B (owner, 2026-11-25) | FP-CAP-33 |
+| NFR-DPI-02 | Mixed DPI scaling correct | OWNER | OWNER | Partial | P1 | M3 | Manual at 100/150/200 % mixed | Manual | Approved — Gate B (owner, 2026-11-25) | FP-CAP-33 |
+| NFR-A11Y-01 | Keyboard access to every new command | OWNER | OWNER | Partial | P1 | M3 | Keyboard-only UI tests | UI tests | Approved — Gate B (owner, 2026-11-25) | FP-SEC-11 |
+| NFR-A11Y-02 | Screen reader names/roles/states for new controls | OWNER; S-CAP-24 | OWNER+DOC | Not verified | P1 | M3 | Automation-tree test + manual Narrator | UI test + manual | Approved — Gate B (owner, 2026-11-25) | FP-SEC-11 |
+| NFR-A11Y-03 | Windows high-contrast themes respected | OWNER; S-CAP-24 | OWNER+DOC | Not verified | P1 | M3 | HC palette from system colours; manual | Test + manual | Approved — Gate B (owner, 2026-11-25) | FP-SET-03, FP-SEC-11 |
+| NFR-SEC-04 | Runs as a standard (non-admin) user | OWNER | OWNER | Unverified | P1 | M3 | CI test as standard user where feasible + manual | CI + manual | Approved — Gate B (owner, 2026-11-25) | FP-SEC-10 |
+| LIB-UI-01 | Library storage path never clips (ellipsis + tooltip) | Audit DEF-05 | OBS | Defect | P2 | M3 | Long path renders trimmed with tooltip | UI test | Approved — Gate B (owner, 2026-11-25) | — |
+| TR-01 | Tray tooltips show title, date and size | S-LIB-01 (UNVERIFIED in Snagit) | INFER | Partial | P2 | M3 | Tooltip text test | UI test | Approved — Gate B (owner, 2026-11-25) | FP-TR-11 |
+
+## M4 Editor (39)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ED-OBJ-01 | Resize handles for all objects | S-ED-31 | DOC | Partial (move only) | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-01, FP-OBJ-10 |
+| ED-OBJ-02 | Fill vs outline | S-ED-28/29 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-04, FP-OBJ-02 |
+| ED-OBJ-03 | Colour picker HEX/RGB + eyedropper | S-ED-38 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-01 |
+| ED-OBJ-04 | Object rotation | S-ED-29 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-04, FP-OBJ-09 |
+| ED-OBJ-05 | Opacity per object | S-ED-25 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-04 |
+| ED-OBJ-06 | Arrowheads / end styles | S-ED-25 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-02, FP-OBJ-06 |
+| ED-OBJ-07 | Shadow | S-ED-29 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-04, FP-OBJ-08 |
+| ED-OBJ-08 | Font family/style/alignment | S-ED-28 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-05, FP-OBJ-05 |
+| ED-OBJ-09 | Dash styles | S-ED-46 (UNVERIFIED) | UNVERIFIED | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-07 |
+| ED-OBJ-10 | Multi-select, marquee, Ctrl+A, select all of a kind | S-ED-22; S-ED-01 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-11 |
+| ED-OBJ-11 | Group/ungroup | S-ED-22 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-12 |
+| ED-OBJ-12 | Layering | S-ED-22 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-13 |
+| ED-OBJ-13 | Object cut/copy/paste/duplicate | S-ED-22/24 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-14, FP-OBJ-15 |
+| ED-OBJ-14 | Paste objects between captures | INFER | INFER | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-16 |
+| ED-OBJ-15 | Per-object flatten | S-ED-22 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-18 |
+| ED-OBJ-16 | Arrow-key nudge | INFER | INFER | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-20 |
+| ED-OBJ-20 | Cursor captured as a movable object | S-CAP-03 | DOC | Partial (pixels) | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-18 |
+| ED-TOOL-01 | Callout | S-ED-27 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-06 |
+| ED-TOOL-02 | Step options (letters, restart, edit value, renumber) | S-ED-11 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-07, FP-OBJ-17 |
+| ED-TOOL-03 | Cut Out | S-ED-34 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-10 |
+| ED-TOOL-04 | Blur / pixelate labelled "not secure" | S-ED-08 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-11 |
+| ED-TOOL-05 | Magnify tool | S-ED-31 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-15 |
+| ED-TOOL-06 | Pen (vector) | S-ED-37 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-17 |
+| ED-TOOL-07 | Eraser | S-ED-39 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-18 |
+| ED-TOOL-08 | Stamps (original artwork) | S-ED-36 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-19 |
+| ED-TOOL-09 | Fill tool | S-ED-38 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-20 |
+| ED-TOOL-10 | Pixel selection (rect/ellipse/polygon/freehand, auto-fill) | S-ED-16 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-21 |
+| ED-TOOL-11 | Magic wand / global colour select | S-ED-17 | DOC | Not started | P3 | M6 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-22 |
+| ED-IMG-01 | Resize image | S-ED-35 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-24 |
+| ED-IMG-02 | Resize canvas | S-ED-46 (UNVERIFIED) | UNVERIFIED | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-25 |
+| ED-IMG-03 | Rotate / flip | S-ED-35 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-26 |
+| ED-IMG-04 | Auto trim | S-ED-01 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-27 |
+| ED-IMG-05 | Rounded image corners | S-ED-29 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-28 |
+| ED-UI-01 | Toolbar customisation | S-ED-24 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-29 |
+| ED-UI-02 | Ctrl+1–9 by toolbar position (aliases) | S-ED-22 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-30 |
+| ED-UI-03 | Canvas / object context menu | S-ED-08/11/12 | DOC | Not started | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-25 |
+| ED-QS-01 | Per-tool Quick Styles | S-ED-05/06 | DOC | Partial (shared list) | P1 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-21 |
+| ED-QS-02 | Favorites across tools | S-ED-06 | DOC | Partial | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-22 |
+| ED-QS-03 | Themes / custom palettes | S-ED-07 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-OBJ-23 |
+
+## M4 Effects (10)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ED-FX-01 | Border | S-ED-21 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-FX-01 |
+| ED-FX-02 | Edges | S-ED-21 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-FX-02 |
+| ED-FX-03 | Shadow effect | S-ED-21 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-FX-03 |
+| ED-FX-04 | Perspective / page curl | S-ED-21 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-FX-04 |
+| ED-FX-05 | Spotlight and magnify effect | S-ED-21/32 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-16 |
+| ED-FX-06 | Watermark | S-ED-21 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-FX-05 |
+| ED-FX-07 | Filters | S-ED-21 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-FX-06 |
+| ED-FX-08 | Colour adjustment | S-ED-21 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-FX-07 |
+| ED-FX-09 | Capture info | S-ED-21 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-FX-08 |
+| ED-FX-10 | Effects in capture presets | S-ED-44 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-FX-09 |
+
+## M5 Advanced capture (12)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| CAP-ADV-01 | Magnifier during selection | S-CAP-06/07 | DOC | Not started | P2 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-05 |
+| CAP-ADV-02 | Exact width/height entry | S-CAP-02 | DOC | Not started | P2 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-06 |
+| CAP-ADV-03 | Fixed region (+ set position) | S-CAP-03/29 | DOC | Not started | P2 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-07 |
+| CAP-ADV-04 | Crosshair keys (arrows, Enter, Shift+Enter) | S-CAP-07 | DOC | Not started | P2 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-08 |
+| CAP-ADV-05 | Repeat last capture | S-CAP-07 | DOC | Not started | P2 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-09 |
+| CAP-ADV-06 | Menu capture | S-CAP-03/20 | DOC | Not started | P2 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-10 |
+| CAP-ADV-07 | Multiple area | S-CAP-03 | DOC | Not started | P3 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-11 |
+| CAP-ADV-08 | Scrolling capture — automatic | S-CAP-05/13 | DOC | Not started | P2 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-12 |
+| CAP-ADV-09 | Scrolling capture — manual/panoramic | S-CAP-05 | DOC | Not started | P2 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-13 |
+| CAP-ADV-10 | Interval capture | S-CAP-03/10 | DOC | Not started | P3 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-14 |
+| CAP-ADV-11 | Clipboard as capture source | S-CAP-03 | DOC | Not started | P2 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-15 |
+| CAP-ADV-12 | Windows Graphics Capture backend with GDI fallback | docs/WINDOWS-GRAPHICS-CAPTURE.md | OBS | Not started | P3 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-32 |
+
+## M6 Offline intelligent tools (7)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| AI-01 | Offline OCR / grab text | S-ED-12/14 | DOC | Not started | P2 | M6 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-13 |
+| AI-02 | Smart redaction (offline detection) | S-ED-08/10 | DOC | Not started | P2 | M6 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-12 |
+| AI-03 | Smart move | S-ED-15 | DOC | Not started | P3 | M6 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-01 |
+| AI-04 | Simplify | S-ED-20 | DOC | Not started | P3 | M6 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-14 |
+| AI-05 | Background removal (offline, licence-compatible) | S-ED-18/19 | DOC | Not started | P3 | M6 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-ED-23 |
+| AI-06 | OCR search in Library | S-LIB-04 (absent in Snagit) | DOC | Not started | P3 | M6 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-LIB-14 |
+| AI-07 | Admin switch to disable intelligent tools | S-LIB-46 | DOC | Not started | P3 | M6 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SEC-12 |
+
+## M7 Documentation (2)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| DOC-01 | Combine images / templates | S-LIB-16 | DOC | Not started | P3 | M7 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-DOC-01 |
+| DOC-02 | Step recording guide | S-LIB-19 | DOC | Not started | P3 | M7 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-DOC-02 |
+
+## Export (8)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| EXP-01 | BMP, GIF, TIFF, WebP export | S-LIB-28/30 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-EXP-02 |
+| EXP-02 | HEIF investigation (Windows support unverified) | S-LIB-29 | UNVERIFIED | Not started | P3 | investigate | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-EXP-04 |
+| EXP-03 | PDF export | S-LIB-28 | DOC | Not started | P2 | M7 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-DOC-04, FP-EXP-05 |
+| EXP-04 | Print | S-LIB-31; S-ED-22 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-EXP-08 |
+| EXP-05 | Share → save to folder at capture time | S-LIB-33 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-24 |
+| EXP-06 | Configurable filename patterns for exports | S-LIB-02/31 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-EXP-09 |
+| EXP-07 | Niche formats ICO/PSD/TGA/WMF/CUR/EPS | S-LIB-28 | DOC | Not started | — | Backlog (not planned) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-EXP-03 |
+| EXP-08 | Optional cloud share destinations (opt-in only) | S-LIB-32/37 | DOC | Not started | — | Backlog (owner decision; conflicts with G-03 unless opt-in) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-EXP-11 |
+
+## Library (later) (5)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| LIB-05 | Merge libraries when moving onto an existing library | S-LIB-05 | DOC | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-LIB-09 |
+| LIB-06 | Details / metadata view | S-LIB-04 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-LIB-15 |
+| LIB-META-01 | Record source application / website | S-LIB-04 | DOC | Not started | P2 | M5 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-LIB-02 |
+| LIB-BATCH-01 | Batch export / convert / effects | S-LIB-15 | DOC | Not started | P2 | M7 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-FX-10, FP-LIB-13 |
+| MIG-01 | Investigate Snagit .snagx migration (format unpublished) | S-LIB-11/13 | UNVERIFIED | Not started | P3 | investigate | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-LIB-17 |
+
+## Tray (later) (3)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| TR-02 | Thumbnail sizes S/M/L | S-LIB-01 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-TR-05 |
+| TR-03 | Clear tray on close preference | S-LIB-01 | DOC | Partial (command) | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-TR-07 |
+| TR-04 | Drag tray image onto canvas to combine | S-LIB-01 | DOC | Not started | P3 | M7 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-TR-10 |
+
+## Settings (later) (4)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| SET-03 | Restore default hotkeys | S-CAP-07 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SET-04 |
+| SET-04 | Reset all settings | S-CAP-06 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SET-07 |
+| SET-05 | Settings / preset import-export | S-CAP-09/21 | DOC | Not started | P2 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-26, FP-SET-08 |
+| SET-06 | Capture sounds | UNVERIFIED | UNVERIFIED | Not started | P3 | M4 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SET-11 |
+
+## Capture (not planned) (2)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| CAP-LEG-01 | Printer capture (virtual printer driver) | S-CAP-06 | UNVERIFIED | Not started | — | Backlog (not planned: driver/admin) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-16 |
+| CAP-LEG-02 | Object capture | S-CAP-32 | DOC (historical) | Not started | — | Backlog (not planned) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-17 |
+
+## M8 Video (11)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| VID-01 | Screen recording region/window/screen to MP4 | S-LIB-21 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-01 |
+| VID-02 | Microphone + system audio | S-LIB-21 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-02 |
+| VID-03 | Webcam picture-in-picture | S-LIB-21 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-02 |
+| VID-04 | Pause/resume, stop hotkeys | S-LIB-21; S-CAP-07 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-03 |
+| VID-05 | Countdown before recording | UNVERIFIED | UNVERIFIED | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-04 |
+| VID-06 | Quality presets up to 4K60 | S-LIB-27 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-05 |
+| VID-07 | Cursor highlight / click animation | S-LIB-02 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-06 |
+| VID-08 | Draw on screen while recording | S-LIB-24 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-07 |
+| VID-09 | Trim, save frame, combine clips | S-LIB-22/23 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-08 |
+| VID-10 | Video from images with narration | S-LIB-20 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-DOC-03 |
+| VID-11 | Animated GIF export | S-LIB-25 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-09 |
+
+## M9 Enterprise (7)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| ENT-01 | MSI/MSIX installer, silent install/uninstall | S-LIB-34 | DOC | Not started | — | M9 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SEC-09 |
+| ENT-02 | Trusted code signing (= PD-04) | OWNER | OWNER | Not started | — | M9 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SEC-08 |
+| ENT-03 | SBOM | INFER | INFER | Not started | — | M9 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SEC-07 |
+| ENT-04 | Intune/SCCM deployment guide | S-LIB-40/41 | DOC | Not started | — | M9 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SEC-09 |
+| ENT-05 | Optional encryption at rest | INFER | INFER | Not started | — | M9 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SEC-04 |
+| ENT-06 | Policy settings for administrators | S-LIB-37 | DOC | Not started | — | M9 | Defined at that milestone's Gate A | — | Proposed — not authorised | — |
+| ENT-07 | Controlled updates (no automatic network by default) | S-CAP-06 | DOC | Not started | — | M9 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SET-05 |
+
+## Totals
+
+| Approval state | Requirements |
+|---|---|
+| Approved — global rule (owner) | 9 |
+| Approved — product decision (owner, 2026-11-25) | 5 |
+| Approved — Gate B (owner, 2026-11-25) | 62 |
+| Delivered M1/M2 — under independent review | 37 |
+| Proposed — not authorised | 110 |
+| **Total** | **223** |
