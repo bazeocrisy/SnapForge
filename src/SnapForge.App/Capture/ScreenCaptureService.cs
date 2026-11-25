@@ -18,11 +18,11 @@ internal static unsafe class ScreenCaptureService
 {
     private const int MaxWindows = 4096;
 
-    public static CaptureSnapshot TakeSnapshot()
+    public static CaptureSnapshot TakeSnapshot(bool includeCursor = false)
     {
         ScreenLayout layout = GetScreenLayout();
         IReadOnlyList<WindowCandidate> windows = EnumerateWindows(Environment.ProcessId);
-        PixelBuffer image = CaptureRegion(layout.VirtualBounds);
+        PixelBuffer image = CaptureRegion(layout.VirtualBounds, includeCursor);
 
         // Parts of the virtual desktop not covered by any monitor have undefined content; make them black.
         foreach (PixelRect gap in layout.UncoveredAreas())
@@ -64,7 +64,7 @@ internal static unsafe class ScreenCaptureService
     }
 
     /// <summary>Copies a rectangle of the screen (virtual-desktop coordinates) into an opaque BGRA buffer.</summary>
-    public static PixelBuffer CaptureRegion(PixelRect screenRect)
+    public static PixelBuffer CaptureRegion(PixelRect screenRect, bool includeCursor = false)
     {
         if (screenRect.IsEmpty)
         {
@@ -109,6 +109,11 @@ internal static unsafe class ScreenCaptureService
             if (!BitBlt(memDc, 0, 0, width, height, screenDc, screenRect.X, screenRect.Y, SRCCOPY | CAPTUREBLT))
             {
                 throw new Win32Exception(Marshal.GetLastPInvokeError(), "BitBlt from the screen failed.");
+            }
+
+            if (includeCursor)
+            {
+                DrawCursor(memDc, screenRect);
             }
 
             GdiFlush();
@@ -176,6 +181,35 @@ internal static unsafe class ScreenCaptureService
         }
 
         return result;
+    }
+
+    /// <summary>Draws the current mouse pointer (as Windows shows it) into the capture at its hotspot position.</summary>
+    private static void DrawCursor(nint memDc, PixelRect screenRect)
+    {
+        var info = new CURSORINFO { cbSize = sizeof(CURSORINFO) };
+        if (!GetCursorInfo(&info) || (info.flags & CURSOR_SHOWING) == 0 || info.hCursor == 0)
+        {
+            return;
+        }
+
+        int hotX = 0, hotY = 0;
+        ICONINFO icon;
+        if (GetIconInfo(info.hCursor, &icon))
+        {
+            hotX = icon.xHotspot;
+            hotY = icon.yHotspot;
+            if (icon.hbmMask != 0)
+            {
+                DeleteObject(icon.hbmMask);
+            }
+
+            if (icon.hbmColor != 0)
+            {
+                DeleteObject(icon.hbmColor);
+            }
+        }
+
+        DrawIconEx(memDc, info.ptScreenPos.X - hotX - screenRect.X, info.ptScreenPos.Y - hotY - screenRect.Y, info.hCursor, 0, 0, 0, 0, DI_NORMAL);
     }
 
     public static (int X, int Y) GetCursorPosition()

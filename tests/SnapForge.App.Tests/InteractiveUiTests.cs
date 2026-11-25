@@ -166,7 +166,8 @@ public class InteractiveUiTests
         }
         finally
         {
-            window.Document?.MarkSaved();
+            await window.FlushAllAsync();
+            window.AllowClose = true;
             window.Close();
         }
     });

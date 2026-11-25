@@ -64,6 +64,9 @@ internal sealed class AnnotationCanvas : Canvas
 
     public ArgbColor RedactionColor { get; set; } = ArgbColor.Black;
 
+    /// <summary>The selected annotation, if any (for the Tool Properties panel).</summary>
+    public Annotation? Selected => SelectedAnnotation();
+
     public bool HasSelection => _selectedId is not null && _document?.FindById(_selectedId.Value) is not null;
 
     public bool IsEditingText => _textEditor is not null;
@@ -107,6 +110,23 @@ internal sealed class AnnotationCanvas : Canvas
         Height = document.Image.Height;
         ResetInteraction();
         _selectedId = null;
+        InvalidateVisual();
+        RaiseStateChanged();
+    }
+
+    /// <summary>Shows nothing (no capture open).</summary>
+    public void Unload()
+    {
+        CancelTextEdit();
+        if (_document is not null)
+        {
+            _document.Changed -= OnDocumentChanged;
+        }
+
+        _document = null;
+        _bitmap = null;
+        _selectedId = null;
+        ResetInteraction();
         InvalidateVisual();
         RaiseStateChanged();
     }
@@ -294,7 +314,18 @@ internal sealed class AnnotationCanvas : Canvas
         if (_redactPreview is { } redact)
         {
             var pen = new Pen(Brushes.White, px) { DashStyle = new DashStyle([4, 4], 0) };
-            dc.DrawRectangle(RedactPreviewFill, pen, new Rect(redact.X, redact.Y, redact.Width, redact.Height));
+            var area = new Rect(redact.X, redact.Y, redact.Width, redact.Height);
+            if (Tool == AnnotationTool.Crop)
+            {
+                // Dim everything that will be cut away.
+                var outside = new CombinedGeometry(GeometryCombineMode.Exclude, new RectangleGeometry(new Rect(0, 0, _document.Image.Width, _document.Image.Height)), new RectangleGeometry(area));
+                dc.DrawGeometry(RedactPreviewFill, null, outside);
+                dc.DrawRectangle(null, pen, area);
+            }
+            else
+            {
+                dc.DrawRectangle(RedactPreviewFill, pen, area);
+            }
         }
 
         if ((_moveCurrent ?? SelectedAnnotation()) is { } selected && _textEditor is null)
@@ -402,7 +433,7 @@ internal sealed class AnnotationCanvas : Canvas
             return;
         }
 
-        if (Tool == AnnotationTool.Redact)
+        if (Tool is AnnotationTool.Redact or AnnotationTool.Crop)
         {
             _redactPreview = RectD.FromPoints(start, p).ToCoveringPixelRect().Intersect(_document.Image.Bounds);
         }
@@ -456,6 +487,14 @@ internal sealed class AnnotationCanvas : Canvas
                 _document.Execute(new RedactCommand(region, RedactionColor));
             }
         }
+        else if (Tool == AnnotationTool.Crop)
+        {
+            PixelRect region = RectD.FromPoints(start, p).ToCoveringPixelRect().Intersect(_document.Image.Bounds);
+            if (region.Width >= 4 && region.Height >= 4)
+            {
+                _document.Execute(new CropCommand(region));
+            }
+        }
         else if (BuildShape(Tool, start, p, constrain) is { } shape && !IsDegenerate(shape))
         {
             _document.Execute(new AddAnnotationCommand(shape));
@@ -481,6 +520,7 @@ internal sealed class AnnotationCanvas : Canvas
 
     private static bool IsDegenerate(Annotation a) => a switch
     {
+        HighlightAnnotation x => x.IsDegenerate,
         ArrowAnnotation x => x.IsDegenerate,
         LineAnnotation x => x.IsDegenerate,
         RectangleAnnotation x => x.IsDegenerate,
@@ -502,6 +542,8 @@ internal sealed class AnnotationCanvas : Canvas
                 return tool == AnnotationTool.Arrow
                     ? new ArrowAnnotation(start, end) { Color = CurrentColor, StrokeWidth = StrokeWidth }
                     : new LineAnnotation(start, end) { Color = CurrentColor, StrokeWidth = StrokeWidth };
+            case AnnotationTool.Highlight:
+                return new HighlightAnnotation(RectD.FromPoints(start, end)) { Color = CurrentColor, StrokeWidth = StrokeWidth };
             case AnnotationTool.Rectangle:
             case AnnotationTool.Ellipse:
                 if (constrain)
@@ -650,7 +692,13 @@ internal sealed class AnnotationCanvas : Canvas
 
     private void OnDocumentChanged(object? sender, DocumentChangedEventArgs e)
     {
-        if (e.ImageChanged && _bitmap is not null && _document is not null)
+        if (_document is not null && (e.SizeChanged || (_bitmap is not null && (_bitmap.PixelWidth != _document.Image.Width || _bitmap.PixelHeight != _document.Image.Height))))
+        {
+            _bitmap = BitmapConversion.ToWriteableBitmap(_document.Image);
+            Width = _document.Image.Width;
+            Height = _document.Image.Height;
+        }
+        else if (e.ImageChanged && _bitmap is not null && _document is not null)
         {
             BitmapConversion.CopyInto(_document.Image, _bitmap);
         }

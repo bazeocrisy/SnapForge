@@ -2,261 +2,509 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         xmlns:editor="clr-namespace:SnapForge.App.Editor"
+        xmlns:views="clr-namespace:SnapForge.App.Views"
         Title="SnapForge"
-        Width="1180" Height="780" MinWidth="820" MinHeight="520"
+        Width="1280" Height="820" MinWidth="900" MinHeight="560"
         WindowStartupLocation="CenterScreen"
-        Background="{StaticResource BackgroundBrush}"
-        Foreground="{StaticResource TextBrush}"
+        Background="{DynamicResource BackgroundBrush}"
+        Foreground="{DynamicResource TextBrush}"
         FontFamily="{StaticResource UiFont}"
         UseLayoutRounding="True"
         Icon="Assets/SnapForge.ico">
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <!-- Recent Captures Tray thumbnail -->
+        <DataTemplate x:Key="TrayTileTemplate">
+            <Button Click="OnTrayTileClick" Tag="{Binding}" Margin="4,0" Padding="0" Cursor="Hand"
+                    ToolTip="{Binding Tooltip}" AutomationProperties.Name="{Binding Title}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Grid Width="132">
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="76" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+                            <Border x:Name="Frame" CornerRadius="6" BorderThickness="2" BorderBrush="Transparent"
+                                    Background="{DynamicResource CanvasBackdropBrush}" ClipToBounds="True">
+                                <Image Source="{Binding Thumbnail}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                            </Border>
+                            <Border Grid.Row="0" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5" CornerRadius="3" Padding="3,1"
+                                    Background="{DynamicResource AccentBrush}" Visibility="{Binding Pinned, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Pinned" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentForegroundBrush}" />
+                            </Border>
+                            <Ellipse Grid.Row="0" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6"
+                                     Fill="{DynamicResource AccentBrush}" ToolTip="Changes not yet saved"
+                                     Visibility="{Binding IsUnsaved, Converter={StaticResource BoolToVis}}" />
+                            <Border Grid.Row="0" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="5" CornerRadius="3" Padding="3,1"
+                                    Background="{DynamicResource WarningBackgroundBrush}" Visibility="{Binding NotInLibrary, Converter={StaticResource BoolToVis}}">
+                                <TextBlock Text="Not in Library" FontSize="9" Foreground="{DynamicResource WarningBrush}" />
+                            </Border>
+                            <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="11" Margin="2,3,2,0" TextTrimming="CharacterEllipsis"
+                                       Foreground="{DynamicResource MutedTextBrush}" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsCurrent}" Value="True">
+                                <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Frame" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource MutedTextBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+                <Button.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="_Open" Click="OnTrayOpen" FontWeight="SemiBold" />
+                        <MenuItem Header="{Binding PinHeader}" Click="OnTrayTogglePin" InputGestureText="Ctrl+Shift+P" />
+                        <MenuItem Header="_Close (keep in Library)" Click="OnTrayClose" />
+                        <MenuItem Header="Close all _unpinned" Click="OnTrayCloseUnpinned" />
+                        <Separator />
+                        <MenuItem Header="Show in _Library" Click="OnTrayShowInLibrary" />
+                        <MenuItem Header="_Delete capture…" Click="OnTrayDelete" />
+                    </ContextMenu>
+                </Button.ContextMenu>
+            </Button>
+        </DataTemplate>
+
+        <!-- Quick Style tile -->
+        <DataTemplate x:Key="QuickStyleTemplate">
+            <Button Click="OnQuickStyleClick" Tag="{Binding}" Width="52" Height="40" Margin="3" Padding="0"
+                    ToolTip="{Binding Name}" AutomationProperties.Name="{Binding Name}">
+                <Button.Template>
+                    <ControlTemplate TargetType="Button">
+                        <Border x:Name="Bd" CornerRadius="6" BorderThickness="1" BorderBrush="{DynamicResource BorderBrush}" Background="{DynamicResource SurfaceRaisedBrush}">
+                            <Grid>
+                                <Rectangle Height="{Binding StrokeWidth}" MaxHeight="12" Fill="{Binding Brush}" Margin="10,0" RadiusX="2" RadiusY="2" VerticalAlignment="Center" />
+                                <Path Data="{StaticResource IconStar}" Fill="{DynamicResource AccentBrush}" Width="24" Height="24" Stretch="None"
+                                      RenderTransformOrigin="0,0" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="0,1,1,0"
+                                      Visibility="{Binding Favorite, Converter={StaticResource BoolToVis}}">
+                                    <Path.RenderTransform><ScaleTransform ScaleX="0.45" ScaleY="0.45" /></Path.RenderTransform>
+                                </Path>
+                            </Grid>
+                        </Border>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Button.Template>
+                <Button.ContextMenu>
+                    <ContextMenu>
+                        <MenuItem Header="Apply" Click="OnQuickStyleApply" />
+                        <MenuItem Header="{Binding FavoriteHeader}" Click="OnQuickStyleToggleFavorite" />
+                        <MenuItem Header="Delete style" Click="OnQuickStyleDelete" IsEnabled="{Binding CanDelete}" />
+                    </ContextMenu>
+                </Button.ContextMenu>
+            </Button>
+        </DataTemplate>
+    </Window.Resources>
+
     <Grid>
         <Grid.RowDefinitions>
-            <RowDefinition Height="Auto" />
             <RowDefinition Height="Auto" />
             <RowDefinition Height="*" />
             <RowDefinition Height="Auto" />
         </Grid.RowDefinitions>
 
-        <!-- Top command bar -->
-        <Border Grid.Row="0" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12,8">
+        <!-- Header: logo, menu, Capture, navigation -->
+        <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10,6">
             <DockPanel LastChildFill="False">
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,14,0">
-                    <Border Width="28" Height="28" CornerRadius="7">
+                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,8,0">
+                    <Border Width="26" Height="26" CornerRadius="7">
                         <Border.Background>
                             <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
                                 <GradientStop Color="#FF9A4D" Offset="0" />
                                 <GradientStop Color="#F0561D" Offset="1" />
                             </LinearGradientBrush>
                         </Border.Background>
-                        <Path Data="M7,11 V7 H11 M17,7 H21 V11 M21,17 V21 H17 M11,21 H7 V17" Stroke="White" StrokeThickness="2.2"
+                        <Path Data="M6,10 V6 H10 M16,6 H20 V10 M20,16 V20 H16 M10,20 H6 V16" Stroke="White" StrokeThickness="2"
                               StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="28" Height="28" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top" />
+                              Width="26" Height="26" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top" />
                     </Border>
-                    <TextBlock Text="SnapForge" FontSize="15" FontWeight="SemiBold" Margin="10,0,0,1" VerticalAlignment="Center" />
+                    <TextBlock Text="SnapForge" FontSize="14" FontWeight="SemiBold" Margin="8,0,0,1" VerticalAlignment="Center" />
                 </StackPanel>
 
-                <Rectangle DockPanel.Dock="Left" Style="{StaticResource Separator}" />
-
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
-                    <Button x:Name="RegionButton" Style="{StaticResource ToolbarButton}" Click="OnCaptureRegion" ToolTip="Capture an area (Ctrl+1)">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconRegion}" />
-                            <TextBlock Text="Region" Margin="6,0,2,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="WindowButton" Style="{StaticResource ToolbarButton}" Click="OnCaptureWindow" ToolTip="Capture a window (Ctrl+2)">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconWindow}" />
-                            <TextBlock Text="Window" Margin="6,0,2,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="DisplayButton" Style="{StaticResource ToolbarButton}" Click="OnCaptureDisplay" ToolTip="Capture one display (Ctrl+3)">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconScreen}" />
-                            <TextBlock Text="Display" Margin="6,0,2,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="AllDisplaysButton" Style="{StaticResource ToolbarButton}" Click="OnCaptureAll" ToolTip="Capture all displays (Ctrl+4)">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconAllScreens}" />
-                            <TextBlock Text="Full screen" Margin="6,0,2,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-
-                <Rectangle DockPanel.Dock="Left" Style="{StaticResource Separator}" />
-
-                <StackPanel DockPanel.Dock="Left" Orientation="Horizontal">
-                    <Button x:Name="UndoButton" Style="{StaticResource ToolbarButton}" Click="OnUndo" ToolTip="Undo (Ctrl+Z)" IsEnabled="False">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconUndo}" />
-                    </Button>
-                    <Button x:Name="RedoButton" Style="{StaticResource ToolbarButton}" Click="OnRedo" ToolTip="Redo (Ctrl+Y)" IsEnabled="False">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconRedo}" />
-                    </Button>
-                </StackPanel>
-
-                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
-                    <Button x:Name="CopyButton" Style="{StaticResource ToolbarButton}" Click="OnCopy" ToolTip="Copy image to clipboard (Ctrl+C)" IsEnabled="False">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCopy}" />
-                            <TextBlock Text="Copy" Margin="6,0,2,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                    <Button x:Name="SaveButton" Style="{StaticResource AccentButton}" Click="OnSave" ToolTip="Save as PNG or JPEG (Ctrl+S)" IsEnabled="False" Margin="6,0,0,0" Padding="14,6">
-                        <StackPanel Orientation="Horizontal">
-                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconSave}" Stroke="#1A1205" />
-                            <TextBlock Text="Save" Margin="6,0,2,0" VerticalAlignment="Center" />
-                        </StackPanel>
-                    </Button>
-                </StackPanel>
-            </DockPanel>
-        </Border>
-
-        <!-- Tool options -->
-        <Border Grid.Row="1" x:Name="OptionsBar" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,0,1" Padding="16,6" IsEnabled="False">
-            <DockPanel LastChildFill="False">
-                <TextBlock DockPanel.Dock="Left" Text="Color" Foreground="{StaticResource MutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <StackPanel DockPanel.Dock="Left" x:Name="SwatchPanel" Orientation="Horizontal" VerticalAlignment="Center">
-                    <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#E53935" Tag="#E53935" ToolTip="Red" IsChecked="True" Checked="OnColorChecked" />
-                    <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#FB8C00" Tag="#FB8C00" ToolTip="Orange" Checked="OnColorChecked" />
-                    <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#FDD835" Tag="#FDD835" ToolTip="Yellow" Checked="OnColorChecked" />
-                    <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#43A047" Tag="#43A047" ToolTip="Green" Checked="OnColorChecked" />
-                    <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#1E88E5" Tag="#1E88E5" ToolTip="Blue" Checked="OnColorChecked" />
-                    <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#8E24AA" Tag="#8E24AA" ToolTip="Purple" Checked="OnColorChecked" />
-                    <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#141414" Tag="#141414" ToolTip="Black" Checked="OnColorChecked" />
-                    <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#FFFFFF" Tag="#FFFFFF" ToolTip="White" Checked="OnColorChecked" />
-                </StackPanel>
-
-                <Rectangle DockPanel.Dock="Left" Style="{StaticResource Separator}" Margin="14,0" />
-
-                <TextBlock DockPanel.Dock="Left" Text="Size" Foreground="{StaticResource MutedTextBrush}" FontSize="12" VerticalAlignment="Center" Margin="0,0,8,0" />
-                <Border DockPanel.Dock="Left" Background="{StaticResource BackgroundBrush}" CornerRadius="7" Padding="2" VerticalAlignment="Center">
-                    <StackPanel Orientation="Horizontal">
-                        <RadioButton GroupName="Size" Style="{StaticResource SegmentButton}" Content="S" Tag="2" ToolTip="Thin" Checked="OnSizeChecked" />
-                        <RadioButton GroupName="Size" Style="{StaticResource SegmentButton}" Content="M" Tag="4" ToolTip="Medium" IsChecked="True" Checked="OnSizeChecked" />
-                        <RadioButton GroupName="Size" Style="{StaticResource SegmentButton}" Content="L" Tag="6" ToolTip="Thick" Checked="OnSizeChecked" />
-                        <RadioButton GroupName="Size" Style="{StaticResource SegmentButton}" Content="XL" Tag="10" ToolTip="Extra thick" Checked="OnSizeChecked" />
-                    </StackPanel>
-                </Border>
-
-                <Rectangle DockPanel.Dock="Left" Style="{StaticResource Separator}" Margin="14,0" />
-
-                <Button DockPanel.Dock="Left" x:Name="DeleteButton" Style="{StaticResource ToolbarButton}" Click="OnDeleteSelection" ToolTip="Delete selected annotation (Del)" IsEnabled="False" MinHeight="30" Padding="8,3">
-                    <StackPanel Orientation="Horizontal">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconDelete}" />
-                        <TextBlock Text="Delete" Margin="4,0,2,0" VerticalAlignment="Center" FontSize="12" />
-                    </StackPanel>
-                </Button>
+                <Menu DockPanel.Dock="Left" VerticalAlignment="Center" x:Name="MainMenu">
+                    <MenuItem Header="_File" SubmenuOpened="OnMenuOpened">
+                        <MenuItem Header="_New capture" InputGestureText="Ctrl+N" Click="OnNewCapture" />
+                        <MenuItem Header="Capture _window…" Click="OnShowCaptureWindow" />
+                        <Separator />
+                        <MenuItem x:Name="SaveToLibraryMenu" Header="Save to _Library" Click="OnSaveToLibrary" />
+                        <MenuItem x:Name="ExportMenu" Header="_Export as PNG/JPEG…" InputGestureText="Ctrl+S" Click="OnSave" />
+                        <MenuItem x:Name="CopyMenu" Header="_Copy image" InputGestureText="Ctrl+C" Click="OnCopy" />
+                        <MenuItem x:Name="ExportPackageMenu" Header="Export editable capture (.sfcap)…" Click="OnExportPackage" />
+                        <MenuItem Header="_Import editable capture (.sfcap)…" Click="OnImportPackage" />
+                        <Separator />
+                        <MenuItem x:Name="SanitizeMenu" Header="_Sanitize capture…" Click="OnSanitize" />
+                        <MenuItem x:Name="CloseCaptureMenu" Header="Close capture" InputGestureText="Ctrl+W" Click="OnCloseCapture" />
+                        <Separator />
+                        <MenuItem Header="Se_ttings…" InputGestureText="Ctrl+," Click="OnSettings" />
+                        <MenuItem Header="E_xit SnapForge" Click="OnExit" />
+                    </MenuItem>
+                    <MenuItem Header="_Edit" SubmenuOpened="OnMenuOpened">
+                        <MenuItem x:Name="UndoMenu" Header="_Undo" InputGestureText="Ctrl+Z" Click="OnUndo" />
+                        <MenuItem x:Name="RedoMenu" Header="_Redo" InputGestureText="Ctrl+Y" Click="OnRedo" />
+                        <Separator />
+                        <MenuItem x:Name="DeleteMenu" Header="_Delete annotation" InputGestureText="Del" Click="OnDeleteSelection" />
+                        <MenuItem Header="_Copy image" InputGestureText="Ctrl+C" Click="OnCopy" />
+                    </MenuItem>
+                    <MenuItem Header="_Image" SubmenuOpened="OnMenuOpened">
+                        <MenuItem Header="_Crop…" InputGestureText="C" Click="OnCropTool" />
+                        <MenuItem Header="_Redact…" InputGestureText="X" Click="OnRedactTool" />
+                        <MenuItem Header="_Sanitize capture…" Click="OnSanitize" />
+                    </MenuItem>
+                    <MenuItem Header="_View" SubmenuOpened="OnMenuOpened">
+                        <MenuItem Header="_Editor" InputGestureText="Ctrl+E" Click="OnShowEditor" />
+                        <MenuItem Header="_Library" InputGestureText="Ctrl+L" Click="OnShowLibrary" />
+                        <MenuItem Header="_Capture window" Click="OnShowCaptureWindow" />
+                        <Separator />
+                        <MenuItem x:Name="ShowTrayMenu" Header="Show _Recent Captures" IsCheckable="True" Click="OnToggleTray" />
+                        <MenuItem x:Name="ShowPanelMenu" Header="Show Quick Styles &amp; _Properties" IsCheckable="True" Click="OnTogglePanel" />
+                        <Separator />
+                        <MenuItem Header="Zoom _in" InputGestureText="Ctrl+=" Click="OnZoomIn" />
+                        <MenuItem Header="Zoom _out" InputGestureText="Ctrl+−" Click="OnZoomOut" />
+                        <MenuItem Header="_Fit to window" InputGestureText="Ctrl+0" Click="OnZoomFit" />
+                        <MenuItem Header="_Actual pixels" InputGestureText="Ctrl+Alt+0" Click="OnZoomActual" />
+                        <Separator />
+                        <MenuItem Header="_Theme">
+                            <MenuItem x:Name="ThemeSystemMenu" Header="Use _Windows setting" IsCheckable="True" Tag="System" Click="OnThemeMenu" />
+                            <MenuItem x:Name="ThemeLightMenu" Header="_Light" IsCheckable="True" Tag="Light" Click="OnThemeMenu" />
+                            <MenuItem x:Name="ThemeDarkMenu" Header="_Dark" IsCheckable="True" Tag="Dark" Click="OnThemeMenu" />
+                        </MenuItem>
+                    </MenuItem>
+                    <MenuItem Header="_Capture" x:Name="CaptureMenu" SubmenuOpened="OnMenuOpened">
+                        <MenuItem Header="_Region" InputGestureText="Ctrl+1" Click="OnCaptureRegion" />
+                        <MenuItem Header="_Window" InputGestureText="Ctrl+2" Click="OnCaptureWindow" />
+                        <MenuItem Header="_Display" InputGestureText="Ctrl+3" Click="OnCaptureDisplay" />
+                        <MenuItem Header="_Full screen" InputGestureText="Ctrl+4" Click="OnCaptureAll" />
+                        <Separator />
+                        <MenuItem x:Name="PresetsMenu" Header="_Presets" />
+                        <MenuItem Header="Capture _window…" Click="OnShowCaptureWindow" />
+                    </MenuItem>
+                    <MenuItem Header="_Help">
+                        <MenuItem Header="_Keyboard shortcuts" InputGestureText="F1" Click="OnShortcuts" />
+                        <MenuItem Header="Where are my captures? (_privacy)" Click="OnPrivacyInfo" />
+                        <MenuItem Header="_About SnapForge" Click="OnAbout" />
+                    </MenuItem>
+                </Menu>
 
                 <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
-                    <Button Style="{StaticResource ToolbarButton}" Click="OnZoomOut" ToolTip="Zoom out (Ctrl+−)" MinHeight="30" Padding="6,3">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconZoomOut}" />
+                    <RadioButton x:Name="EditorTab" GroupName="Nav" Style="{StaticResource NavTab}" IsChecked="True" Checked="OnNavChecked" ToolTip="Editor (Ctrl+E)">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconEditor}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                            <TextBlock Text="Editor" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="LibraryTab" GroupName="Nav" Style="{StaticResource NavTab}" Checked="OnNavChecked" ToolTip="Library (Ctrl+L)">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconLibrary}" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
+                            <TextBlock Text="Library" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </RadioButton>
+                    <Rectangle Style="{StaticResource Separator}" />
+                    <Button x:Name="CaptureButton" Style="{StaticResource AccentButton}" Click="OnNewCapture" Padding="16,7"
+                            ToolTip="Capture with the Capture window's current settings (Ctrl+N)" AutomationProperties.Name="Capture">
+                        <StackPanel Orientation="Horizontal">
+                            <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCapture}" Stroke="{DynamicResource AccentForegroundBrush}" />
+                            <TextBlock Text="Capture" Margin="6,0,2,0" VerticalAlignment="Center" FontSize="14" />
+                        </StackPanel>
                     </Button>
-                    <TextBlock x:Name="ZoomText" Text="100%" Width="48" TextAlignment="Center" VerticalAlignment="Center" FontSize="12" Foreground="{StaticResource MutedTextBrush}" />
-                    <Button Style="{StaticResource ToolbarButton}" Click="OnZoomIn" ToolTip="Zoom in (Ctrl+=)" MinHeight="30" Padding="6,3">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconZoomIn}" />
-                    </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Click="OnZoomFit" ToolTip="Fit to window (Ctrl+0)" MinHeight="30" Padding="6,3">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFit}" />
-                    </Button>
-                    <Button Style="{StaticResource ToolbarButton}" Click="OnZoomActual" ToolTip="Actual pixels (Ctrl+Alt+0)" MinHeight="30" Padding="8,3">
-                        <TextBlock Text="1:1" FontSize="12" FontWeight="SemiBold" />
+                    <Button Style="{StaticResource ToolbarButton}" Click="OnShowCaptureWindow" ToolTip="Capture window: mode, delay, presets" AutomationProperties.Name="Capture options" Padding="6">
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconSettings}" />
                     </Button>
                 </StackPanel>
             </DockPanel>
         </Border>
 
-        <Grid Grid.Row="2">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="Auto" />
-                <ColumnDefinition Width="*" />
-            </Grid.ColumnDefinitions>
+        <!-- Workspaces -->
+        <Grid Grid.Row="1">
+            <Grid x:Name="EditorWorkspace">
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="*" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
 
-            <!-- Tool palette -->
-            <Border Grid.Column="0" x:Name="ToolPalette" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,0,1,0" Padding="10,10" IsEnabled="False">
-                <StackPanel>
-                    <RadioButton x:Name="SelectTool" GroupName="Tool" Style="{StaticResource ToolButton}" Tag="Select" Checked="OnToolChecked" ToolTip="Select and move (V)">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconSelect}" />
-                    </RadioButton>
-                    <RadioButton x:Name="ArrowTool" GroupName="Tool" Style="{StaticResource ToolButton}" Tag="Arrow" Checked="OnToolChecked" ToolTip="Arrow (A) — hold Shift for 45° angles" IsChecked="True">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconArrow}" />
-                    </RadioButton>
-                    <RadioButton x:Name="LineTool" GroupName="Tool" Style="{StaticResource ToolButton}" Tag="Line" Checked="OnToolChecked" ToolTip="Line (L) — hold Shift for 45° angles">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconLine}" />
-                    </RadioButton>
-                    <RadioButton x:Name="RectangleTool" GroupName="Tool" Style="{StaticResource ToolButton}" Tag="Rectangle" Checked="OnToolChecked" ToolTip="Rectangle (R) — hold Shift for a square">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconRect}" />
-                    </RadioButton>
-                    <RadioButton x:Name="EllipseTool" GroupName="Tool" Style="{StaticResource ToolButton}" Tag="Ellipse" Checked="OnToolChecked" ToolTip="Ellipse (E) — hold Shift for a circle">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconEllipse}" />
-                    </RadioButton>
-                    <RadioButton x:Name="TextTool" GroupName="Tool" Style="{StaticResource ToolButton}" Tag="Text" Checked="OnToolChecked" ToolTip="Text (T) — Enter to finish, Shift+Enter for a new line">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconText}" />
-                    </RadioButton>
-                    <RadioButton x:Name="StepTool" GroupName="Tool" Style="{StaticResource ToolButton}" Tag="StepMarker" Checked="OnToolChecked" ToolTip="Numbered step (N)">
-                        <Grid Width="24" Height="24">
-                            <Ellipse Width="19" Height="19" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.8" />
-                            <TextBlock Text="1" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1"
-                                       Foreground="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" />
-                        </Grid>
-                    </RadioButton>
-                    <Rectangle Height="1" Fill="{StaticResource BorderBrush}" Margin="6,8" />
-                    <RadioButton x:Name="RedactTool" GroupName="Tool" Style="{StaticResource ToolButton}" Tag="Redact" Checked="OnToolChecked" ToolTip="Redact (X) — permanently blacks out pixels">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconRedact}" />
-                    </RadioButton>
-                </StackPanel>
-            </Border>
+                <!-- Horizontal annotation toolbar -->
+                <Border Grid.Row="0" x:Name="ToolPalette" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="8,4" IsEnabled="False">
+                    <DockPanel LastChildFill="False">
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle">
+                            <RadioButton x:Name="SelectTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Select" Checked="OnToolChecked" ToolTip="Select and move (V)" AutomationProperties.Name="Select tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconSelect}" /><TextBlock Text="Select" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="ArrowTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Arrow" Checked="OnToolChecked" ToolTip="Arrow (A) — Shift for 45°" IsChecked="True" AutomationProperties.Name="Arrow tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconArrow}" /><TextBlock Text="Arrow" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="LineTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Line" Checked="OnToolChecked" ToolTip="Line (L)" AutomationProperties.Name="Line tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconLine}" /><TextBlock Text="Line" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="RectangleTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Rectangle" Checked="OnToolChecked" ToolTip="Rectangle (R) — Shift for a square" AutomationProperties.Name="Rectangle tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconRect}" /><TextBlock Text="Shape" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="EllipseTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Ellipse" Checked="OnToolChecked" ToolTip="Ellipse (E) — Shift for a circle" AutomationProperties.Name="Ellipse tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconEllipse}" /><TextBlock Text="Ellipse" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="HighlightTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Highlight" Checked="OnToolChecked" ToolTip="Highlight (H)" AutomationProperties.Name="Highlight tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconHighlight}" /><TextBlock Text="Highlight" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="TextTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Text" Checked="OnToolChecked" ToolTip="Text (T) — Enter to finish, Shift+Enter for a new line" AutomationProperties.Name="Text tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconText}" /><TextBlock Text="Text" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="StepTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="StepMarker" Checked="OnToolChecked" ToolTip="Numbered step (N)" AutomationProperties.Name="Step tool">
+                                <StackPanel>
+                                    <Grid Width="24" Height="24">
+                                        <Ellipse Width="19" Height="19" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.8" />
+                                        <TextBlock Text="1" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1" />
+                                    </Grid>
+                                    <TextBlock Text="Step" FontSize="10" HorizontalAlignment="Center" />
+                                </StackPanel>
+                            </RadioButton>
+                            <Rectangle Style="{StaticResource Separator}" Height="32" />
+                            <RadioButton x:Name="RedactTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Redact" Checked="OnToolChecked" ToolTip="Redact (X) — blacks out pixels in every export" AutomationProperties.Name="Redact tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconRedact}" /><TextBlock Text="Redact" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="CropTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Crop" Checked="OnToolChecked" ToolTip="Crop (C) — drag the area to keep" AutomationProperties.Name="Crop tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconCrop}" /><TextBlock Text="Crop" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                        </StackPanel>
 
-            <!-- Image viewport -->
-            <ScrollViewer Grid.Column="1" x:Name="Viewport" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
-                          Background="{StaticResource BackgroundBrush}" Focusable="False" Visibility="Collapsed"
-                          PreviewMouseWheel="OnViewportMouseWheel" SizeChanged="OnViewportSizeChanged">
-                <Border HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24" BorderBrush="#2EFFFFFF" BorderThickness="1">
-                    <!-- No bitmap effects here: they force an intermediate texture that large multi-monitor captures can exceed. -->
-                    <Border x:Name="ZoomHost">
-                        <Border.LayoutTransform>
-                            <ScaleTransform x:Name="ZoomTransform" ScaleX="1" ScaleY="1" />
-                        </Border.LayoutTransform>
-                        <editor:AnnotationCanvas x:Name="Editor" />
-                    </Border>
+                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="6,0,0,0">
+                            <Rectangle Style="{StaticResource Separator}" Height="32" />
+                            <Button x:Name="UndoButton" Style="{StaticResource ToolbarButton}" Click="OnUndo" ToolTip="Undo (Ctrl+Z)" IsEnabled="False" AutomationProperties.Name="Undo">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconUndo}" />
+                            </Button>
+                            <Button x:Name="RedoButton" Style="{StaticResource ToolbarButton}" Click="OnRedo" ToolTip="Redo (Ctrl+Y)" IsEnabled="False" AutomationProperties.Name="Redo">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconRedo}" />
+                            </Button>
+                            <Button x:Name="DeleteButton" Style="{StaticResource ToolbarButton}" Click="OnDeleteSelection" ToolTip="Delete selected annotation (Del)" IsEnabled="False" AutomationProperties.Name="Delete annotation">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconDelete}" />
+                            </Button>
+                        </StackPanel>
+
+                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button x:Name="CopyButton" Style="{StaticResource ToolbarButton}" Click="OnCopy" ToolTip="Copy image to clipboard (Ctrl+C)" IsEnabled="False" AutomationProperties.Name="Copy">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCopy}" />
+                                    <TextBlock Text="Copy" Margin="6,0,2,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="SaveButton" Style="{StaticResource ToolbarButton}" Click="OnSave" ToolTip="Export as PNG or JPEG (Ctrl+S)" IsEnabled="False" AutomationProperties.Name="Export">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconSave}" />
+                                    <TextBlock Text="Export" Margin="6,0,2,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
+                            <ToggleButton x:Name="PanelToggle" Style="{StaticResource ToolbarButton}" Click="OnTogglePanel" ToolTip="Show or hide Quick Styles &amp; Properties" AutomationProperties.Name="Toggle properties panel">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconPanel}" />
+                            </ToggleButton>
+                        </StackPanel>
+                    </DockPanel>
                 </Border>
-            </ScrollViewer>
 
-            <!-- Start screen -->
-            <Grid Grid.Column="1" x:Name="StartScreen">
-                <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
-                    <TextBlock Text="Take a screenshot" FontSize="26" FontWeight="SemiBold" HorizontalAlignment="Center" />
-                    <TextBlock Text="Capture, mark up and redact — then copy or save." FontSize="14" Foreground="{StaticResource MutedTextBrush}"
-                               HorizontalAlignment="Center" Margin="0,6,0,22" />
-                    <WrapPanel HorizontalAlignment="Center">
-                        <Button Style="{StaticResource CaptureCard}" Click="OnCaptureRegion">
-                            <StackPanel>
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconRegion}" Stroke="{StaticResource AccentBrush}" RenderTransformOrigin="0.5,0.5">
-                                    <Path.RenderTransform><ScaleTransform ScaleX="1.6" ScaleY="1.6" /></Path.RenderTransform>
-                                </Path>
-                                <TextBlock Text="Region" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,18,0,2" />
-                                <TextBlock Text="Ctrl+1" FontSize="12" Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource CaptureCard}" Click="OnCaptureWindow">
-                            <StackPanel>
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconWindow}" Stroke="{StaticResource AccentBrush}" RenderTransformOrigin="0.5,0.5">
-                                    <Path.RenderTransform><ScaleTransform ScaleX="1.6" ScaleY="1.6" /></Path.RenderTransform>
-                                </Path>
-                                <TextBlock Text="Window" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,18,0,2" />
-                                <TextBlock Text="Ctrl+2" FontSize="12" Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource CaptureCard}" Click="OnCaptureDisplay">
-                            <StackPanel>
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconScreen}" Stroke="{StaticResource AccentBrush}" RenderTransformOrigin="0.5,0.5">
-                                    <Path.RenderTransform><ScaleTransform ScaleX="1.6" ScaleY="1.6" /></Path.RenderTransform>
-                                </Path>
-                                <TextBlock Text="Display" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,18,0,2" />
-                                <TextBlock Text="Ctrl+3" FontSize="12" Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                        <Button Style="{StaticResource CaptureCard}" Click="OnCaptureAll">
-                            <StackPanel>
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconAllScreens}" Stroke="{StaticResource AccentBrush}" RenderTransformOrigin="0.5,0.5">
-                                    <Path.RenderTransform><ScaleTransform ScaleX="1.6" ScaleY="1.6" /></Path.RenderTransform>
-                                </Path>
-                                <TextBlock Text="Full screen" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,18,0,2" />
-                                <TextBlock Text="Ctrl+4 · all displays" FontSize="12" Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center" />
-                            </StackPanel>
-                        </Button>
-                    </WrapPanel>
-                    <TextBlock x:Name="DisplaySummary" FontSize="12" Foreground="{StaticResource MutedTextBrush}" HorizontalAlignment="Center" Margin="0,22,0,0" />
+                <!-- Privacy banners -->
+                <StackPanel Grid.Row="1">
+                    <Border x:Name="RedactionBanner" Background="{DynamicResource WarningBackgroundBrush}" Padding="14,6" Visibility="Collapsed">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Sanitize…" Click="OnSanitize" />
+                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource WarningBrush}"
+                                       Text="Exports of this capture are redacted, but its editable Library copy still keeps the original pixels so redactions can be undone. Sanitize to remove them permanently." />
+                        </DockPanel>
+                    </Border>
+                    <Border x:Name="NoHistoryBanner" Background="{DynamicResource WarningBackgroundBrush}" Padding="14,6" Visibility="Collapsed">
+                        <DockPanel>
+                            <Button DockPanel.Dock="Right" Style="{StaticResource LinkButton}" Content="Save to Library" Click="OnSaveToLibrary" />
+                            <TextBlock TextWrapping="Wrap" VerticalAlignment="Center" Foreground="{DynamicResource WarningBrush}"
+                                       Text="Captured without history: this capture exists only in memory and is lost when you close it unless you export or save it." />
+                        </DockPanel>
+                    </Border>
+                    <Border x:Name="SaveErrorBanner" Background="{DynamicResource WarningBackgroundBrush}" Padding="14,6" Visibility="Collapsed">
+                        <TextBlock x:Name="SaveErrorText" TextWrapping="Wrap" Foreground="{DynamicResource WarningBrush}" />
+                    </Border>
                 </StackPanel>
+
+                <!-- Canvas + properties panel -->
+                <Grid Grid.Row="2">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="*" MinWidth="300" />
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition x:Name="PanelColumn" Width="260" MinWidth="0" MaxWidth="520" />
+                    </Grid.ColumnDefinitions>
+
+                    <ScrollViewer Grid.Column="0" x:Name="Viewport" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Auto"
+                                  Background="{DynamicResource CanvasBackdropBrush}" Focusable="False" Visibility="Collapsed"
+                                  PreviewMouseWheel="OnViewportMouseWheel" SizeChanged="OnViewportSizeChanged">
+                        <Border HorizontalAlignment="Center" VerticalAlignment="Center" Margin="24" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                            <!-- No bitmap effects here: they force an intermediate texture that large multi-monitor captures can exceed. -->
+                            <Border x:Name="ZoomHost">
+                                <Border.LayoutTransform>
+                                    <ScaleTransform x:Name="ZoomTransform" ScaleX="1" ScaleY="1" />
+                                </Border.LayoutTransform>
+                                <editor:AnnotationCanvas x:Name="Editor" />
+                            </Border>
+                        </Border>
+                    </ScrollViewer>
+
+                    <!-- Empty editor -->
+                    <Grid Grid.Column="0" x:Name="StartScreen" Background="{DynamicResource BackgroundBrush}">
+                        <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
+                            <TextBlock Text="Take a screenshot" FontSize="26" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                            <TextBlock Text="Captures are kept in your Library automatically. Mark them up, redact, then copy or export."
+                                       FontSize="14" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" Margin="0,6,0,22" />
+                            <WrapPanel HorizontalAlignment="Center">
+                                <Button Style="{StaticResource CaptureCard}" Click="OnCaptureRegion" AutomationProperties.Name="Capture region">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconRegion}" Stroke="{DynamicResource AccentBrush}" RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform><ScaleTransform ScaleX="1.6" ScaleY="1.6" /></Path.RenderTransform>
+                                        </Path>
+                                        <TextBlock Text="Region" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,18,0,2" />
+                                        <TextBlock Text="Ctrl+1" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource CaptureCard}" Click="OnCaptureWindow" AutomationProperties.Name="Capture window">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconWindow}" Stroke="{DynamicResource AccentBrush}" RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform><ScaleTransform ScaleX="1.6" ScaleY="1.6" /></Path.RenderTransform>
+                                        </Path>
+                                        <TextBlock Text="Window" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,18,0,2" />
+                                        <TextBlock Text="Ctrl+2" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource CaptureCard}" Click="OnCaptureDisplay" AutomationProperties.Name="Capture display">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconScreen}" Stroke="{DynamicResource AccentBrush}" RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform><ScaleTransform ScaleX="1.6" ScaleY="1.6" /></Path.RenderTransform>
+                                        </Path>
+                                        <TextBlock Text="Display" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,18,0,2" />
+                                        <TextBlock Text="Ctrl+3" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                                <Button Style="{StaticResource CaptureCard}" Click="OnCaptureAll" AutomationProperties.Name="Capture full screen">
+                                    <StackPanel>
+                                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconAllScreens}" Stroke="{DynamicResource AccentBrush}" RenderTransformOrigin="0.5,0.5">
+                                            <Path.RenderTransform><ScaleTransform ScaleX="1.6" ScaleY="1.6" /></Path.RenderTransform>
+                                        </Path>
+                                        <TextBlock Text="Full screen" FontSize="15" FontWeight="SemiBold" HorizontalAlignment="Center" Margin="0,18,0,2" />
+                                        <TextBlock Text="Ctrl+4 · all displays" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" />
+                                    </StackPanel>
+                                </Button>
+                            </WrapPanel>
+                            <TextBlock x:Name="DisplaySummary" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" Margin="0,22,0,0" />
+                            <TextBlock x:Name="HotkeySummary" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" Margin="0,6,0,0" />
+                        </StackPanel>
+                    </Grid>
+
+                    <GridSplitter Grid.Column="1" x:Name="PanelSplitter" Width="5" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext"
+                                  DragCompleted="OnPanelSplitterDragCompleted" AutomationProperties.Name="Resize properties panel" ToolTip="Drag to resize" />
+
+                    <!-- Quick Styles and Tool Properties -->
+                    <Border Grid.Column="2" x:Name="PropertiesPanel" Background="{DynamicResource SurfaceBrush}">
+                        <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                            <StackPanel Margin="14,4,14,14" x:Name="PropertiesContent" IsEnabled="False">
+                                <DockPanel Margin="0,14,0,6">
+                                    <Button DockPanel.Dock="Right" x:Name="SaveStyleButton" Style="{StaticResource LinkButton}" Content="+ Save current" Click="OnSaveQuickStyle"
+                                            ToolTip="Save the current color and thickness as a Quick Style" />
+                                    <TextBlock Text="QUICK STYLES" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                                </DockPanel>
+                                <ItemsControl x:Name="QuickStylesList" ItemTemplate="{StaticResource QuickStyleTemplate}" Focusable="False">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                                <TextBlock Text="Right-click a style to mark it as a favorite (favorites are listed first)." FontSize="11" TextWrapping="Wrap"
+                                           Foreground="{DynamicResource MutedTextBrush}" Margin="0,4,0,0" />
+
+                                <TextBlock Text="TOOL PROPERTIES" Style="{StaticResource SectionHeader}" Margin="0,20,0,6" />
+                                <TextBlock x:Name="ToolNameText" FontSize="14" FontWeight="SemiBold" Text="Arrow" />
+                                <TextBlock x:Name="ToolHintText" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,2,0,8" />
+
+                                <StackPanel x:Name="StyleProperties">
+                                    <TextBlock Text="Color" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,4,0,4" />
+                                    <WrapPanel x:Name="SwatchPanel">
+                                        <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#E53935" Tag="#E53935" ToolTip="Red" IsChecked="True" Checked="OnColorChecked" AutomationProperties.Name="Red" />
+                                        <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#FB8C00" Tag="#FB8C00" ToolTip="Orange" Checked="OnColorChecked" AutomationProperties.Name="Orange" />
+                                        <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#FDD835" Tag="#FDD835" ToolTip="Yellow" Checked="OnColorChecked" AutomationProperties.Name="Yellow" />
+                                        <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#43A047" Tag="#43A047" ToolTip="Green" Checked="OnColorChecked" AutomationProperties.Name="Green" />
+                                        <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#1E88E5" Tag="#1E88E5" ToolTip="Blue" Checked="OnColorChecked" AutomationProperties.Name="Blue" />
+                                        <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#8E24AA" Tag="#8E24AA" ToolTip="Purple" Checked="OnColorChecked" AutomationProperties.Name="Purple" />
+                                        <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#141414" Tag="#141414" ToolTip="Black" Checked="OnColorChecked" AutomationProperties.Name="Black" />
+                                        <RadioButton GroupName="Color" Style="{StaticResource SwatchButton}" Background="#FFFFFF" Tag="#FFFFFF" ToolTip="White" Checked="OnColorChecked" AutomationProperties.Name="White" />
+                                    </WrapPanel>
+                                    <DockPanel Margin="0,8,0,0">
+                                        <TextBlock Text="Hex" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" Width="40" />
+                                        <TextBox x:Name="HexBox" Text="#E53935" LostFocus="OnHexCommitted" KeyDown="OnHexKeyDown" AutomationProperties.Name="Color hex value" />
+                                    </DockPanel>
+                                    <DockPanel Margin="0,12,0,4">
+                                        <TextBlock x:Name="ThicknessValue" DockPanel.Dock="Right" FontSize="12" Text="4 px" />
+                                        <TextBlock x:Name="ThicknessLabel" Text="Thickness" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
+                                    </DockPanel>
+                                    <Slider x:Name="ThicknessSlider" Minimum="1" Maximum="20" Value="4" SmallChange="1" LargeChange="2" IsSnapToTickEnabled="True" TickFrequency="1"
+                                            ValueChanged="OnThicknessChanged" AutomationProperties.Name="Thickness" />
+                                </StackPanel>
+
+                                <TextBlock x:Name="SelectionText" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,14,0,0" />
+
+                                <TextBlock Text="CAPTURE" Style="{StaticResource SectionHeader}" Margin="0,22,0,6" />
+                                <TextBlock x:Name="CaptureInfoText" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" />
+                            </StackPanel>
+                        </ScrollViewer>
+                    </Border>
+                </Grid>
+
+                <!-- Recent Captures Tray -->
+                <Border Grid.Row="3" x:Name="TrayPanel" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0">
+                    <DockPanel>
+                        <DockPanel DockPanel.Dock="Top" Margin="12,4,8,0">
+                            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                                <Button Style="{StaticResource LinkButton}" Content="Close unpinned" Click="OnTrayCloseUnpinned" ToolTip="Remove unpinned thumbnails from the tray (captures stay in the Library)" />
+                                <Button Style="{StaticResource LinkButton}" Content="Open Library" Click="OnShowLibrary" />
+                                <Button Style="{StaticResource LinkButton}" Content="Hide" Click="OnToggleTray" ToolTip="Hide the Recent Captures tray (View menu shows it again)" />
+                            </StackPanel>
+                            <TextBlock x:Name="TrayHeader" Text="RECENT CAPTURES" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                        </DockPanel>
+                        <ScrollViewer x:Name="TrayScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PreviewMouseWheel="OnTrayMouseWheel" Focusable="False" Padding="8,6,8,8">
+                            <Grid>
+                                <ItemsControl x:Name="TrayItems" ItemTemplate="{StaticResource TrayTileTemplate}" AutomationProperties.Name="Recent captures">
+                                    <ItemsControl.ItemsPanel>
+                                        <ItemsPanelTemplate><VirtualizingStackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                                    </ItemsControl.ItemsPanel>
+                                </ItemsControl>
+                                <TextBlock x:Name="TrayEmptyText" Text="Your recent captures appear here." Foreground="{DynamicResource MutedTextBrush}" Margin="6,20" FontSize="12" />
+                            </Grid>
+                        </ScrollViewer>
+                    </DockPanel>
+                </Border>
             </Grid>
+
+            <views:LibraryView x:Name="LibraryPane" Visibility="Collapsed" />
         </Grid>
 
         <!-- Status bar -->
-        <Border Grid.Row="3" Background="{StaticResource SurfaceBrush}" BorderBrush="{StaticResource BorderBrush}" BorderThickness="0,1,0,0" Padding="14,5">
+        <Border Grid.Row="2" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,1,0,0" Padding="12,3">
             <DockPanel>
-                <TextBlock DockPanel.Dock="Right" x:Name="ImageInfo" FontSize="12" Foreground="{StaticResource MutedTextBrush}" />
-                <TextBlock x:Name="StatusText" FontSize="12" Foreground="{StaticResource MutedTextBrush}" Text="Ready" TextTrimming="CharacterEllipsis" />
+                <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                    <TextBlock x:Name="SaveStateText" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,16,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="ImageInfo" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,12,0" VerticalAlignment="Center" />
+                    <Button Style="{StaticResource ToolbarButton}" Click="OnZoomOut" ToolTip="Zoom out (Ctrl+−)" MinHeight="24" Padding="4,1" AutomationProperties.Name="Zoom out">
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconZoomOut}" />
+                    </Button>
+                    <TextBlock x:Name="ZoomText" Text="100%" Width="46" TextAlignment="Center" VerticalAlignment="Center" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />
+                    <Button Style="{StaticResource ToolbarButton}" Click="OnZoomIn" ToolTip="Zoom in (Ctrl+=)" MinHeight="24" Padding="4,1" AutomationProperties.Name="Zoom in">
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconZoomIn}" />
+                    </Button>
+                    <Button Style="{StaticResource ToolbarButton}" Click="OnZoomFit" ToolTip="Fit to window (Ctrl+0)" MinHeight="24" Padding="4,1" AutomationProperties.Name="Fit to window">
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFit}" />
+                    </Button>
+                    <Button Style="{StaticResource ToolbarButton}" Click="OnZoomActual" ToolTip="Actual pixels (Ctrl+Alt+0)" MinHeight="24" Padding="6,1" AutomationProperties.Name="Actual pixels">
+                        <TextBlock Text="1:1" FontSize="11" FontWeight="SemiBold" />
+                    </Button>
+                </StackPanel>
+                <TextBlock x:Name="StatusText" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Text="Ready" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
             </DockPanel>
         </Border>
     </Grid>

@@ -45,12 +45,10 @@ public class UiSmokeTests
             Assert.True(doc.Undo());
             Assert.NotEqual(ArgbColor.Black, window.RenderFinalImage().GetPixel(300, 225));
 
-            doc.MarkSaved(); // avoid the unsaved-changes prompt on close
         }
         finally
         {
-            // Never leave unsaved state: the close prompt would block the test run.
-            window.Document?.MarkSaved();
+            window.AllowClose = true;
             window.Close();
         }
 

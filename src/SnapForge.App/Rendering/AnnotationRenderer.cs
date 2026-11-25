@@ -42,6 +42,9 @@ internal static class AnnotationRenderer
             case StepMarkerAnnotation s:
                 DrawStep(dc, s);
                 break;
+            case HighlightAnnotation h:
+                dc.DrawRectangle(Frozen(new SolidColorBrush(BitmapConversion.ToMediaColor(h.Color with { A = (byte)Math.Round(255 * Math.Clamp(h.Opacity, 0.05, 1)) }))), null, R(h.Rect));
+                break;
             case RedactionMaskAnnotation m:
                 // Integer-aligned, unstroked, opaque: covers whole pixels exactly with no anti-aliased edge.
                 dc.DrawRectangle(Frozen(new SolidColorBrush(BitmapConversion.ToMediaColor(m.Color with { A = 255 }))), null,

@@ -5,6 +5,7 @@ using System.Windows;
 using System.Windows.Threading;
 using SnapForge.App.Capture;
 using SnapForge.App.Rendering;
+using SnapForge.App.Services;
 using SnapForge.Core.Annotations;
 using SnapForge.Core.Editing;
 using SnapForge.Core.Export;
@@ -69,6 +70,15 @@ internal static class SelfTest
             return result;
         });
 
+        string temp = Path.Combine(Path.GetTempPath(), "snapforge-selftest-" + Guid.NewGuid().ToString("N"));
+        Check("capture library (temporary)", () =>
+        {
+            // Never touches the user's real library or settings.
+            AppServices.Current = AppServices.Create(Path.Combine(temp, "settings.json"), Path.Combine(temp, "library"),
+                s => s with { CloseToNotificationArea = false, PrivacyNoticeShown = true });
+            return $"opened {AppServices.Current.Library.Root}";
+        });
+
         Check("main window + edit + redact + export", () =>
         {
             var window = new MainWindow();
@@ -92,19 +102,61 @@ internal static class SelfTest
 
                 int png = ImageExporter.Encode(final, ImageFileFormat.Png).Length;
                 int jpeg = ImageExporter.Encode(final, ImageFileFormat.Jpeg).Length;
-                doc.MarkSaved();
+                Pump();
+                PumpUntil(() => window.CurrentSession?.InLibrary == true && !window.CurrentSession.IsSaving, TimeSpan.FromSeconds(10));
+                window.FlushAllAsync().GetAwaiter();
+                PumpUntil(() => !window.CurrentSession!.IsSaving && !doc.IsDirty, TimeSpan.FromSeconds(10));
                 return $"rendered {final.Width}x{final.Height}; PNG {png} bytes; JPEG {jpeg} bytes";
             }
             finally
             {
-                window.Document?.MarkSaved();
+                window.AllowClose = true;
                 window.Close();
             }
         });
 
+        Check("library persistence", () =>
+        {
+            AppServices services = AppServices.Current ?? throw new InvalidOperationException("No services.");
+            services.Writer.WhenIdleAsync().GetAwaiter().GetResult();
+            var reopened = Core.Library.CaptureLibrary.Open(services.Library.Root);
+            int count = reopened.Records.Count;
+            if (count < 1)
+            {
+                throw new InvalidOperationException("The capture was not saved to the library.");
+            }
+
+            Core.Storage.CaptureContent content = reopened.Load(reopened.Records[0].Id);
+            return $"{count} capture(s) saved and reloaded ({content.Annotations.Count} annotation(s))";
+        });
+
+        try
+        {
+            AppServices.Current?.Dispose();
+            Directory.Delete(temp, recursive: true);
+        }
+        catch (IOException)
+        {
+        }
+
         lines.Add(ok ? "RESULT: PASS" : "RESULT: FAIL");
         File.WriteAllLines(reportPath, lines);
         return ok ? 0 : 1;
+    }
+
+    private static void PumpUntil(Func<bool> condition, TimeSpan timeout)
+    {
+        DateTime end = DateTime.UtcNow + timeout;
+        while (!condition() && DateTime.UtcNow < end)
+        {
+            Pump();
+            Thread.Sleep(20);
+        }
+
+        if (!condition())
+        {
+            throw new TimeoutException("Timed out waiting for the library save.");
+        }
     }
 
     private static void Pump()

@@ -7,10 +7,15 @@ namespace SnapForge.App.Interop;
 internal static unsafe class WindowChrome
 {
     /// <summary>Dark title bar to match the app theme (Windows 10 20H1+ / Windows 11; ignored elsewhere).</summary>
-    public static void UseDarkTitleBar(Window window)
+    public static void UseDarkTitleBar(Window window, bool dark = true)
     {
         nint hwnd = new WindowInteropHelper(window).Handle;
-        int enabled = 1;
+        if (hwnd == 0)
+        {
+            return;
+        }
+
+        int enabled = dark ? 1 : 0;
         _ = DwmSetWindowAttribute(hwnd, DWMWA_USE_IMMERSIVE_DARK_MODE, &enabled, sizeof(int));
     }
 

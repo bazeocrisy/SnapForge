@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <InternalsVisibleTo Include="SnapForge.Core.Tests" />
+    <InternalsVisibleTo Include="SnapForge.App.Tests" />
   </ItemGroup>
 
 </Project>

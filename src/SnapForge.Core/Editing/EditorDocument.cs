@@ -75,6 +75,9 @@ public sealed class EditorDocument
 
     public void MarkSaved() => _savedStateId = History.CurrentStateId;
 
+    /// <summary>Marks a specific earlier state as saved (used when a background save of that state completes).</summary>
+    public void MarkSaved(long stateId) => _savedStateId = stateId;
+
     public void Execute(IEditCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);

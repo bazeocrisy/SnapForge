@@ -1,0 +1,190 @@
+<UserControl x:Class="SnapForge.App.Views.LibraryView"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             xmlns:views="clr-namespace:SnapForge.App.Views"
+             Background="{DynamicResource BackgroundBrush}">
+    <UserControl.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+
+        <DataTemplate x:Key="HeaderRowTemplate">
+            <TextBlock Text="{Binding Title}" FontSize="13" FontWeight="SemiBold" Margin="6,16,0,8" Foreground="{DynamicResource TextBrush}" />
+        </DataTemplate>
+
+        <DataTemplate x:Key="TileRowTemplate">
+            <ItemsControl ItemsSource="{Binding Tiles}" Focusable="False">
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><StackPanel Orientation="Horizontal" /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+                <ItemsControl.ItemTemplate>
+                    <DataTemplate>
+                        <Border x:Name="Tile" Width="{Binding TileWidth}" Margin="6" CornerRadius="8" BorderThickness="2" BorderBrush="Transparent"
+                                Background="{DynamicResource SurfaceBrush}" Padding="6" Cursor="Hand"
+                                MouseLeftButtonDown="OnTileMouseDown" ToolTip="{Binding Tooltip}" Tag="{Binding}"
+                                AutomationProperties.Name="{Binding Title}">
+                            <Border.ContextMenu>
+                                <ContextMenu Opened="OnTileContextOpened">
+                                    <MenuItem Header="_Open in Editor" Click="OnOpenSelected" FontWeight="SemiBold" InputGestureText="Enter" />
+                                    <MenuItem Header="_Rename…" Click="OnRename" InputGestureText="F2" />
+                                    <MenuItem Header="_Duplicate" Click="OnDuplicate" />
+                                    <MenuItem Header="Toggle _favorite" Click="OnToggleFavorite" />
+                                    <MenuItem Header="_Tags…" Click="OnEditTags" />
+                                    <MenuItem Header="Move to _folder…" Click="OnSetFolder" />
+                                    <Separator />
+                                    <MenuItem Header="_Export as PNG/JPEG…" Click="OnExport" />
+                                    <MenuItem Header="Export editable capture (.sfcap)…" Click="OnExportPackage" />
+                                    <MenuItem Header="_Sanitize…" Click="OnSanitize" />
+                                    <Separator />
+                                    <MenuItem x:Name="TrashItem" Header="Move to _Trash" Click="OnDelete" InputGestureText="Del" />
+                                    <MenuItem Header="_Restore" Click="OnRestore" />
+                                    <MenuItem Header="Delete _permanently…" Click="OnDeletePermanently" />
+                                </ContextMenu>
+                            </Border.ContextMenu>
+                            <StackPanel>
+                                <Grid Height="{Binding ImageHeight}">
+                                    <Border Background="{DynamicResource CanvasBackdropBrush}" CornerRadius="4" />
+                                    <Image Source="{Binding Thumbnail}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <Path Data="{StaticResource IconStar}" Fill="{DynamicResource AccentBrush}" Width="24" Height="24" Stretch="None"
+                                          HorizontalAlignment="Right" VerticalAlignment="Top" Margin="2" Visibility="{Binding Favorite, Converter={StaticResource BoolToVis}}" />
+                                    <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4" CornerRadius="3" Padding="4,1"
+                                            Background="{DynamicResource WarningBackgroundBrush}" Visibility="{Binding HasWarning, Converter={StaticResource BoolToVis}}">
+                                        <TextBlock Text="{Binding WarningText}" FontSize="10" Foreground="{DynamicResource WarningBrush}" />
+                                    </Border>
+                                </Grid>
+                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" Margin="2,6,2,0" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextBrush}" />
+                                <TextBlock Text="{Binding Subtitle}" FontSize="11" Margin="2,1,2,0" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource MutedTextBrush}" />
+                            </StackPanel>
+                        </Border>
+                        <DataTemplate.Triggers>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="Tile" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                                <Setter TargetName="Tile" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                            </DataTrigger>
+                            <Trigger SourceName="Tile" Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Tile" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            </Trigger>
+                        </DataTemplate.Triggers>
+                    </DataTemplate>
+                </ItemsControl.ItemTemplate>
+            </ItemsControl>
+        </DataTemplate>
+
+        <views:LibraryRowTemplateSelector x:Key="RowSelector" Header="{StaticResource HeaderRowTemplate}" Tiles="{StaticResource TileRowTemplate}" />
+    </UserControl.Resources>
+
+    <Grid>
+        <Grid.ColumnDefinitions>
+            <ColumnDefinition Width="220" MinWidth="160" MaxWidth="360" />
+            <ColumnDefinition Width="Auto" />
+            <ColumnDefinition Width="*" />
+        </Grid.ColumnDefinitions>
+
+        <!-- Sidebar -->
+        <Border Grid.Column="0" Background="{DynamicResource SurfaceBrush}">
+            <ScrollViewer VerticalScrollBarVisibility="Auto" Focusable="False">
+                <StackPanel Margin="10,12" x:Name="Sidebar">
+                    <TextBlock Text="LIBRARY" Style="{StaticResource SectionHeader}" Margin="10,0,0,6" />
+                    <RadioButton x:Name="AllView" GroupName="View" Style="{StaticResource SidebarItem}" Tag="All" IsChecked="True" Checked="OnViewChecked">
+                        <DockPanel><TextBlock x:Name="AllCount" DockPanel.Dock="Right" Foreground="{DynamicResource MutedTextBrush}" /><StackPanel Orientation="Horizontal"><Path Style="{StaticResource IconPath}" Data="{StaticResource IconLibrary}" Width="22" /><TextBlock Text="All Captures" Margin="6,0,0,0" VerticalAlignment="Center" /></StackPanel></DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="RecentView" GroupName="View" Style="{StaticResource SidebarItem}" Tag="Recent" Checked="OnViewChecked">
+                        <DockPanel><TextBlock x:Name="RecentCount" DockPanel.Dock="Right" Foreground="{DynamicResource MutedTextBrush}" /><StackPanel Orientation="Horizontal"><Path Style="{StaticResource IconPath}" Data="{StaticResource IconClock}" Width="22" /><TextBlock Text="Recent (7 days)" Margin="6,0,0,0" VerticalAlignment="Center" /></StackPanel></DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="FavoritesView" GroupName="View" Style="{StaticResource SidebarItem}" Tag="Favorites" Checked="OnViewChecked">
+                        <DockPanel><TextBlock x:Name="FavoritesCount" DockPanel.Dock="Right" Foreground="{DynamicResource MutedTextBrush}" /><StackPanel Orientation="Horizontal"><Path Style="{StaticResource IconPath}" Data="{StaticResource IconStar}" Width="22" /><TextBlock Text="Favorites" Margin="6,0,0,0" VerticalAlignment="Center" /></StackPanel></DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="TrashView" GroupName="View" Style="{StaticResource SidebarItem}" Tag="Trash" Checked="OnViewChecked">
+                        <DockPanel><TextBlock x:Name="TrashCount" DockPanel.Dock="Right" Foreground="{DynamicResource MutedTextBrush}" /><StackPanel Orientation="Horizontal"><Path Style="{StaticResource IconPath}" Data="{StaticResource IconTrash}" Width="22" /><TextBlock Text="Trash" Margin="6,0,0,0" VerticalAlignment="Center" /></StackPanel></DockPanel>
+                    </RadioButton>
+
+                    <TextBlock Text="TAGS" Style="{StaticResource SectionHeader}" Margin="10,18,0,6" />
+                    <StackPanel x:Name="TagsPanel" />
+                    <TextBlock x:Name="NoTagsText" Text="No tags yet. Right-click a capture → Tags…" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" />
+
+                    <TextBlock Text="FOLDERS" Style="{StaticResource SectionHeader}" Margin="10,18,0,6" />
+                    <StackPanel x:Name="FoldersPanel" />
+                    <TextBlock x:Name="NoFoldersText" Text="No folders yet. Right-click a capture → Move to folder…" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" />
+
+                    <TextBlock Text="STORAGE" Style="{StaticResource SectionHeader}" Margin="10,18,0,6" />
+                    <TextBlock x:Name="StorageText" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" />
+                    <Button Style="{StaticResource LinkButton}" Content="Storage &amp; privacy settings…" HorizontalAlignment="Left" Margin="4,4,0,0" Click="OnStorageSettings" />
+                </StackPanel>
+            </ScrollViewer>
+        </Border>
+        <GridSplitter Grid.Column="1" Width="5" HorizontalAlignment="Stretch" ResizeBehavior="PreviousAndNext" AutomationProperties.Name="Resize sidebar" />
+
+        <!-- Main area -->
+        <Grid Grid.Column="2">
+            <Grid.RowDefinitions>
+                <RowDefinition Height="Auto" />
+                <RowDefinition Height="*" />
+            </Grid.RowDefinitions>
+
+            <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="12,8">
+                <DockPanel LastChildFill="True">
+                    <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBlock x:Name="SelectionText" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" Margin="12,0" />
+                        <Button x:Name="OpenButton" Content="Open" Click="OnOpenSelected" Margin="2,0" IsEnabled="False" ToolTip="Open in Editor (Enter)" />
+                        <Button x:Name="ExportButton" Content="Export…" Click="OnExport" Margin="2,0" IsEnabled="False" />
+                        <Button x:Name="DeleteButton" Content="Move to Trash" Click="OnDelete" Margin="2,0" IsEnabled="False" ToolTip="Del" />
+                        <Button x:Name="RestoreButton" Content="Restore" Click="OnRestore" Margin="2,0" Visibility="Collapsed" />
+                        <Button x:Name="EmptyTrashButton" Content="Empty Trash…" Click="OnEmptyTrash" Margin="2,0" Visibility="Collapsed" />
+                        <Button x:Name="MoreButton" Content="More ▾" Click="OnMore" Margin="2,0" IsEnabled="False">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="_Rename…" Click="OnRename" InputGestureText="F2" />
+                                    <MenuItem Header="_Duplicate" Click="OnDuplicate" />
+                                    <MenuItem Header="Toggle _favorite" Click="OnToggleFavorite" />
+                                    <MenuItem Header="_Tags…" Click="OnEditTags" />
+                                    <MenuItem Header="Move to _folder…" Click="OnSetFolder" />
+                                    <MenuItem Header="Export editable capture (.sfcap)…" Click="OnExportPackage" />
+                                    <MenuItem Header="_Sanitize…" Click="OnSanitize" />
+                                    <MenuItem Header="Delete _permanently…" Click="OnDeletePermanently" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                    </StackPanel>
+                    <StackPanel Orientation="Horizontal" VerticalAlignment="Center">
+                        <TextBox x:Name="SearchBox" Width="260" TextChanged="OnSearchChanged" AutomationProperties.Name="Search captures"
+                                 ToolTip="Search titles, tags, folders, dates (yyyy-mm-dd) and sizes (e.g. 1920x1080)" />
+                        <Button x:Name="SortButton" Content="Sort: Newest ▾" Click="OnSortClick" Margin="8,0,0,0">
+                            <Button.ContextMenu>
+                                <ContextMenu>
+                                    <MenuItem Header="Newest first" Tag="NewestFirst" Click="OnSortChosen" />
+                                    <MenuItem Header="Oldest first" Tag="OldestFirst" Click="OnSortChosen" />
+                                    <MenuItem Header="Recently opened" Tag="RecentlyModified" Click="OnSortChosen" />
+                                    <MenuItem Header="Name (A–Z)" Tag="TitleAscending" Click="OnSortChosen" />
+                                    <MenuItem Header="Largest first" Tag="LargestFirst" Click="OnSortChosen" />
+                                </ContextMenu>
+                            </Button.ContextMenu>
+                        </Button>
+                        <TextBlock Text="Size" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" Margin="14,0,6,0" />
+                        <Slider x:Name="SizeSlider" Width="110" Minimum="110" Maximum="320" Value="180" SmallChange="10" LargeChange="40" VerticalAlignment="Center"
+                                ValueChanged="OnSizeChanged" AutomationProperties.Name="Thumbnail size" />
+                    </StackPanel>
+                </DockPanel>
+            </Border>
+
+            <ItemsControl Grid.Row="1" x:Name="Rows" ItemTemplateSelector="{StaticResource RowSelector}"
+                          VirtualizingPanel.IsVirtualizing="True" VirtualizingPanel.VirtualizationMode="Recycling" VirtualizingPanel.ScrollUnit="Pixel"
+                          ScrollViewer.CanContentScroll="True" Focusable="True" KeyboardNavigation.IsTabStop="True"
+                          SizeChanged="OnRowsSizeChanged" PreviewKeyDown="OnGridKeyDown" MouseLeftButtonDown="OnGridBackgroundClick"
+                          AutomationProperties.Name="Captures" FocusVisualStyle="{x:Null}" Padding="12,0,12,12">
+                <ItemsControl.Template>
+                    <ControlTemplate TargetType="ItemsControl">
+                        <ScrollViewer x:Name="RowsScroller" Focusable="False" CanContentScroll="True" Padding="{TemplateBinding Padding}" Background="Transparent">
+                            <ItemsPresenter />
+                        </ScrollViewer>
+                    </ControlTemplate>
+                </ItemsControl.Template>
+                <ItemsControl.ItemsPanel>
+                    <ItemsPanelTemplate><VirtualizingStackPanel /></ItemsPanelTemplate>
+                </ItemsControl.ItemsPanel>
+            </ItemsControl>
+
+            <StackPanel Grid.Row="1" x:Name="EmptyState" HorizontalAlignment="Center" VerticalAlignment="Center" Visibility="Collapsed">
+                <TextBlock x:Name="EmptyTitle" Text="No captures yet" FontSize="20" FontWeight="SemiBold" HorizontalAlignment="Center" />
+                <TextBlock x:Name="EmptyText" Text="Captures you take are saved here automatically." FontSize="13" Foreground="{DynamicResource MutedTextBrush}" HorizontalAlignment="Center" Margin="0,6,0,0" />
+            </StackPanel>
+        </Grid>
+    </Grid>
+</UserControl>

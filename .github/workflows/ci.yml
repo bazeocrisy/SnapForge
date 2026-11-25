@@ -162,6 +162,26 @@ jobs:
           Write-Output "Nothing was extracted to %TEMP%\.net."
           if ($p.ExitCode -ne 0) { throw "Self-test failed." }
 
+      - name: Render workspace screenshots (demo library in a temporary folder)
+        if: always()
+        shell: pwsh
+        working-directory: portable
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "screenshots"
+          $p = Start-Process -FilePath .\SnapForge.exe -ArgumentList '--screenshots', "`"$out`"" -Wait -PassThru
+          if (Test-Path "$out\screenshots.txt") { Get-Content "$out\screenshots.txt" }
+          Write-Output "Exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "Screenshot tour failed." }
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: screenshots-${{ github.sha }}
+          path: ${{ runner.temp }}/screenshots
+          retention-days: 30
+          if-no-files-found: warn
+
   core-linux:
     name: Core tests (Linux)
     runs-on: ubuntu-latest
