@@ -19,7 +19,8 @@
                     <DataTemplate>
                         <Border x:Name="Tile" Width="{Binding TileWidth}" Margin="6" CornerRadius="8" BorderThickness="2" BorderBrush="Transparent"
                                 Background="{DynamicResource SurfaceBrush}" Padding="6" Cursor="Hand"
-                                MouseLeftButtonDown="OnTileMouseDown" ToolTip="{Binding Tooltip}" Tag="{Binding}"
+                                MouseLeftButtonDown="OnTileMouseDown" MouseMove="OnTileMouseMove" MouseLeftButtonUp="OnTileMouseUp"
+                                ToolTip="{Binding Tooltip}" Tag="{Binding}"
                                 AutomationProperties.Name="{Binding Title}">
                             <Border.ContextMenu>
                                 <ContextMenu Opened="OnTileContextOpened">
@@ -107,6 +108,10 @@
 
                     <TextBlock Text="STORAGE" Style="{StaticResource SectionHeader}" Margin="10,18,0,6" />
                     <TextBlock x:Name="StorageText" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" />
+                    <TextBlock Text="Stored locally in:" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" Margin="10,2,10,0" />
+                    <!-- Long paths are shortened in the middle-free way (trailing ellipsis); the full path is in the tooltip. -->
+                    <TextBlock x:Name="StoragePathText" FontSize="11" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                               Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" AutomationProperties.Name="Library location" />
                     <Button Style="{StaticResource LinkButton}" Content="Storage &amp; privacy settings…" HorizontalAlignment="Left" Margin="4,4,0,0" Click="OnStorageSettings" />
                 </StackPanel>
             </ScrollViewer>
@@ -145,6 +150,7 @@
                                 ValueChanged="OnSizeChanged" AutomationProperties.Name="Thumbnail size" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2">
+                        <Button x:Name="ImportButton" Content="Import…" Click="OnImport" Margin="0,0,4,0" ToolTip="Import PNG, JPEG or BMP images (you can also drop files here)" />
                         <Button x:Name="OpenButton" Content="Open" Click="OnOpenSelected" Margin="0,0,4,0" IsEnabled="False" ToolTip="Open in Editor (Enter)" />
                         <Button x:Name="ExportButton" Content="Export…" Click="OnExport" Margin="0,0,4,0" IsEnabled="False" />
                         <Button x:Name="DeleteButton" Content="Move to Trash" Click="OnDelete" Margin="0,0,4,0" IsEnabled="False" ToolTip="Del" />

@@ -31,9 +31,12 @@ public sealed record CaptureOptions
     /// <summary>Save to the Capture Library. Off = capture without history (kept in memory only).</summary>
     public bool SaveToLibrary { get; init; } = true;
 
-    public static IReadOnlyList<int> AllowedDelays { get; } = [0, 1, 2, 3, 5, 10];
+    /// <summary>Quick choices offered by the delay picker; any whole number of seconds 0–<see cref="MaxDelaySeconds"/> is accepted.</summary>
+    public static IReadOnlyList<int> AllowedDelays { get; } = [0, 1, 2, 3, 5, 10, 15, 30, 60];
 
-    public CaptureOptions Normalized() => this with { DelaySeconds = Math.Clamp(DelaySeconds, 0, 60) };
+    public const int MaxDelaySeconds = 60;
+
+    public CaptureOptions Normalized() => this with { DelaySeconds = Math.Clamp(DelaySeconds, 0, MaxDelaySeconds) };
 }
 
 /// <summary>A named, reusable set of capture options with an optional global hotkey.</summary>
@@ -47,13 +50,30 @@ public sealed record CapturePreset
 
     public HotkeyGesture? Hotkey { get; init; }
 
+    /// <summary>Name of built-in preset 4 before milestone 3. It suggested a menu-capture mode that does not exist.</summary>
+    public const string LegacyMenuPresetName = "Menu capture (3 s delay, cursor)";
+
+    public const string DelayedRegionPresetName = "Region with 3 s delay and pointer";
+
+    public static Guid DelayedRegionPresetId { get; } = new("8f6d2b0e-1a3c-4d5e-9f00-000000000004");
+
     public static IReadOnlyList<CapturePreset> Defaults { get; } =
     [
         new() { Id = new Guid("8f6d2b0e-1a3c-4d5e-9f00-000000000001"), Name = "Region to Editor", Options = new() { Mode = CaptureMode.Region } },
         new() { Id = new Guid("8f6d2b0e-1a3c-4d5e-9f00-000000000002"), Name = "Window to Editor", Options = new() { Mode = CaptureMode.Window } },
         new() { Id = new Guid("8f6d2b0e-1a3c-4d5e-9f00-000000000003"), Name = "Full screen to Clipboard (no history)", Options = new() { Mode = CaptureMode.AllScreens, PreviewInEditor = false, CopyToClipboard = true, SaveToLibrary = false } },
-        new() { Id = new Guid("8f6d2b0e-1a3c-4d5e-9f00-000000000004"), Name = "Menu capture (3 s delay, cursor)", Options = new() { Mode = CaptureMode.Region, DelaySeconds = 3, CaptureCursor = true } },
+        new() { Id = DelayedRegionPresetId, Name = DelayedRegionPresetName, Options = new() { Mode = CaptureMode.Region, DelaySeconds = 3, CaptureCursor = true } },
     ];
+}
+
+/// <summary>File type and quality produced when captures are dragged out of SnapForge.</summary>
+public sealed record DragDropSettings
+{
+    public Export.ImageFileFormat Format { get; init; } = Export.ImageFileFormat.Png;
+
+    public int JpegQuality { get; init; } = Export.ExportRules.JpegQuality;
+
+    public DragDropSettings Normalized() => this with { JpegQuality = Math.Clamp(JpegQuality, 1, 100) };
 }
 
 /// <summary>A saved color + thickness combination shown in the Quick Styles panel.</summary>
@@ -153,6 +173,18 @@ public sealed record AppSettings
 
     public double LastStrokeWidth { get; init; } = 4;
 
+    /// <summary>Desktop capture widget (enabled and topmost by default).</summary>
+    public WidgetSettings Widget { get; init; } = new();
+
+    /// <summary>What dragging a capture out of SnapForge produces.</summary>
+    public DragDropSettings DragDrop { get; init; } = new();
+
+    /// <summary>User's choice for "Launch with Windows" (the registry value is the source of truth at run time).</summary>
+    public bool LaunchAtStartup { get; init; }
+
+    /// <summary>Last position of the capture panel; null = centred on the primary monitor.</summary>
+    public WindowPosition? CapturePanelPosition { get; init; }
+
     public string EffectiveLibraryPath => string.IsNullOrWhiteSpace(LibraryPath) ? CaptureLibrary.DefaultRoot() : LibraryPath;
 
     public static string DefaultPath() =>
@@ -176,7 +208,13 @@ public sealed record AppSettings
                 throw new JsonException("Unsupported settings version.");
             }
 
-            return s with { Capture = s.Capture.Normalized(), Presets = s.Presets.Count == 0 ? CapturePreset.Defaults : s.Presets };
+            return s with
+            {
+                Capture = s.Capture.Normalized(),
+                Presets = s.Presets.Count == 0 ? CapturePreset.Defaults : MigratePresets(s.Presets),
+                Widget = s.Widget ?? new WidgetSettings(),
+                DragDrop = (s.DragDrop ?? new DragDropSettings()).Normalized(),
+            };
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException or IOException or ArgumentException or FormatException)
         {
@@ -191,6 +229,15 @@ public sealed record AppSettings
             return new AppSettings();
         }
     }
+
+    /// <summary>
+    /// Renames the built-in delayed-region preset if the user never renamed it (its old name implied a menu-capture
+    /// mode that SnapForge does not have). User-renamed presets are left alone.
+    /// </summary>
+    internal static IReadOnlyList<CapturePreset> MigratePresets(IReadOnlyList<CapturePreset> presets) =>
+        [.. presets.Select(p => p.Id == CapturePreset.DelayedRegionPresetId && p.Name == CapturePreset.LegacyMenuPresetName
+            ? p with { Name = CapturePreset.DelayedRegionPresetName }
+            : p)];
 
     public void Save(string path) => AtomicFile.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(this, Json));
 

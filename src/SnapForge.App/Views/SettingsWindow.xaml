@@ -25,6 +25,42 @@
                 <CheckBox x:Name="CloseToTrayBox" Content="Keep running in the notification area when the window is closed (hotkeys keep working)" Click="OnBehaviourChanged" />
                 <CheckBox x:Name="ShowCaptureWindowBox" Content="Show the Capture window when SnapForge starts" Click="OnBehaviourChanged" />
 
+                <CheckBox x:Name="StartupBox" Content="Launch SnapForge when I sign in to Windows (starts in the notification area)" Click="OnStartupChanged"
+                          AutomationProperties.Name="Launch with Windows" />
+                <TextBlock x:Name="StartupStatus" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="26,0,0,4" />
+
+                <TextBlock Text="CAPTURE WIDGET" Style="{StaticResource SectionHeader}" />
+                <CheckBox x:Name="WidgetEnabledBox" Content="Show the capture widget at the screen edge" Click="OnWidgetChanged" AutomationProperties.Name="Show the capture widget" />
+                <CheckBox x:Name="WidgetTopmostBox" Content="Keep the widget on top of other windows" Click="OnWidgetChanged" />
+                <CheckBox x:Name="WidgetAutoHideBox" Content="Auto-hide: shrink to a thin strip until the pointer touches it" Click="OnWidgetChanged" />
+                <DockPanel Margin="0,4,0,0">
+                    <TextBlock Text="Open the widget" VerticalAlignment="Center" Width="130" />
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="WidgetHover" GroupName="WidgetMode" Style="{StaticResource SegmentButton}" Content="On hover" Checked="OnWidgetChanged" />
+                        <RadioButton x:Name="WidgetClick" GroupName="WidgetMode" Style="{StaticResource SegmentButton}" Content="On click" Checked="OnWidgetChanged" />
+                    </StackPanel>
+                </DockPanel>
+                <WrapPanel Margin="0,6,0,0">
+                    <Button Content="Move widget to top centre" Click="OnWidgetReset" Margin="0,0,6,6" />
+                </WrapPanel>
+                <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}"
+                           Text="Drag the widget by its grip to dock it at the top, left or right edge of any display; it remembers the place. It never takes keyboard focus and is hidden while a capture is taken." />
+
+                <TextBlock Text="DRAG AND DROP" Style="{StaticResource SectionHeader}" />
+                <DockPanel>
+                    <TextBlock Text="Dragged captures become" VerticalAlignment="Center" Width="170" />
+                    <StackPanel Orientation="Horizontal">
+                        <RadioButton x:Name="DragPng" GroupName="DragFormat" Style="{StaticResource SegmentButton}" Content="PNG (lossless)" Checked="OnDragFormatChanged" />
+                        <RadioButton x:Name="DragJpeg" GroupName="DragFormat" Style="{StaticResource SegmentButton}" Content="JPEG (smaller)" Checked="OnDragFormatChanged" />
+                    </StackPanel>
+                </DockPanel>
+                <DockPanel Margin="0,6,0,0">
+                    <TextBox x:Name="JpegQualityBox" DockPanel.Dock="Right" Width="70" LostFocus="OnDragFormatChanged" AutomationProperties.Name="JPEG quality" />
+                    <TextBlock Text="JPEG quality (1–100)" VerticalAlignment="Center" />
+                </DockPanel>
+                <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,4,0,0"
+                           Text="Dragging a capture to Explorer, the desktop, Office, mail, chat or a browser copies a flattened image (annotations applied, redactions burned in, no metadata) named after the capture and its time. Editable captures and original pixels are never included. Temporary copies are deleted automatically." />
+
                 <TextBlock Text="HOTKEYS" Style="{StaticResource SectionHeader}" />
                 <DockPanel>
                     <Button DockPanel.Dock="Right" Content="Clear" Click="OnClearHotkey" Margin="8,0,0,0" />

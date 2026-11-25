@@ -524,7 +524,11 @@ public partial class MainWindow : Window
         foreach ((TrayTileViewModel tile, (Guid key, bool pinned, bool _)) in _trayTiles.Zip(wanted))
         {
             tile.Pinned = pinned;
-            tile.Title = _services.Library.Find(key)?.Title ?? (_sessions.TryGetValue(key, out EditorSession? s) ? s.Title : "Capture");
+            CaptureRecord? record = _services.Library.Find(key);
+            tile.Title = record?.Title ?? (_sessions.TryGetValue(key, out EditorSession? s) ? s.Title : "Capture");
+            tile.Detail = record is null
+                ? string.Empty
+                : $"{record.CreatedUtc.ToLocalTime():g} · {record.Width}×{record.Height}";
             _ = LoadTrayThumbnailAsync(tile);
         }
 
@@ -563,7 +567,7 @@ public partial class MainWindow : Window
     {
         if (TileFrom(sender) is { } tile)
         {
-            await OpenTileAsync(tile).ConfigureAwait(true);
+            await OnTrayTileClickedAsync(tile).ConfigureAwait(true);
         }
     }
 
@@ -1602,7 +1606,9 @@ public partial class MainWindow : Window
 
     // ------------------------------------------------------------------ help
 
-    private void OnShortcuts(object sender, RoutedEventArgs e) => MessageBox.Show(this,
+    private void OnShortcuts(object sender, RoutedEventArgs e) => ShowShortcuts(this);
+
+    internal void ShowShortcuts(Window owner) => MessageBox.Show(owner,
         "Capture: Ctrl+N (current settings) · Ctrl+1 Region · Ctrl+2 Window · Ctrl+3 Display · Ctrl+4 Full screen\n" +
         $"Global capture hotkey: {_services.Settings.CaptureHotkey?.ToString() ?? "none"} (Settings → Hotkeys)\n\n" +
         "Workspaces: Ctrl+E Editor · Ctrl+L Library · Ctrl+, Settings\n\n" +

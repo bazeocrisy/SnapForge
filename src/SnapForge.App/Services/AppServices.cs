@@ -15,8 +15,14 @@ internal sealed class AppServices : IDisposable
         SettingsPath = settingsPath;
         Settings = settings;
         Library = library;
-        Tray = RecentTray.Open(library.Root, id => library.Find(id) is { IsDeleted: false });
+
+        // Before the first index finishes, only check that the capture folder exists; deleted/trashed items are
+        // pruned once the index is complete.
+        Tray = RecentTray.Open(library.Root, id => library.IsIndexed ? library.Find(id) is { IsDeleted: false } : library.ExistsOnDisk(id));
     }
+
+    /// <summary>Completes when the library's first full index (and start-up retention) has finished.</summary>
+    public Task Indexing { get; private set; } = Task.CompletedTask;
 
     public static AppServices? Current { get; set; }
 
@@ -38,7 +44,11 @@ internal sealed class AppServices : IDisposable
     public ThumbnailCache Thumbnails { get; } = new();
 
     /// <summary>Opens settings and the library. <paramref name="libraryOverride"/> is used by tests.</summary>
-    public static AppServices Create(string settingsPath, string? libraryOverride = null, Func<AppSettings, AppSettings>? adjust = null)
+    /// <param name="deferIndex">
+    /// True for the app: the library opens instantly and is indexed in the background by <see cref="StartIndexingAsync"/>
+    /// so start-up never waits for thousands of captures to be read. Tests use false (indexed before returning).
+    /// </param>
+    public static AppServices Create(string settingsPath, string? libraryOverride = null, Func<AppSettings, AppSettings>? adjust = null, bool deferIndex = false)
     {
         AppSettings settings = AppSettings.Load(settingsPath);
         if (adjust is not null)
@@ -47,7 +57,7 @@ internal sealed class AppServices : IDisposable
         }
 
         string root = libraryOverride ?? settings.EffectiveLibraryPath;
-        CaptureLibrary library = CaptureLibrary.Open(root);
+        CaptureLibrary library = deferIndex ? CaptureLibrary.OpenDeferred(root) : CaptureLibrary.Open(root);
         return new AppServices(settingsPath, settings, library);
     }
 
@@ -98,6 +108,36 @@ internal sealed class AppServices : IDisposable
     }
 
     public void Dispose() => Writer.Dispose();
+
+    /// <summary>
+    /// Indexes the library on the background writer (later saves queue behind it, so nothing races the index),
+    /// applies retention, then prunes the tray on the calling (UI) thread.
+    /// </summary>
+    public Task StartIndexingAsync()
+    {
+        if (Library.IsIndexed)
+        {
+            return Indexing;
+        }
+
+        CaptureLibrary library = Library;
+        RetentionPolicy retention = Settings.Retention;
+        Indexing = IndexAsync();
+        return Indexing;
+
+        async Task IndexAsync()
+        {
+            await Writer.RunAsync(() =>
+            {
+                library.CompleteOpen();
+                library.ApplyRetention(retention, DateTime.UtcNow);
+            }).ConfigureAwait(true);
+            if (ReferenceEquals(library, Library))
+            {
+                Tray.Prune(id => Library.Find(id) is { IsDeleted: false });
+            }
+        }
+    }
 
     public void ApplyRetention()
     {

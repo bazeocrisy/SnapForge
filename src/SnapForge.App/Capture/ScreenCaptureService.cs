@@ -223,7 +223,7 @@ internal static unsafe class ScreenCaptureService
         return DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED, &cloaked, sizeof(int)) == 0 && cloaked != 0;
     }
 
-    private static PixelRect GetVisibleBounds(nint hwnd)
+    internal static PixelRect GetVisibleBounds(nint hwnd)
     {
         RECT r;
         // Extended frame bounds exclude the invisible resize borders Windows 10/11 add around windows.

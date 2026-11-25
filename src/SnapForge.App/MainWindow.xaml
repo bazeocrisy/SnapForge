@@ -10,6 +10,7 @@
         Foreground="{DynamicResource TextBrush}"
         FontFamily="{StaticResource UiFont}"
         UseLayoutRounding="True"
+        AllowDrop="True" DragOver="OnWindowDragOver" Drop="OnWindowDrop"
         Icon="Assets/SnapForge.ico">
     <Window.Resources>
         <BooleanToVisibilityConverter x:Key="BoolToVis" />
@@ -17,7 +18,8 @@
         <!-- Recent Captures Tray thumbnail -->
         <DataTemplate x:Key="TrayTileTemplate">
             <Button Click="OnTrayTileClick" Tag="{Binding}" Margin="4,0" Padding="0" Cursor="Hand"
-                    ToolTip="{Binding Tooltip}" AutomationProperties.Name="{Binding Title}">
+                    PreviewMouseLeftButtonDown="OnTrayTilePreviewMouseDown" PreviewMouseMove="OnTrayTilePreviewMouseMove"
+                    ToolTip="{Binding Tooltip}" AutomationProperties.Name="{Binding Title}" AutomationProperties.HelpText="Click to open, Ctrl+click to select several, drag to another app to copy as an image">
                 <Button.Template>
                     <ControlTemplate TargetType="Button">
                         <Grid Width="132">
@@ -33,6 +35,7 @@
                                     Background="{DynamicResource AccentBrush}" Visibility="{Binding Pinned, Converter={StaticResource BoolToVis}}">
                                 <TextBlock Text="Pinned" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentForegroundBrush}" />
                             </Border>
+                            <Border x:Name="SelectedMark" Grid.Row="0" Visibility="Collapsed" CornerRadius="6" Background="{DynamicResource AccentSubtleBrush}" IsHitTestVisible="False" />
                             <Ellipse Grid.Row="0" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6"
                                      Fill="{DynamicResource AccentBrush}" ToolTip="Changes not yet saved"
                                      Visibility="{Binding IsUnsaved, Converter={StaticResource BoolToVis}}" />
@@ -46,6 +49,10 @@
                         <ControlTemplate.Triggers>
                             <DataTrigger Binding="{Binding IsCurrent}" Value="True">
                                 <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            </DataTrigger>
+                            <DataTrigger Binding="{Binding IsSelected}" Value="True">
+                                <Setter TargetName="SelectedMark" Property="Visibility" Value="Visible" />
+                                <Setter TargetName="Frame" Property="BorderBrush" Value="{DynamicResource AccentHoverBrush}" />
                             </DataTrigger>
                             <Trigger Property="IsMouseOver" Value="True">
                                 <Setter TargetName="Frame" Property="Opacity" Value="0.85" />
@@ -135,6 +142,7 @@
                         <MenuItem Header="Capture _window…" Click="OnShowCaptureWindow" />
                         <Separator />
                         <MenuItem x:Name="SaveToLibraryMenu" Header="Save to _Library" Click="OnSaveToLibrary" />
+                        <MenuItem Header="_Import images…" Click="OnImportImages" />
                         <MenuItem x:Name="ExportMenu" Header="_Export as PNG/JPEG…" InputGestureText="Ctrl+S" Click="OnSave" />
                         <MenuItem x:Name="CopyMenu" Header="_Copy image" InputGestureText="Ctrl+C" Click="OnCopy" />
                         <MenuItem x:Name="ExportPackageMenu" Header="Export editable capture (.sfcap)…" Click="OnExportPackage" />
@@ -467,7 +475,8 @@
                             </StackPanel>
                             <TextBlock x:Name="TrayHeader" Text="RECENT CAPTURES" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
                         </DockPanel>
-                        <ScrollViewer x:Name="TrayScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PreviewMouseWheel="OnTrayMouseWheel" Focusable="False" Padding="8,6,8,8">
+                        <ScrollViewer x:Name="TrayScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PreviewMouseWheel="OnTrayMouseWheel" Focusable="False" Padding="8,6,8,8"
+                                      AllowDrop="True" DragOver="OnTrayDragOver" Drop="OnTrayDrop">
                             <Grid>
                                 <ItemsControl x:Name="TrayItems" ItemTemplate="{StaticResource TrayTileTemplate}" AutomationProperties.Name="Recent captures">
                                     <ItemsControl.ItemsPanel>

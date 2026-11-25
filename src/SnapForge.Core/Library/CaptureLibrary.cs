@@ -62,13 +62,41 @@ public sealed class CaptureLibrary
     /// <summary>Opens (creating if necessary) the library at <paramref name="root"/> and indexes it.</summary>
     public static CaptureLibrary Open(string root)
     {
+        CaptureLibrary library = OpenDeferred(root);
+        library.CompleteOpen();
+        return library;
+    }
+
+    /// <summary>
+    /// Opens the library without reading any capture yet, so a UI can appear immediately. Call
+    /// <see cref="CompleteOpen"/> on a background thread; until it finishes <see cref="IsIndexed"/> is false and
+    /// <see cref="Records"/> may be incomplete. Writes made meanwhile are kept (see <see cref="Reindex"/>).
+    /// </summary>
+    public static CaptureLibrary OpenDeferred(string root)
+    {
         ArgumentException.ThrowIfNullOrWhiteSpace(root);
         var library = new CaptureLibrary(root);
         Directory.CreateDirectory(library.CapturesDirectory);
-        AtomicFile.CleanupTemporaryFiles(library.Root);
-        library.Reindex();
         return library;
     }
+
+    /// <summary>True once the first full index has finished.</summary>
+    public bool IsIndexed { get; private set; }
+
+    /// <summary>Raised once, after the first full index (on the indexing thread).</summary>
+    public event EventHandler? Indexed;
+
+    /// <summary>Removes leftovers of interrupted writes and builds the index. Safe to call from a background thread.</summary>
+    public void CompleteOpen()
+    {
+        AtomicFile.CleanupTemporaryFiles(Root);
+        Reindex();
+        IsIndexed = true;
+        Indexed?.Invoke(this, EventArgs.Empty);
+    }
+
+    /// <summary>True if a capture folder with a manifest exists on disk (usable before indexing finishes).</summary>
+    public bool ExistsOnDisk(Guid id) => File.Exists(Path.Combine(FolderOf(id), CaptureFormat.ManifestFile));
 
     public static string DefaultRoot() =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductInfo.Name, "Library");
@@ -99,6 +127,16 @@ public sealed class CaptureLibrary
 
         lock (_gate)
         {
+            // Keep records written while this scan was running (their folders may have been created after the
+            // directory enumeration passed them); drop only records whose folders are really gone.
+            foreach (var pair in _records)
+            {
+                if (!found.ContainsKey(pair.Key) && Directory.Exists(FolderOf(pair.Key)))
+                {
+                    found[pair.Key] = pair.Value;
+                }
+            }
+
             _records.Clear();
             foreach (var pair in found)
             {

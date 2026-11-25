@@ -116,6 +116,9 @@ public partial class LibraryView : UserControl
     private readonly HashSet<Guid> _selected = [];
     private int _anchor = -1;
     private int _focusIndex = -1;
+    private int _pendingSingleSelect = -1;
+    private Point? _dragStart;
+    private LibraryTileViewModel? _dragTile;
     private int _perRow = 4;
     private readonly DispatcherTimer _searchDelay;
     private bool _initializing = true;
@@ -275,7 +278,9 @@ public partial class LibraryView : UserControl
         StorageUsage usage = library.GetUsage();
         StorageText.Text = $"{usage.CaptureCount} captures · {MainWindow.FormatBytes(usage.TotalBytes)}" +
                            (usage.TrashCount > 0 ? $"\nTrash: {usage.TrashCount} · {MainWindow.FormatBytes(usage.TrashBytes)}" : string.Empty) +
-                           $"\nStored locally in:\n{usage.Root}";
+                           (library.IsIndexed ? string.Empty : "\nLoading the library…");
+        StoragePathText.Text = usage.Root;
+        StoragePathText.ToolTip = usage.Root;
     }
 
     private void RebuildKeyList(Panel panel, TextBlock emptyText, IReadOnlyList<string> keys, Core.Library.LibraryView view, string icon)
@@ -404,8 +409,97 @@ public partial class LibraryView : UserControl
             return;
         }
 
-        ClickSelect(tile.Index, Keyboard.Modifiers);
+        // Pressing on a tile that is already part of a multi-selection keeps the selection (so it can be dragged);
+        // a plain click without dragging narrows it to that tile on release.
+        ModifierKeys mods = Keyboard.Modifiers;
+        _pendingSingleSelect = mods == ModifierKeys.None && _selected.Contains(tile.Record.Id) && _selected.Count > 1 ? tile.Index : -1;
+        if (_pendingSingleSelect < 0)
+        {
+            ClickSelect(tile.Index, mods);
+        }
+
+        _dragStart = e.GetPosition(this);
+        _dragTile = tile;
         e.Handled = true;
+    }
+
+    private void OnTileMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _dragStart is not { } start || _dragTile is null || _host is null)
+        {
+            return;
+        }
+
+        Vector d = e.GetPosition(this) - start;
+        if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        _dragStart = null;
+        _dragTile = null;
+        _pendingSingleSelect = -1;
+        List<Guid> ids = [.. SelectedRecords().Where(r => !r.IsDeleted && r.Damage is null).Select(r => r.Id)];
+        if (ids.Count > 0)
+        {
+            _host.StartCaptureDrag((DependencyObject)sender, ids);
+        }
+
+        e.Handled = true;
+    }
+
+    private void OnTileMouseUp(object sender, MouseButtonEventArgs e)
+    {
+        if (_pendingSingleSelect >= 0)
+        {
+            ClickSelect(_pendingSingleSelect, ModifierKeys.None);
+        }
+
+        _pendingSingleSelect = -1;
+        _dragStart = null;
+        _dragTile = null;
+    }
+
+    private async void OnImport(object sender, RoutedEventArgs e)
+    {
+        if (_host is not null)
+        {
+            await _host.ImportWithDialogAsync().ConfigureAwait(true);
+        }
+    }
+
+    /// <summary>The on-screen tile of a capture, if realized (tests).</summary>
+    internal FrameworkElement? TileElement(Guid id) => FindTile(Rows, id);
+
+    private static FrameworkElement? FindTile(DependencyObject parent, Guid id)
+    {
+        for (int i = 0; i < System.Windows.Media.VisualTreeHelper.GetChildrenCount(parent); i++)
+        {
+            DependencyObject child = System.Windows.Media.VisualTreeHelper.GetChild(parent, i);
+            if (child is FrameworkElement { Tag: LibraryTileViewModel t } fe && t.Record.Id == id)
+            {
+                return fe;
+            }
+
+            if (FindTile(child, id) is { } found)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
+
+    /// <summary>Selects captures by id (tests and drag set-up).</summary>
+    internal void SelectIds(IEnumerable<Guid> ids)
+    {
+        _selected.Clear();
+        foreach (Guid id in ids)
+        {
+            _selected.Add(id);
+        }
+
+        ApplySelection();
     }
 
     private void ClickSelect(int index, ModifierKeys mods)

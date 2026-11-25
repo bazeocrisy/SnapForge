@@ -19,9 +19,10 @@ using SnapForge.Core.Storage;
 namespace SnapForge.App;
 
 /// <summary>
-/// <c>SnapForge.exe --screenshots &lt;folder&gt;</c>: builds a throw-away demo library in a temporary folder and saves
-/// PNG renderings of the Editor, Library, Capture window and Settings in light and dark themes. Used by CI to produce
-/// review screenshots; it never reads or writes the user's real library or settings.
+/// <c>SnapForge.exe --screenshots &lt;folder&gt;</c>: builds a throw-away demo library in a temporary folder, shows
+/// the real windows on the desktop and saves screen captures of the Editor, tray, Library, capture panel, widget
+/// (collapsed, expanded, docked left) and Settings in light and dark themes. Used by CI to produce review
+/// screenshots; it never reads or writes the user's real library or settings.
 /// </summary>
 internal static class ScreenshotTour
 {
@@ -37,15 +38,29 @@ internal static class ScreenshotTour
         try
         {
             AppServices services = AppServices.Create(Path.Combine(temp, "settings.json"), Path.Combine(temp, "library"),
-                s => s with { CloseToNotificationArea = false, PrivacyNoticeShown = true, Theme = ThemePreference.Dark });
+                s => s with { CloseToNotificationArea = false, PrivacyNoticeShown = true, Theme = ThemePreference.Dark, Widget = s.Widget with { Enabled = false } });
             AppServices.Current = services;
             SeedLibrary(services.Library, services.Tray);
 
+            // Real screenshots: each window is shown on the actual desktop and the screen pixels are captured with
+            // SnapForge's own GDI capture (not an off-screen rendering). The CI desktop is small (1024×768), so
+            // windows are sized to fit its work area.
+            Core.Capture.ScreenLayout layout = Interop.PhysicalPlacement.Layout();
+            PixelRect work = layout.Monitors[0].WorkArea;
+            log.Add($"Desktop: {string.Join("; ", layout.Monitors.Select(m => $"{m.DeviceName} {m.Bounds.Width}x{m.Bounds.Height} at {m.DpiScale * 100:0}%"))}");
             foreach (ThemePreference theme in new[] { ThemePreference.Dark, ThemePreference.Light })
             {
                 ThemeManager.Apply(theme);
                 string suffix = theme == ThemePreference.Dark ? "dark" : "light";
-                var main = new MainWindow(services) { Width = 1440, Height = 900, WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
+                double dip = layout.Monitors[0].DpiScale;
+                var main = new MainWindow(services)
+                {
+                    Width = work.Width / dip,
+                    Height = work.Height / dip,
+                    WindowStartupLocation = WindowStartupLocation.Manual,
+                    Left = work.X / dip,
+                    Top = work.Y / dip,
+                };
                 Application.Current.MainWindow = main;
                 main.Show();
                 main.RestoreToolSettings();
@@ -55,24 +70,58 @@ internal static class ScreenshotTour
                 main.OpenCaptureAsync(demo.Id).GetAwaiter();
                 PumpUntil(() => main.CurrentSession?.CaptureId == demo.Id);
                 main.SelectTool.IsChecked = true;
+                main.SelectTrayTiles(2);
                 Pump(600);
-                Save(main, Path.Combine(outputFolder, $"editor-{suffix}.png"), log);
+                SaveScreen(main, null, Path.Combine(outputFolder, $"editor-{suffix}.png"), log);
+                if (Bounds(main) is { } mb)
+                {
+                    // The Recent Captures tray with two tiles selected for a multi-capture drag.
+                    var trayTop = main.TrayPanel.PointToScreen(new Point(0, 0));
+                    var tray = PixelRect.FromLtrb(mb.X, (int)trayTop.Y, mb.Right, mb.Bottom);
+                    SaveRegion(tray, Path.Combine(outputFolder, $"tray-{suffix}.png"), log);
+                }
 
                 main.ShowLibraryWorkspace();
+                main.LibraryPane.SelectIds(services.Library.Records.OrderByDescending(r => r.CreatedUtc).Take(2).Select(r => r.Id));
                 Pump(900);
-                Save(main, Path.Combine(outputFolder, $"library-{suffix}.png"), log);
+                SaveScreen(main, null, Path.Combine(outputFolder, $"library-{suffix}.png"), log);
                 main.ShowEditorWorkspace();
 
-                var capture = new CaptureWindow(services) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
+                var capture = new CaptureWindow(services);
                 capture.Show();
-                Pump(400);
-                Save(capture, Path.Combine(outputFolder, $"capture-window-{suffix}.png"), log);
+                Pump(500);
+                SaveScreen(capture, null, Path.Combine(outputFolder, $"capture-panel-{suffix}.png"), log);
                 capture.Hide();
 
-                var settings = new SettingsWindow(services) { WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0, Height = 1000 };
+                // Widget: collapsed tab at the top centre, then expanded, then docked on the left edge.
+                services.UpdateSettings(x => x with { Widget = x.Widget with { Enabled = true, Placement = null } });
+                var widget = new CaptureWidget(services);
+                widget.Show();
+                Pump(400);
+                SaveScreen(widget, 70, Path.Combine(outputFolder, $"widget-collapsed-{suffix}.png"), log);
+                widget.Expand();
+                Pump(400);
+                SaveScreen(widget, 40, Path.Combine(outputFolder, $"widget-expanded-{suffix}.png"), log);
+                widget.DockAt(work.X + 2, work.Y + (work.Height / 2));
+                widget.Expand();
+                Pump(400);
+                SaveScreen(widget, 40, Path.Combine(outputFolder, $"widget-left-{suffix}.png"), log);
+                services.UpdateSettings(x => x with { Widget = x.Widget with { Placement = null } });
+                widget.Close();
+
+                var settings = new SettingsWindow(services)
+                {
+                    WindowStartupLocation = WindowStartupLocation.Manual,
+                    Left = work.X / dip,
+                    Top = work.Y / dip,
+                    Height = Math.Min(720, work.Height / dip),
+                };
                 settings.Show();
                 Pump(400);
-                Save(settings, Path.Combine(outputFolder, $"settings-{suffix}.png"), log);
+                SaveScreen(settings, null, Path.Combine(outputFolder, $"settings-{suffix}.png"), log);
+                settings.WidgetEnabledBox.BringIntoView();
+                Pump(300);
+                SaveScreen(settings, null, Path.Combine(outputFolder, $"settings-widget-dragdrop-{suffix}.png"), log);
                 settings.Close();
 
                 main.FlushAllAsync().GetAwaiter();
@@ -106,32 +155,61 @@ internal static class ScreenshotTour
         }
     }
 
-    private static void Save(Window window, string path, List<string> log)
+    private static PixelRect? Bounds(Window window)
     {
-        // Render the window's template root (no layout offset), so content margins are not shifted out of frame.
-        var root = (FrameworkElement)VisualTreeHelper.GetChild(window, 0);
-        int w = (int)Math.Ceiling(root.ActualWidth), h = (int)Math.Ceiling(root.ActualHeight);
-        var rtb = new RenderTargetBitmap(w, h, 96, 96, PixelFormats.Pbgra32);
-        var background = new DrawingVisual();
-        using (DrawingContext dc = background.RenderOpen())
+        nint hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
+        if (hwnd == 0)
         {
-            dc.DrawRectangle(window.Background, null, new Rect(0, 0, w, h));
+            return null;
         }
 
-        rtb.Render(background);
-        rtb.Render(root);
-        var encoder = new PngBitmapEncoder();
-        encoder.Frames.Add(BitmapFrame.Create(rtb));
-        using (FileStream fs = File.Create(path))
+        PixelRect r = Capture.ScreenCaptureService.GetVisibleBounds(hwnd);
+        return r.IsEmpty ? null : r;
+    }
+
+    /// <summary>Brings the window to the front and saves the screen pixels it covers (plus an optional margin).</summary>
+    private static void SaveScreen(Window window, int? margin, string path, List<string> log)
+    {
+        bool wasTopmost = window.Topmost;
+        window.Topmost = true;
+        if (window.ShowActivated)
         {
-            encoder.Save(fs);
+            window.Activate();
         }
+
+        Pump(350);
+        if (Bounds(window) is not { } b)
+        {
+            log.Add($"{Path.GetFileName(path)} skipped: window has no bounds");
+            return;
+        }
+
+        int m = margin ?? 0;
+        SaveRegion(PixelRect.FromLtrb(b.X - m, b.Y - m, b.Right + m, b.Bottom + m), path, log);
+        window.Topmost = wasTopmost;
+    }
+
+    /// <summary>Captures a screen region with SnapForge's GDI capture and writes PNG + a small JPEG preview.</summary>
+    private static void SaveRegion(PixelRect screenRect, string path, List<string> log)
+    {
+        Pump(150);
+        Capture.CaptureSnapshot snap = Capture.ScreenCaptureService.TakeSnapshot(includeCursor: false);
+        PixelRect r = snap.Layout.ClipSelectionToBitmap(screenRect);
+        if (r.IsEmpty)
+        {
+            log.Add($"{Path.GetFileName(path)} skipped: region off screen");
+            return;
+        }
+
+        PixelBuffer image = snap.Image.Crop(r);
+        File.WriteAllBytes(path, ImageExporter.Encode(image, Core.Export.ImageFileFormat.Png));
 
         // Small JPEG preview (for quick review where the full artifact cannot be downloaded).
         string previewDir = Path.Combine(Path.GetDirectoryName(path)!, "preview");
         Directory.CreateDirectory(previewDir);
-        double scale = Math.Min(1.0, 720.0 / w);
-        var small = new TransformedBitmap(rtb, new ScaleTransform(scale, scale));
+        BitmapSource full = BitmapConversion.ToFrozenBitmap(image);
+        double scale = Math.Min(1.0, 720.0 / image.Width);
+        var small = new TransformedBitmap(full, new ScaleTransform(scale, scale));
         var jpeg = new JpegBitmapEncoder { QualityLevel = 55 };
         jpeg.Frames.Add(BitmapFrame.Create(small));
         using (FileStream fs = File.Create(Path.Combine(previewDir, Path.GetFileNameWithoutExtension(path) + ".jpg")))
@@ -139,7 +217,7 @@ internal static class ScreenshotTour
             jpeg.Save(fs);
         }
 
-        log.Add($"{Path.GetFileName(path)} {w}x{h}");
+        log.Add($"{Path.GetFileName(path)} {image.Width}x{image.Height} (screen capture at {screenRect.X},{screenRect.Y})");
     }
 
     /// <summary>Creates realistic-looking synthetic screenshots (no real screen content) with annotations.</summary>

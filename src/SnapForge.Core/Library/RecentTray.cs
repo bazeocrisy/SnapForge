@@ -101,6 +101,35 @@ public sealed class RecentTray
         Commit();
     }
 
+    /// <summary>
+    /// Moves an item to <paramref name="targetIndex"/> (an index into <see cref="Items"/> after removal of the item).
+    /// Items stay in their own section: a pinned item cannot be moved among unpinned ones or vice versa, so the
+    /// target is clamped to the item's section. Returns true if the order changed.
+    /// </summary>
+    public bool Move(Guid id, int targetIndex)
+    {
+        int index = _items.FindIndex(i => i.Id == id);
+        if (index < 0)
+        {
+            return false;
+        }
+
+        TrayItem item = _items[index];
+        _items.RemoveAt(index);
+        int pinnedCount = _items.Count(i => i.Pinned);
+        int lo = item.Pinned ? 0 : pinnedCount;
+        int hi = item.Pinned ? pinnedCount : _items.Count;
+        int target = Math.Clamp(targetIndex, lo, hi);
+        _items.Insert(target, item);
+        if (target == index)
+        {
+            return false;
+        }
+
+        Commit();
+        return true;
+    }
+
     /// <summary>Drops items whose capture no longer exists (or is in the Trash).</summary>
     public void Prune(Func<Guid, bool> exists)
     {

@@ -48,6 +48,109 @@ public partial class SettingsWindow : Window
             : $"{unsanitized} library capture(s) still keep original pixels under their redactions (so the redactions can be undone). Exports are unaffected.")
             + "\nSnapForge has no network features: captures are never uploaded or synchronized by SnapForge.";
         UpdateHotkeyStatus();
+        LoadGateBSettings(s);
+        _loading = false;
+    }
+
+    private void LoadGateBSettings(AppSettings s)
+    {
+        WidgetEnabledBox.IsChecked = s.Widget.Enabled;
+        WidgetTopmostBox.IsChecked = s.Widget.Topmost;
+        WidgetAutoHideBox.IsChecked = s.Widget.AutoHide;
+        WidgetHover.IsChecked = s.Widget.ExpandMode == WidgetExpandMode.Hover;
+        WidgetClick.IsChecked = s.Widget.ExpandMode == WidgetExpandMode.Click;
+        DragPng.IsChecked = s.DragDrop.Format == Core.Export.ImageFileFormat.Png;
+        DragJpeg.IsChecked = s.DragDrop.Format == Core.Export.ImageFileFormat.Jpeg;
+        JpegQualityBox.Text = s.DragDrop.JpegQuality.ToString(CultureInfo.CurrentCulture);
+        JpegQualityBox.IsEnabled = s.DragDrop.Format == Core.Export.ImageFileFormat.Jpeg;
+        bool registered = SafeStartupEnabled();
+        StartupBox.IsChecked = registered;
+        StartupStatus.Text = registered && !StartupPointsHere()
+            ? "The startup entry points to a different copy of SnapForge.exe. Turn this off and on again to use this copy."
+            : "Per-user setting (no administrator rights). Turn it off here or in Windows Settings → Apps → Startup.";
+    }
+
+    private static bool SafeStartupEnabled()
+    {
+        try
+        {
+            return StartupRegistration.IsEnabled();
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            return false;
+        }
+    }
+
+    private static bool StartupPointsHere()
+    {
+        try
+        {
+            return StartupRegistration.PointsAt(StartupRegistration.CurrentExecutable());
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private void OnStartupChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        bool enabled = StartupBox.IsChecked == true;
+        try
+        {
+            StartupRegistration.Set(enabled, StartupRegistration.CurrentExecutable());
+            _services.UpdateSettings(s => s with { LaunchAtStartup = enabled });
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException or InvalidOperationException)
+        {
+            MessageBox.Show(this, $"The startup setting could not be changed:\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        _loading = true;
+        LoadGateBSettings(_services.Settings);
+        _loading = false;
+    }
+
+    private void OnWidgetChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        _services.UpdateSettings(s => s with
+        {
+            Widget = s.Widget with
+            {
+                Enabled = WidgetEnabledBox.IsChecked == true,
+                Topmost = WidgetTopmostBox.IsChecked == true,
+                AutoHide = WidgetAutoHideBox.IsChecked == true,
+                ExpandMode = WidgetClick.IsChecked == true ? WidgetExpandMode.Click : WidgetExpandMode.Hover,
+            },
+        });
+    }
+
+    private void OnWidgetReset(object sender, RoutedEventArgs e) =>
+        _services.UpdateSettings(s => s with { Widget = s.Widget with { Placement = null, Enabled = true } });
+
+    private void OnDragFormatChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        int quality = int.TryParse(JpegQualityBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out int q) ? q : _services.Settings.DragDrop.JpegQuality;
+        var format = DragJpeg.IsChecked == true ? Core.Export.ImageFileFormat.Jpeg : Core.Export.ImageFileFormat.Png;
+        _services.UpdateSettings(s => s with { DragDrop = new DragDropSettings { Format = format, JpegQuality = quality }.Normalized() });
+        _loading = true;
+        LoadGateBSettings(_services.Settings);
         _loading = false;
     }
 

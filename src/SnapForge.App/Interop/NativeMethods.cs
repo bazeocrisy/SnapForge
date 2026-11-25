@@ -156,6 +156,24 @@ internal static unsafe partial class NativeMethods
     public static nint GetWindowLongPtr(nint hWnd, int nIndex) =>
         nint.Size == 8 ? GetWindowLongPtr64(hWnd, nIndex) : GetWindowLong32(hWnd, nIndex);
 
+    [LibraryImport("user32.dll", EntryPoint = "SetWindowLongPtrW")]
+    private static partial nint SetWindowLongPtr64(nint hWnd, int nIndex, nint value);
+
+    [LibraryImport("user32.dll", EntryPoint = "SetWindowLongW")]
+    private static partial int SetWindowLong32(nint hWnd, int nIndex, int value);
+
+    public static nint SetWindowLongPtr(nint hWnd, int nIndex, nint value) =>
+        nint.Size == 8 ? SetWindowLongPtr64(hWnd, nIndex, value) : SetWindowLong32(hWnd, nIndex, (int)value);
+
+    public const long WS_EX_TOPMOST = 0x00000008;
+    public const uint SWP_NOSIZE = 0x0001;
+    public const uint SWP_NOMOVE = 0x0002;
+    public const uint SWP_NOZORDER = 0x0004;
+    public static readonly nint HWND_NOTOPMOST = -2;
+
+    [LibraryImport("user32.dll")]
+    public static partial nint GetForegroundWindow();
+
     [LibraryImport("user32.dll", EntryPoint = "GetWindowTextW")]
     public static partial int GetWindowText(nint hWnd, char* lpString, int nMaxCount);
 

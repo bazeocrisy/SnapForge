@@ -43,14 +43,17 @@ internal static class ImageExporter
     }
 
     /// <summary>Encodes to PNG or JPEG. No metadata (EXIF, location, user name) is written.</summary>
-    public static byte[] Encode(PixelBuffer image, ImageFileFormat format)
+    public static byte[] Encode(PixelBuffer image, ImageFileFormat format) => Encode(image, format, ExportRules.JpegQuality);
+
+    /// <summary>Encodes with an explicit JPEG quality (1–100; ignored for PNG). No metadata is written.</summary>
+    public static byte[] Encode(PixelBuffer image, ImageFileFormat format, int jpegQuality)
     {
         ArgumentNullException.ThrowIfNull(image);
         BitmapSource source = new FormatConvertedBitmap(BitmapConversion.ToFrozenBitmap(image), PixelFormats.Bgr24, null, 0);
         BitmapEncoder encoder = format switch
         {
             ImageFileFormat.Png => new PngBitmapEncoder(),
-            ImageFileFormat.Jpeg => new JpegBitmapEncoder { QualityLevel = ExportRules.JpegQuality },
+            ImageFileFormat.Jpeg => new JpegBitmapEncoder { QualityLevel = Math.Clamp(jpegQuality, 1, 100) },
             _ => throw new ArgumentOutOfRangeException(nameof(format)),
         };
         encoder.Frames.Add(BitmapFrame.Create(source));

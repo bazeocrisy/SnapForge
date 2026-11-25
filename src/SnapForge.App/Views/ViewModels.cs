@@ -34,6 +34,8 @@ internal sealed class TrayTileViewModel : ObservableObject
     private bool _isCurrent;
     private bool _isUnsaved;
     private bool _pinned;
+    private bool _isSelected;
+    private string _detail = string.Empty;
 
     public required Guid Key { get; init; }
 
@@ -52,7 +54,15 @@ internal sealed class TrayTileViewModel : ObservableObject
 
     public string PinHeader => Pinned ? "Un_pin" : "_Pin to tray";
 
-    public string Tooltip => NotInLibrary ? $"{Title} — not saved to the Library" : Title;
+    /// <summary>Selected for a multi-capture drag (Ctrl/Shift-click).</summary>
+    public bool IsSelected { get => _isSelected; set => Set(ref _isSelected, value); }
+
+    /// <summary>Date and size shown in the tooltip.</summary>
+    public string Detail { get => _detail; set { if (Set(ref _detail, value)) OnPropertyChanged(nameof(Tooltip)); } }
+
+    public string Tooltip => NotInLibrary
+        ? $"{Title} — not saved to the Library\nDrag to another app to copy it as an image"
+        : $"{Title}{(Detail.Length > 0 ? "\n" + Detail : string.Empty)}\nDrag to another app to copy it as an image";
 }
 
 /// <summary>One Quick Style tile.</summary>

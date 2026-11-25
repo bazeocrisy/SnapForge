@@ -162,7 +162,7 @@ jobs:
           Write-Output "Nothing was extracted to %TEMP%\.net."
           if ($p.ExitCode -ne 0) { throw "Self-test failed." }
 
-      - name: Render workspace screenshots (demo library in a temporary folder)
+      - name: Real screenshots of the workspaces, capture panel and widget (demo library in a temporary folder)
         if: always()
         shell: pwsh
         working-directory: portable
@@ -184,6 +184,82 @@ jobs:
         with:
           name: screenshots-${{ github.sha }}
           path: ${{ runner.temp }}/screenshots
+          retention-days: 30
+          if-no-files-found: warn
+
+  benchmarks:
+    name: Library scale benchmarks (production durability)
+    needs: windows
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+
+      - name: Build the benchmark tool
+        run: dotnet build tools/SnapForge.Benchmarks/SnapForge.Benchmarks.csproj -c Release
+
+      - name: Download the portable build (for UI start-up measurements)
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: ${{ needs.windows.outputs.artifact }}
+          path: portable
+
+      # One library grows 100 → 1 000 → 5 000 → 10 000 → 25 000 captures. Every capture is written through the
+      # production code path with production durability (flush to disk on every file); nothing is bypassed.
+      # After each size the real UI is started over that library to measure start-up and responsiveness.
+      # A size is skipped (and reported) only if seeding it would not fit the job's time budget.
+      - name: Run benchmarks
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP "bench-library"
+          $out = Join-Path $env:RUNNER_TEMP "bench"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $tool = "tools/SnapForge.Benchmarks/bin/Release/net10.0/SnapForge.Benchmarks.exe"
+          $budget = [TimeSpan]::FromMinutes(120)
+          $clock = [Diagnostics.Stopwatch]::StartNew()
+          $count = 0; $msPerCreate = 0.0
+          foreach ($size in 100, 1000, 5000, 10000, 25000) {
+            if ($msPerCreate -gt 0) {
+              $need = [TimeSpan]::FromMilliseconds(($size - $count) * $msPerCreate * 1.15)
+              $left = $budget - $clock.Elapsed
+              if ($need -gt $left) {
+                $msg = "SKIPPED $size captures: seeding needs about $([int]$need.TotalMinutes) min at $msPerCreate ms/capture; $([int]$left.TotalMinutes) min left"
+                Write-Output $msg; $msg | Out-File -Append "$out/skipped.txt"; continue
+              }
+            }
+            & $tool --root $root --sizes $size --keep --out "$out/core-$size.json" | Select-Object -Last 3
+            if ($LASTEXITCODE -ne 0) { throw "Benchmark tool failed at $size" }
+            $r = (Get-Content "$out/core-$size.json" | ConvertFrom-Json).Results[0]
+            $count = $r.Captures; $msPerCreate = [double]$r.CreateMsRecent
+            $p = Start-Process -FilePath portable\SnapForge.exe -ArgumentList '--benchmark-startup', "`"$root`"", "`"$out/ui-$size.json`"" -Wait -PassThru
+            if ($p.ExitCode -ne 0) { Get-Content "$out/ui-$size.json"; throw "UI start-up benchmark failed at $size" }
+          }
+          # Summary table
+          $rows = foreach ($f in Get-ChildItem "$out" -Filter core-*.json | Sort-Object { [int]($_.BaseName -replace 'core-','') }) {
+            $c = (Get-Content $f.FullName | ConvertFrom-Json).Results[0]
+            $uiFile = Join-Path $out ($f.Name -replace 'core-','ui-')
+            $u = if (Test-Path $uiFile) { Get-Content $uiFile | ConvertFrom-Json } else { $null }
+            "| $($c.Captures) | $($u.WindowShownSinceProcessStartMs) | $($u.IndexCompleteMs) | $($u.LongestUiFreezeMs) | $($u.LibraryViewMs) | $($u.SearchMs) | $($c.SearchCommonMs) | $($c.ThumbnailMsPerItem) | $($c.AutosaveMedianMs) / $($c.AutosaveP95Ms) | $($c.CreateMsRecent) | $($u.WorkingSetMb) | $($c.DiskMb) |"
+          }
+          $table = @("| Captures | Window shown (ms from process start) | Index complete (ms) | Longest UI freeze (ms) | Library view (ms) | UI search (ms) | Core search (ms) | Thumbnail (ms each) | Autosave median / p95 (ms) | Capture save (ms) | Working set (MB) | Disk (MB) |", "|---|---|---|---|---|---|---|---|---|---|---|---|") + $rows
+          $table | Out-File "$out/summary.md"
+          if (Test-Path "$out/skipped.txt") { "`n" + (Get-Content "$out/skipped.txt" -Raw) | Out-File -Append "$out/summary.md" }
+          Get-Content "$out/summary.md"
+          "### Library benchmarks (production durability)`n" + (Get-Content "$out/summary.md" -Raw) | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          Get-ChildItem $out -Filter *.json | ForEach-Object { Write-Output "== $($_.Name)"; Get-Content $_.FullName }
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: benchmarks-${{ github.sha }}
+          path: ${{ runner.temp }}/bench
           retention-days: 30
           if-no-files-found: warn
 

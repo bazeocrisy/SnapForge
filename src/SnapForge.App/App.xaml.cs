@@ -18,6 +18,7 @@ public partial class App : Application
     private const string InstanceName = "SnapForge-SingleInstance-7c1d";
     private static ShellIntegration? _shell;
     private static CaptureWindow? _captureWindow;
+    private static CaptureWidget? _widget;
     private static bool _notifiedRunning;
     private Mutex? _instanceMutex;
     private EventWaitHandle? _activateSignal;
@@ -33,6 +34,13 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        if (e.Args.Length >= 3 && e.Args[0] == "--benchmark-startup")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            _ = StartupBenchmark.RunAsync(e.Args[1], e.Args[2]).ContinueWith(t => Dispatcher.Invoke(() => Shutdown(t.Result)), TaskScheduler.Default);
+            return;
+        }
 
         if (e.Args.Length >= 1 && e.Args[0] is "--self-test" or "--screenshots")
         {
@@ -59,22 +67,31 @@ public partial class App : Application
         AppServices services;
         try
         {
-            services = AppServices.Create(AppSettings.DefaultPath());
+            services = AppServices.Create(AppSettings.DefaultPath(), deferIndex: true);
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
             MessageBox.Show($"The Capture Library could not be opened:\n\n{ex.Message}\n\nSnapForge will use the default location instead.", ProductInfo.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
-            services = AppServices.Create(AppSettings.DefaultPath(), adjust: s => s with { LibraryPath = null });
+            services = AppServices.Create(AppSettings.DefaultPath(), adjust: s => s with { LibraryPath = null }, deferIndex: true);
         }
 
         AppServices.Current = services;
         ThemeManager.Apply(services.Settings.Theme);
-        services.ApplyRetention();
+
+        // Leftover drag-and-drop copies from a previous session (e.g. after a crash) are removed in the background.
+        _ = Task.Run(CaptureDragDrop.Sweep);
 
         var window = new MainWindow(services);
         MainWindow = window;
         window.RestoreToolSettings();
-        window.Show();
+        bool background = e.Args.Contains(StartupRegistration.BackgroundArgument);
+        if (!background)
+        {
+            window.Show();
+        }
+
+        // The library is indexed after the window is up, so start-up time does not grow with the library size.
+        _ = services.StartIndexingAsync();
 
         _shell = new ShellIntegration();
         _shell.ShowIcon(ProductInfo.Name);
@@ -82,6 +99,8 @@ public partial class App : Application
         _shell.IconContextMenuRequested += (_, _) => ShowNotificationMenu();
         services.SettingsChanged += (_, _) => RegisterHotkeys(notifyOnFailure: false);
         RegisterHotkeys(notifyOnFailure: true);
+        services.SettingsChanged += (_, _) => Current.Dispatcher.BeginInvoke(() => ApplyWidget(services));
+        ApplyWidget(services);
 
         if (services.Settings.ShowCaptureWindowOnStart)
         {
@@ -100,6 +119,16 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        _widget?.Close();
+        _widget = null;
+        try
+        {
+            CaptureDragDrop.Store.DeleteAll(DateTime.UtcNow);
+        }
+        catch (IOException)
+        {
+        }
+
         _shell?.Dispose();
         _shell = null;
         AppServices.Current?.Dispose();
@@ -164,6 +193,29 @@ public partial class App : Application
                 { SaveToLibrary: true } => "Capture saved to the Library.",
                 _ => "Capture copied to the clipboard (not saved to the Library).",
             });
+        }
+    }
+
+    /// <summary>The desktop capture widget, if enabled.</summary>
+    internal static CaptureWidget? Widget => _widget;
+
+    /// <summary>Shows, hides and updates the desktop widget to match the settings.</summary>
+    internal static void ApplyWidget(AppServices services)
+    {
+        if (services.Settings.Widget.Enabled)
+        {
+            if (_widget is null)
+            {
+                _widget = new CaptureWidget(services);
+                _widget.Show();
+            }
+
+            _widget.ApplySettings();
+        }
+        else if (_widget is not null)
+        {
+            _widget.Close();
+            _widget = null;
         }
     }
 
@@ -280,7 +332,9 @@ public partial class App : Application
         }
 
         Add("_Capture", () => _ = CaptureWithOptionsAsync(AppServices.Current!.Settings.Capture), bold: true);
-        Add("Capture _window…", ShowCaptureWindow);
+        Add("Capture _panel…", ShowCaptureWindow);
+        bool widgetOn = AppServices.Current?.Settings.Widget.Enabled == true;
+        Add(widgetOn ? "Hide capture _widget" : "Show capture _widget", () => AppServices.Current?.UpdateSettings(s => s with { Widget = s.Widget with { Enabled = !widgetOn } }));
         menu.Items.Add(new Separator());
         Add("Open _Editor", () => { MainShell?.BringToFront(); MainShell?.ShowEditorWorkspace(); });
         Add("Open _Library", () => { MainShell?.BringToFront(); MainShell?.ShowLibraryWorkspace(); });
