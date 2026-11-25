@@ -24,6 +24,15 @@ Every factual claim in the Gate A documents cites an ID from this registry. Acce
 * No hands-on use of Snagit. No hands-on use of SnapForge on a physical Windows PC. Windows evidence is CI only.
 * Snagit is used as a functional reference only. No TechSmith code, branding, icons, artwork or text is reused.
 
+## Revalidation status (RES-01)
+
+The owner intends to allow the official TechSmith and Microsoft documentation domains. As of the milestone-3
+handoff (2026-11-25) the hosts are **still blocked** from this environment (re-checked with `curl`: HTTP 000 for
+`www.techsmith.com`, `support.techsmith.com`, `learn.microsoft.com`). Therefore **no source has been revalidated
+yet**; every external row stays "search extract only". When access is granted, each DOC row will be re-read on the
+original page and marked **DOC-direct** (confirmed, with the date) or corrected. Until then no document describes a
+search extract as direct inspection (G-07, RES-02).
+
 ## Internal sources
 
 | ID | Source | Class |
@@ -33,7 +42,8 @@ Every factual claim in the Gate A documents cites an ID from this registry. Acce
 | I-03 | CI run https://github.com/bazeocrisy/SnapForge/actions/runs/45704874375 — Windows job 139524253513 log: build 0 warnings/0 errors, core 135/135, app 33/33, no vulnerable packages, `SnapForge.exe` SHA-256 `4f0bf414…f9d1`, artifact zip digest `5f0590c3…9efa` | CI |
 | I-04 | Local Linux re-run in this session: `dotnet build` 0/0, core tests 135/135 | OBS |
 | I-05 | Owner handoff package `SnapForge-Claude-Handoff.zip`: `CLAUDE-PROMPT.md`, `references/snagit-capture-panel.png` (742×237 px, viewed), `context/milestone-2-handoff.txt` (labelled "not independently verified") | OBS |
-| I-06 | `docs/screenshots/*.jpg` — off-screen renders produced by `SnapForge.exe --screenshots` on the CI runner (1024×768, seeded demo data) | CI |
+| I-06 | `docs/screenshots/*.jpg` — **real screen captures** (milestone 3) produced by `SnapForge.exe --screenshots` on the CI runner's 1024×768 desktop with a seeded demo library; earlier milestones used off-screen renders | CI |
+| I-07 | Benchmark run 45722027176 (job "Library scale benchmarks"), see docs/BENCHMARKS.md | CI |
 
 ## External sources
 
