@@ -2,6 +2,57 @@
 
 Branch: `claude/pensive-euler-ulw6m4` · Pull request #1 (draft, not merged)
 
+## Round 3 — interface redesign and persistent Capture Library (2026-11-25)
+
+### What was built
+Three workspaces (Capture window, Editor, Library), Recent Captures Tray, notification-area icon, configurable global
+hotkeys, capture presets, light/dark themes, a persistent local Capture Library with a documented editable format
+(v1), automatic crash-resistant saving, capture without history, backup/restore, retention, storage usage, movable
+location, and destructive sanitization. Crop and highlight were added; Quick Styles with favorites. Details:
+REQUIREMENTS.md (status per requirement), ARCHITECTURE.md (D12–D20), CAPTURE-FORMAT.md, SECURITY.md (threat model),
+COMPETITIVE-ANALYSIS.md.
+
+### Verification performed
+* **Automated (CI, Windows Server 2025 runner + Linux):** 135 core tests (Linux and Windows) and 33 Windows app
+  tests. New areas covered: format round-trips and rejection of bad input; interrupted/disk-full writes (core and UI);
+  crash between content and manifest; damaged captures; restart recovery with editable annotations; Editor ↔ Library
+  switching; search and views; tray close/pin/delete; capture without history; storage location move; sanitize
+  (pixels, hidden annotation text, thumbnail, history); hotkey conflicts between two registrations and inside
+  SnapForge; 600-capture library view with lazy thumbnails; 1 500-capture index/search. All MVP tests still pass
+  (including the six real-mouse UI tests).
+* **Portable build:** self-test (now including a library save/reload in a temporary folder) and the screenshot tour
+  both run with every .NET installation hidden.
+* **Visual review:** the screenshot tour's previews of all workspaces in dark and light themes were inspected; this
+  found and fixed a clipped thumbnail-size slider and a low-contrast warning badge in the Library.
+* **Not performed:** any manual use on a physical Windows 10/11 PC, mixed-DPI or multi-monitor use, screen-reader
+  testing, hands-on comparison with a running copy of Snagit.
+
+### Problems found and fixed during this round
+| Problem | Fix |
+|---|---|
+| Recent view sorted by file-write time (wall clock) instead of capture/open time | `RecentActivityUtc` uses capture/last-opened time |
+| ISO timestamp parsing used an invalid DateTimeStyles combination (all library tests failed initially) | Corrected parsing |
+| Redundant write-through + flush made saves ~2× slower on Windows | Single explicit flush before the atomic rename |
+| 600-capture UI test timed out (seeding with per-file disk flush) | Test-only flush bypass for seeding; durability still tested elsewhere |
+| CI concurrency cancelled a run when docs were pushed mid-run | Process note: wait for runs before pushing |
+| Library toolbar clipped the thumbnail-size slider at ~1000 px width | Wrapping toolbar |
+| "Unsanitized redactions" badge hard to read on thumbnails | Opaque badge with border |
+
+### Known limitations and remaining defects (milestone 2)
+* Autosave is debounced (1.2 s) and runs in the background: a crash or power loss within that window loses the last
+  edits (the previous saved version stays intact).
+* Undo history is not persisted: after reopening a capture, earlier edits cannot be undone step by step (redactions
+  remain removable because the base image keeps the originals until sanitized).
+* Library files are not encrypted; secure deletion is best effort (SSD/VSS/backups/sync).
+* Quick Styles are shared across tools (no per-tool styles, themes, opacity or shadow); no toolbar customization;
+  no tray drag-reordering or "clear unpinned on exit"; no "start with Windows"; no preset import/export.
+* Planned editing features not yet implemented (and not shown as working): resize, blur/pixelate, callouts.
+* The mouse pointer is captured into the pixels (not a movable object).
+* Library start-up reads every capture's manifest; tested to 1 500 captures, not beyond.
+* Single-instance and hotkeys are per Windows user session.
+* Screenshots from CI are limited to the runner's 1024×768 desktop.
+* Not code-signed; product name and copyright attribution await owner approval.
+
 ## Round 2 — quality-gate corrections (2026-11-25)
 
 | # | Required correction | What was done | Evidence |
