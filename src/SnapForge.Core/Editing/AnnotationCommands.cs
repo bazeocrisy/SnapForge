@@ -89,6 +89,7 @@ internal static class AnnotationNames
         EllipseAnnotation => "ellipse",
         TextAnnotation => "text",
         StepMarkerAnnotation s => $"step {s.Number}",
+        RedactionMaskAnnotation => "redaction",
         _ => "annotation",
     };
 }

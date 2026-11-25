@@ -210,4 +210,60 @@ public class EditorDocumentTests
         Assert.Single(d.Annotations);
         Assert.True(d.IsDirty);
     }
+
+    [Fact]
+    public void Redaction_places_unselectable_mask_above_earlier_annotations_and_undo_removes_it()
+    {
+        EditorDocument d = NewDoc();
+        var text = new TextAnnotation(new PointD(12, 12), "secret", 20) { MeasuredSize = new PointD(40, 20) };
+        d.Execute(new AddAnnotationCommand(text));
+        var redact = new RedactCommand(new PixelRect(10, 10, 30, 20), ArgbColor.Black);
+        d.Execute(redact);
+
+        Assert.Equal(2, d.Annotations.Count);
+        var mask = Assert.IsType<RedactionMaskAnnotation>(d.Annotations[^1]);
+        Assert.Equal(new PixelRect(10, 10, 30, 20), mask.Region);
+        Assert.Equal(ArgbColor.Black, mask.Color);
+        Assert.False(mask.HitTest(new PointD(20, 20), 10));
+        Assert.Same(mask, mask.Translate(5, 5));
+
+        // Hit testing passes through the mask (it can never be selected or moved).
+        Assert.Same(text, d.HitTest(new PointD(20, 20), 1));
+
+        d.Execute(new AddAnnotationCommand(Line(20)));
+        Assert.IsType<LineAnnotation>(d.Annotations[^1]); // later annotations go above the mask
+
+        d.Undo();
+        d.Undo();
+        Assert.Equal([text], d.Annotations);
+        d.Redo();
+        Assert.IsType<RedactionMaskAnnotation>(d.Annotations[^1]);
+    }
+
+    [Fact]
+    public void Discard_wipes_retained_original_pixels_and_image()
+    {
+        EditorDocument d = NewDoc();
+        var redact = new RedactCommand(new PixelRect(0, 0, 10, 10), ArgbColor.Black);
+        d.Execute(redact);
+        d.Discard();
+
+        Assert.True(d.IsDiscarded);
+        Assert.All(d.Image.Pixels, b => Assert.Equal(0, b));
+        Assert.Empty(d.Annotations);
+        Assert.False(d.History.CanUndo);
+        Assert.Throws<InvalidOperationException>(() => redact.Revert(d));
+        Assert.Throws<ObjectDisposedException>(() => d.Execute(new AddAnnotationCommand(Line(1))));
+    }
+
+    [Fact]
+    public void Discard_also_wipes_originals_held_in_redo_branch()
+    {
+        EditorDocument d = NewDoc();
+        var redact = new RedactCommand(new PixelRect(0, 0, 10, 10), ArgbColor.Black);
+        d.Execute(redact);
+        d.Undo(); // command now lives in the redo branch, still holding the originals
+        d.Discard();
+        Assert.Throws<InvalidOperationException>(() => redact.Revert(d));
+    }
 }

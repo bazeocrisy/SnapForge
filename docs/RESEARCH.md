@@ -49,9 +49,9 @@ Sources consulted: Microsoft Learn — [Capturing an image (GDI)](https://learn.
 * .NET runtime and WPF are MIT-licensed (verified in the `Microsoft.WindowsDesktop.App.Runtime.win-x64`
   10.0.x package metadata). Redistributing them in a self-contained build is allowed; attribution is in
   `THIRD-PARTY-NOTICES.md`.
-* **Open decision for the owner:** SnapForge's own license. The repository currently has no `LICENSE`
-  file, which legally means "all rights reserved". Choose (e.g. MIT, Apache-2.0, GPL-3.0, or proprietary)
-  before any public distribution.
+* SnapForge is licensed under the **MIT License** (`LICENSE`, copyright holder "bazeocrisy" — the repository
+  owner's GitHub account; to be confirmed by the owner). MIT is compatible with the MIT-licensed .NET runtime
+  redistributed in the portable build.
 * Code signing: the development build is unsigned, so Windows SmartScreen will warn. A production release
   needs an Authenticode certificate (a cost decision for the owner; not a code dependency).
 
@@ -67,7 +67,8 @@ Web searches on 2026-11-25 found existing uses of the name:
 | "SnapForge UI" on Product Hunt, UI component library | UI components | Low |
 
 No USPTO registration for "SnapForge" appeared in the searches, but web search is **not** a trademark
-clearance. Recommendation: treat SnapForge as a working name; before any public release, run a formal
+clearance. Five alternative names with preliminary searches are in [NAMING.md](NAMING.md).
+Recommendation: treat SnapForge as a working name; before any public release, run a formal
 trademark search (USPTO, EUIPO, UKIPO) and strongly consider a distinct name. To keep a rename cheap, the
 name lives in `SnapForge.Core/ProductInfo.cs`, `Directory.Build.props`, the window title/XAML text and
 the icon only.

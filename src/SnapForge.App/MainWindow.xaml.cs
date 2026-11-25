@@ -33,6 +33,7 @@ public partial class MainWindow : Window
     private string? _lastSaveDirectory;
     private bool _fitMode = true;
     private bool _busy;
+    private bool _exportedSinceLoad;
 
     public MainWindow()
     {
@@ -52,7 +53,10 @@ public partial class MainWindow : Window
     /// <summary>Loads a captured image into the editor (also used by tests).</summary>
     internal void LoadImage(PixelBuffer image, DateTime capturedAt)
     {
+        EditorDocument? previous = _document;
         _document = new EditorDocument(image);
+        _document.Changed += OnDocumentChanged;
+        _exportedSinceLoad = false;
         _capturedAt = capturedAt;
         Editor.Load(_document);
         StartScreen.Visibility = Visibility.Collapsed;
@@ -64,6 +68,27 @@ public partial class MainWindow : Window
         Dispatcher.BeginInvoke(ApplyFitZoom, System.Windows.Threading.DispatcherPriority.Loaded);
         UpdateCommandState();
         Editor.Focus();
+
+        // The previous screenshot (and any original pixels kept for undoing its redactions) is no longer needed.
+        if (previous is not null)
+        {
+            previous.Changed -= OnDocumentChanged;
+            previous.Discard();
+        }
+    }
+
+    protected override void OnClosed(EventArgs e)
+    {
+        base.OnClosed(e);
+        _document?.Discard();
+    }
+
+    private void OnDocumentChanged(object? sender, DocumentChangedEventArgs e)
+    {
+        if (e.ImageChanged && _exportedSinceLoad)
+        {
+            SetStatus("Redaction changed. Anything you already copied or saved still contains the earlier version.");
+        }
     }
 
     protected override void OnClosing(CancelEventArgs e)
@@ -211,10 +236,21 @@ public partial class MainWindow : Window
                 ? snapshot.Layout.VirtualBounds
                 : await OverlaySession.RunAsync(snapshot, mode).ConfigureAwait(true);
 
+            PixelBuffer? image = null;
             if (selection is { } screenRect)
             {
                 PixelRect bitmapRect = snapshot.Layout.ClipSelectionToBitmap(screenRect);
-                PixelBuffer image = bitmapRect == snapshot.Image.Bounds ? snapshot.Image : snapshot.Image.Crop(bitmapRect);
+                image = bitmapRect == snapshot.Image.Bounds ? snapshot.Image : snapshot.Image.Crop(bitmapRect);
+            }
+
+            // The full-desktop frame usually holds far more than the user selected; zero it once it is not the result.
+            if (!ReferenceEquals(image, snapshot.Image))
+            {
+                Array.Clear(snapshot.Image.Pixels);
+            }
+
+            if (image is not null)
+            {
                 LoadImage(image, snapshot.CapturedAt);
                 SetStatus(mode switch
                 {
@@ -269,7 +305,7 @@ public partial class MainWindow : Window
                 AnnotationTool.Select => "Click an annotation to select it; drag to move. Double-click text to edit. Delete removes it.",
                 AnnotationTool.Text => "Click to place text. Enter to finish, Shift+Enter for a new line, Esc to cancel.",
                 AnnotationTool.StepMarker => "Click to place the next numbered step.",
-                AnnotationTool.Redact => "Drag over sensitive content. Redaction replaces the pixels — it cannot be recovered from saved or copied images.",
+                AnnotationTool.Redact => "Drag over sensitive content. You can undo while editing; once copied or saved, the exported image contains only the black box.",
                 _ => "Drag to draw. Hold Shift to constrain.",
             });
         }
@@ -359,6 +395,7 @@ public partial class MainWindow : Window
         try
         {
             await ImageExporter.CopyToClipboardAsync(RenderFinalImage()).ConfigureAwait(true);
+            _exportedSinceLoad = true;
             SetStatus("Copied to clipboard.");
         }
 #pragma warning disable CA1031 // Report clipboard failures instead of crashing.
@@ -405,6 +442,7 @@ public partial class MainWindow : Window
             _busy = true;
             await ImageExporter.SaveAsync(RenderFinalImage(), path, format).ConfigureAwait(true);
             _document.MarkSaved();
+            _exportedSinceLoad = true;
             _lastSaveDirectory = Path.GetDirectoryName(path);
             SetStatus($"Saved {path}");
         }

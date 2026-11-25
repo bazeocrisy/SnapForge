@@ -9,6 +9,15 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+
+        if (e.Args.Length >= 1 && e.Args[0] == "--self-test")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            string report = e.Args.Length >= 2 ? e.Args[1] : Path.Combine(Environment.CurrentDirectory, "snapforge-self-test.txt");
+            Shutdown(SelfTest.Run(report));
+            return;
+        }
+
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 
         var window = new MainWindow();

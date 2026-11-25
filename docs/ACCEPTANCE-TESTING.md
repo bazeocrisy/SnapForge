@@ -1,109 +1,167 @@
-# Windows acceptance test script (MVP)
+# SnapForge — Windows acceptance test (step-by-step guide)
 
-Automated CI covers model logic, rendering/export pixels, encoders, clipboard formats, the GDI capture
-path and a main-window smoke test. **Interactive behavior (mouse selection, overlays, DPI placement,
-real pasting) has not been tested on a physical Windows machine yet.** This script is that test.
+This guide is written for someone who is **not a developer**. You need a Windows 10 or Windows 11 PC,
+about 60–90 minutes, and a GitHub account that can see the SnapForge repository.
 
-## Setup
+Record your results in **ACCEPTANCE-RESULTS-TEMPLATE.md** (it is in the same download). For every check,
+write **Pass**, **Fail** or **Skipped**, and for a failure write one sentence about what you saw and attach a
+photo or screenshot.
 
-1. Download the latest `SnapForge-portable-win-x64-dev-<commit>` artifact from the pull request's
-   **Checks → CI → Artifacts** (or the Actions run page) and unzip it.
-2. Optional: verify the checksum — `Get-FileHash .\SnapForge.exe -Algorithm SHA256` must match `SHA256SUMS.txt`.
-3. Run `SnapForge.exe`. It is unsigned: on the SmartScreen prompt choose **More info → Run anyway**.
-4. Record: Windows version (`winver`), each monitor's resolution, scale (%) and arrangement.
+> Nothing in this test sends data anywhere. SnapForge has no internet features. Screenshots you take stay
+> on your PC unless you save or copy them.
 
-Recommended configurations: (a) single monitor 100 %; (b) single monitor 150 % or 175 %;
-(c) two monitors with different scales, one placed **left of or above** the primary (negative coordinates);
-(d) a laptop with an external display at a different scale, if available.
+---
 
-For each step mark Pass / Fail and attach a screenshot of failures.
+## Part 1 — Get the program
 
-## A. Start-up
+### 1.1 Download
+1. Open the pull request page: `https://github.com/bazeocrisy/SnapForge/pull/1` (sign in to GitHub if asked).
+2. Scroll to the bottom and click **Checks** (or the green tick ✓ next to the latest commit), then click **CI**.
+3. On the run page, scroll down to **Artifacts**.
+4. Click the item named **SnapForge-portable-win-x64-dev-…** — a ZIP file (about 55 MB) downloads.
+5. Open your **Downloads** folder, right-click the ZIP → **Extract All…** → **Extract**.
+   You now have a folder containing `SnapForge.exe`, five `.dll` files and some text files. Keep them together.
 
-| # | Steps | Expected |
-|---|-------|----------|
-| A1 | Launch the exe on a machine without .NET installed | Window opens within a few seconds, dark theme, dark title bar, start screen with 4 capture cards |
-| A2 | Look at the line under the cards | Lists every display with resolution and scale |
-| A3 | Resize the window to the minimum size | Layout stays usable, nothing overlaps |
+### 1.2 Check the download is genuine (checksum)
+1. Open the extracted folder. Click the address bar at the top, type `powershell` and press **Enter**.
+   A blue or black window opens in that folder.
+2. Copy this whole line, paste it into that window (right-click pastes) and press **Enter**:
 
-## B. Capture
+   ```
+   Get-Content SHA256SUMS.txt | ForEach-Object { $h,$f = $_ -split '\s+',2; if ((Get-FileHash $f -Algorithm SHA256).Hash -eq $h) { "OK        $f" } else { "MISMATCH  $f" } }
+   ```
+3. **Expected:** every line starts with `OK`. If any line says `MISMATCH`, stop and report it — do not run the program.
+4. Write the SHA-256 value shown for `SnapForge.exe` (first word of its line in `SHA256SUMS.txt`) in your results.
 
-| # | Steps | Expected |
-|---|-------|----------|
-| B1 | Click **Full screen** | Window disappears, then returns with an image covering all monitors; status bar size = total desktop size (e.g. 1920+2560 wide); SnapForge itself is not in the image |
-| B2 | Check the gap areas (config c with different heights) | Black, not garbage or stale pixels |
-| B3 | Click **Region**, drag a rectangle on the primary monitor | Screen freezes and dims; dashed crosshair before drag; live size label; result matches selection exactly and its size equals the label |
-| B4 | **Region** dragged from one monitor across to another with a different scale | Selection rectangle is continuous on both monitors; result contains both parts with no offset, gap or stretch |
-| B5 | **Region** on the secondary monitor with negative coordinates | Correct content and size |
-| B6 | **Region**, then press Esc; repeat with right-click | Overlay closes, previous screenshot (if any) unchanged, status "Capture cancelled." |
-| B7 | **Region**, click without dragging | Nothing happens; overlay stays until you drag or cancel |
-| B8 | **Window**, hover different windows | Each window highlights with its size; taskbar and desktop also highlight |
-| B9 | **Window**, click a normal window | Result is the window with no transparent/extra border; title bar included |
-| B10 | **Window** on a maximized window | Result equals the monitor area of that window, no overhang |
-| B11 | **Window** on a partly covered window | Result shows the covering window over it (documented limitation) |
-| B12 | **Display**, click each monitor | Result size equals that monitor's resolution |
-| B13 | Repeat B3 and B12 at 150 % / 175 % scale | Results remain pixel-accurate and sharp (not blurry, not cropped) |
-| B14 | Ctrl+1 / Ctrl+2 / Ctrl+3 / Ctrl+4 while SnapForge is focused | Start region / window / display / full-screen capture |
+### 1.3 Quick automatic self-check (optional but useful)
+In the same PowerShell window, paste and press **Enter**:
+```
+Start-Process .\SnapForge.exe -ArgumentList '--self-test','self-test.txt' -Wait; Get-Content self-test.txt
+```
+A SnapForge window flashes briefly. **Expected:** the last line says `RESULT: PASS`. Copy the whole output into your results.
 
-## C. Preview and zoom
+### 1.4 Note your setup
+* Windows version: press **Windows key + R**, type `winver`, press **Enter**. Write down the text (e.g. "Windows 11, Version 24H2, OS Build 26100.xxxx").
+* For each monitor: **Settings → System → Display**. Click each numbered screen and note **Display resolution** and **Scale** (e.g. 2560 × 1440, 150 %).
+* Note whether a second monitor is placed **left of** or **above** the main one (shown in the same Settings page).
 
-| # | Steps | Expected |
-|---|-------|----------|
-| C1 | After a large capture | Image fits the window; zoom shows < 100 % |
-| C2 | Click **1:1** | Image shown at actual pixels (zoom 100 %), sharp |
-| C3 | Ctrl+mouse wheel, Ctrl+= / Ctrl+−, Ctrl+0 | Zoom in / out / fit |
+**Please test these setups if you can** (each is a separate round of Parts 2–6):
+* **A** — one monitor at 100 % scale.
+* **B** — one monitor at 150 % or 175 % scale.
+* **C** — two monitors with **different** scales, the second one placed **left of or above** the main one.
 
-## D. Annotation
+---
 
-| # | Steps | Expected |
-|---|-------|----------|
-| D1 | Arrow tool (A): drag | Arrow with solid head at the end point; preview while dragging matches result |
-| D2 | Hold Shift while dragging arrow/line | Snaps to 0/45/90° |
-| D3 | Line (L), Rectangle (R), Ellipse (E); Shift makes square/circle | Shapes as previewed |
-| D4 | Click without dragging with a shape tool | Nothing is added |
-| D5 | Text (T): click, type two lines using Shift+Enter, press Enter | Text appears with outline halo; editing box disappears |
-| D6 | Text: click, press Esc | Nothing added |
-| D7 | Step (N): click 3 times | Markers 1, 2, 3; delete "2" then click again → "4" |
-| D8 | Change color and size, then draw | New annotations use them |
-| D9 | Select (V): click an annotation, drag | Dashed selection outline; moves; Delete removes it |
-| D10 | With an annotation selected, change color / size | The selected annotation updates; one undo step each |
-| D11 | Select tool: double-click a text annotation | Opens it for editing; changes apply on Enter |
+## Part 2 — Start the program
 
-## E. Redaction
+| ID | Do this | You should see |
+|----|---------|----------------|
+| S1 | Double-click `SnapForge.exe`. If a blue box "Windows protected your PC" appears, click **More info** → **Run anyway** (the development build is not signed yet). | Within a few seconds a dark window titled **SnapForge** with four large buttons: Region, Window, Display, Full screen. |
+| S2 | Read the small grey line under the four buttons. | It lists your display(s) with resolution and scale. |
+| S3 | Drag the window's corner to make it as small as possible. | Everything still fits; nothing overlaps. |
+| S4 | Look at the title bar. | Windows 11: dark title bar. Windows 10: light title bar (expected). |
 
-| # | Steps | Expected |
-|---|-------|----------|
-| E1 | Redact tool (X): drag over text | Area becomes solid black |
-| E2 | Save as PNG, open in Paint, zoom in on the edge | Fully black including edge pixels; no trace of the text |
-| E3 | Copy, paste into Paint | Same as E2 |
-| E4 | Draw an arrow over the redacted area, save | Arrow visible over black; area under the arrow still black |
-| E5 | Undo the redaction | Original pixels return (in-session only) |
+---
 
-## F. Undo/redo
+## Part 3 — Taking screenshots
 
-| # | Steps | Expected |
-|---|-------|----------|
-| F1 | Make 5 mixed edits, Ctrl+Z ×5, Ctrl+Y ×5 | Exact step-by-step reversal and replay; buttons and tooltips name the step |
-| F2 | Undo twice, make a new edit | Redo becomes unavailable |
+Before this part, open two ordinary programs (for example Notepad and File Explorer) so there is something to capture.
 
-## G. Output
+| ID | Do this | You should see |
+|----|---------|----------------|
+| C1 | Click **Full screen**. | SnapForge disappears for a moment, then shows a picture of your **whole** screen (all monitors side by side). The bottom-right corner shows the size, e.g. "1920 × 1080 px". SnapForge's own window is **not** in the picture. |
+| C2 | (Setup C only) Look at areas where the monitors don't line up. | Those empty areas are plain black. |
+| C3 | Click **Region**. Press and hold the left mouse button, drag a box, release. | The screen freezes and darkens, a dashed cross-hair follows the mouse, a box with a size label (e.g. "412 × 237") appears while dragging. After releasing, the editor shows exactly what was inside the box, and the size at the bottom right matches the label. |
+| C4 | (Setup C) **Region**: drag a box that starts on one monitor and ends on the other. | The box is drawn continuously across both monitors; the result contains both parts with no gap, shift or stretching. |
+| C5 | (Setup C) **Region** entirely on the monitor that is left of / above the main one. | Correct content and size. |
+| C6 | Click **Region**, then press **Esc**. Repeat, and this time **right-click** instead. | The darkened screen closes; the previous screenshot (if any) is unchanged; the bottom bar says "Capture cancelled." |
+| C7 | Click **Region** and just click once without dragging. | Nothing happens — the darkened screen stays until you drag a box or press Esc. |
+| C8 | Click **Window** and move the mouse over different windows (also the taskbar and the desktop). | Each window under the mouse is highlighted with its size. |
+| C9 | Click a Notepad window. | The result is that window, including its title bar, with no transparent or extra border. |
+| C10 | Maximise a window, then **Window** → click it. | The result is exactly the screen area of that window (no extra strip at the edges). |
+| C11 | Let one window partly cover another, then **Window** → click the covered window. | The covering window appears on top in the result. *This is a known limitation, not a failure — mark Pass if it looks like this.* |
+| C12 | Click **Display**, then click each monitor in turn (one capture per click). | The result size equals that monitor's resolution. |
+| C13 | (Setups B and C) Repeat C3 and C12. | Results are sharp (not blurry) and not cut off. |
+| C14 | With SnapForge in front, press **Ctrl+1**, **Ctrl+2**, **Ctrl+3**, **Ctrl+4** (one at a time; press Esc to cancel each). | They start Region, Window, Display and Full screen. |
 
-| # | Steps | Expected |
-|---|-------|----------|
-| G1 | Save (Ctrl+S), default name | Dialog opens in Pictures\Screenshots (or Pictures) with name "SnapForge YYYY-MM-DD HHMMSS.png" |
-| G2 | Save as PNG, reopen | Identical to editor view at 1:1; properties show no camera/author metadata |
-| G3 | Save choosing the JPEG type | `.jpg` file; good quality; opens everywhere |
-| G4 | Save over an existing file | Overwrite confirmation; file replaced |
-| G5 | Save into a folder without write permission (e.g. `C:\Windows`) | Clear error message, app keeps running, no partial file |
-| G6 | Copy (Ctrl+C), paste into Paint, Word, a browser text box (e.g. GitHub comment), Teams/Slack | Image pastes correctly in each |
-| G7 | Title shows "unsaved changes" after edits; disappears after saving | As described |
-| G8 | With unsaved changes: start a new capture; close the window | Confirmation each time; "No" keeps the current work |
+---
 
-## H. Robustness
+## Part 4 — Viewing
 
-| # | Steps | Expected |
-|---|-------|----------|
-| H1 | Capture on a 3-monitor or > 8K-wide desktop, if available | Works; editor scrolls and zooms; save succeeds |
-| H2 | Change display scale while SnapForge is open, then capture | Correct result |
-| H3 | Disconnect a monitor, then capture | Correct result for the remaining layout |
-| H4 | Task Manager: memory after 10 captures | No unbounded growth beyond the current image + history |
+| ID | Do this | You should see |
+|----|---------|----------------|
+| V1 | After a full-screen capture, look at the zoom number next to the magnifier buttons. | The whole picture fits the window; the number is below 100 %. |
+| V2 | Click **1:1**. | Shows 100 %, picture is sharp; scroll bars let you move around. |
+| V3 | Hold **Ctrl** and turn the mouse wheel; then press **Ctrl+0**. | Zooms in/out; Ctrl+0 fits it back. |
+
+---
+
+## Part 5 — Marking up
+
+Use a capture that has some text on it. Tools are on the left; colour and size are along the top.
+
+| ID | Do this | You should see |
+|----|---------|----------------|
+| M1 | Choose the **Arrow** tool and drag. | An arrow appears with a solid head at the point where you released. |
+| M2 | Draw another arrow while holding **Shift**. | It snaps to straight horizontal, vertical or diagonal. |
+| M3 | Try **Line**, **Rectangle**, **Ellipse** (hold Shift for a square / circle). | Each shape matches what you saw while dragging. |
+| M4 | With a shape tool, click once without dragging. | Nothing is added. |
+| M5 | **Text** tool: click, type "Hello", press **Shift+Enter**, type "world", press **Enter**. | Two lines of text with a light outline appear; the typing box disappears. |
+| M6 | **Text** tool: click, type something, press **Esc**. | Nothing is added. |
+| M7 | **Step** tool (circle with "1"): click three places. | Numbered circles 1, 2, 3. |
+| M8 | Choose a different colour and size, then draw something. | The new item uses them. |
+| M9 | **Select** tool (arrow pointer): click on a shape's outline and drag it. | A dashed orange outline shows it is selected; it moves. |
+| M10 | With a shape selected, click another colour, then **L** size. | The selected shape changes colour, then thickness. |
+| M11 | With a shape selected, click **Delete** (top bar) — then select another and press the **Delete** key. | Each one disappears. |
+| M12 | **Select** tool: double-click a text item, change the words, press **Enter**. | The text updates. |
+| M13 | **Step** tool after deleting step "2": click once more. | The new step is "4" (numbers are never reused). |
+
+---
+
+## Part 6 — Hiding sensitive information (redaction)
+
+| ID | Do this | You should see |
+|----|---------|----------------|
+| R1 | **Redact** tool (black bar icon): drag over some text. | The area becomes solid black. |
+| R2 | Type some text with the **Text** tool, then redact over that text. | The black box covers your text too. |
+| R3 | After R2, draw an arrow pointing into the black box. | The arrow is visible on top of the black box. |
+| R4 | Click **Save**, save as PNG. Open the file in **Paint**, zoom in on the black box's edges. | Completely black, including the edges; no trace of the text underneath. |
+| R5 | Click **Copy**, open Paint, press **Ctrl+V**. | Same as R4. |
+| R6 | Save again choosing **JPEG** in "Save as type"; open it. | The black area shows no readable trace of the original. |
+| R7 | In SnapForge press **Ctrl+Z** until the redaction is gone. | The original text reappears **inside SnapForge** (undo works while editing). The files from R4/R6 are still redacted. |
+| R8 | After R5, redact something new. | The bottom bar warns that anything already copied or saved still has the earlier version. |
+| R9 | Right-click the saved PNG → **Properties** → **Details**. | No author, camera, location or program information. |
+
+---
+
+## Part 7 — Undo, saving and copying
+
+| ID | Do this | You should see |
+|----|---------|----------------|
+| U1 | Make five different changes, press **Ctrl+Z** five times, then **Ctrl+Y** five times. | Each change is undone one by one, then redone one by one. Hovering the undo/redo buttons names the step. |
+| U2 | Undo twice, then make a new change. | Redo is no longer available (greyed out). |
+| O1 | Press **Ctrl+S**. | The Save window opens in Pictures\Screenshots (or Pictures), named like "SnapForge 2026-11-25 143012.png". |
+| O2 | Save as PNG and open it. | Looks the same as SnapForge at 1:1. |
+| O3 | Save to a file name that already exists. | Windows asks whether to replace it; Yes replaces it. |
+| O4 | Try saving into `C:\Windows`. | A clear error message; SnapForge keeps running; no file is created. |
+| O5 | **Copy**, then paste (Ctrl+V) into: Paint, Word (or WordPad/Google Docs), a web form or chat (e.g. a GitHub comment box, Teams, Slack, Outlook). | The picture pastes correctly in each. |
+| O6 | Make a change. Look at the window title. Save. Look again. | Title says "unsaved changes" after the change, and not after saving. |
+| O7 | Make a change without saving, then click **Region** (and later close the window with ✕). | SnapForge asks before throwing away the changes. Choosing **No** keeps your work. |
+
+---
+
+## Part 8 — Robustness (if possible)
+
+| ID | Do this | You should see |
+|----|---------|----------------|
+| H1 | With three monitors or a very wide desktop: **Full screen**, then zoom and save. | Works; save succeeds. |
+| H2 | Change the display **Scale** in Settings while SnapForge is open, then capture. | Correct, sharp result. |
+| H3 | Unplug a monitor, then capture. | Works with the remaining monitor(s). |
+| H4 | Open **Task Manager**, note SnapForge's memory, take ten captures, check again. | Memory does not keep growing with every capture. |
+
+---
+
+## When you're done
+
+Fill in the summary at the top of ACCEPTANCE-RESULTS-TEMPLATE.md and send it (with any screenshots of failures)
+to the reviewer. Thank you!

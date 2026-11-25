@@ -10,7 +10,10 @@
     <ApplicationIcon>Assets\SnapForge.ico</ApplicationIcon>
     <AllowUnsafeBlocks>true</AllowUnsafeBlocks>
     <Description>SnapForge screenshot capture and annotation tool</Description>
-    <!-- Portable build settings (used by `dotnet publish -r win-x64`). -->
+    <!-- Portable build: dotnet publish with win-x64, self-contained, single file.
+         Native WPF libraries stay next to the exe (no IncludeNativeLibrariesForSelfExtract), so nothing is
+         extracted into %TEMP%\.net at run time. -->
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
     <SelfContained>false</SelfContained>
     <InvariantGlobalization>false</InvariantGlobalization>
     <SatelliteResourceLanguages>en</SatelliteResourceLanguages>

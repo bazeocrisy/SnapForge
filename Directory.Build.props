@@ -9,9 +9,12 @@
     <Deterministic>true</Deterministic>
     <!-- Lets the Windows-only projects compile on Linux/macOS (CI and dev containers). They still only run on Windows. -->
     <EnableWindowsTargeting>true</EnableWindowsTargeting>
-    <Company>SnapForge contributors</Company>
+    <!-- Dependency integrity: packages.lock.json pins exact versions and content hashes; CI restores in locked mode. -->
+    <RestorePackagesWithLockFile>true</RestorePackagesWithLockFile>
+    <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
+    <Company>bazeocrisy</Company>
     <Product>SnapForge</Product>
     <Version>0.1.0-dev</Version>
-    <Copyright>Copyright © 2026 SnapForge contributors</Copyright>
+    <Copyright>Copyright (c) 2026 bazeocrisy</Copyright>
   </PropertyGroup>
 </Project>

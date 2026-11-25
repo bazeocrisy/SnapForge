@@ -24,7 +24,7 @@ arrows, shapes, text and numbered steps, hide sensitive data for real, then copy
 | R7 | Annotate with arrow, line, rectangle, ellipse and text; choose color and size; Shift constrains. |
 | R8 | Numbered step markers that auto-increment. |
 | R9 | Select, move, recolor, resize and delete annotations; edit text. |
-| R10 | Permanent redaction: covered pixels are replaced, never recoverable from output. |
+| R10 | Redaction: covered pixels (and earlier annotations) are replaced in every export, never recoverable from output; reversible only while editing. |
 | R11 | Undo and redo for every edit, including redaction. |
 | R12 | Save as PNG (lossless) or JPEG (quality 92). |
 | R13 | Copy the finished image to the clipboard. |
@@ -64,3 +64,7 @@ Each criterion is verified either automatically (A) in CI or manually (M) on Win
 | AC16 | Closing or recapturing with unsaved changes asks first. | M |
 | AC17 | The portable exe starts on a clean Windows 10 22H2 / Windows 11 machine without .NET installed. | M |
 | AC18 | Build has zero compiler/analyzer warnings; all automated tests pass on Windows CI. | A |
+| AC19 | A redaction also covers annotations created before it; annotations created after it stay visible. | A + M |
+| AC20 | A region drag completes regardless of the order in which mouse-up and capture-loss events arrive. | A (unit + real-input UI test) |
+| AC21 | The portable build runs on a machine where no .NET runtime is installed and extracts nothing to %TEMP%. | A (CI job with .NET hidden) + M |
+| AC22 | Every file in the portable artifact is listed in SHA256SUMS.txt and verifies after download. | A + M |

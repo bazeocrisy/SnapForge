@@ -1,5 +1,7 @@
 # Third-party notices
 
+SnapForge is licensed under the MIT License (see `LICENSE`).
+
 SnapForge itself has **no third-party runtime dependencies**. It uses only the .NET runtime and
 Windows Presentation Foundation (WPF), plus Win32 APIs that ship with Windows.
 

@@ -7,7 +7,8 @@ A fast, private screenshot and annotation tool for Windows 10 and 11, built with
 > **Status: development build (v0.1.0-dev), not released.** Automated tests run on Windows in CI;
 > interactive acceptance testing on physical Windows hardware is still pending
 > (see [docs/ACCEPTANCE-TESTING.md](docs/ACCEPTANCE-TESTING.md)).
-> "SnapForge" is a working name — see [naming conflicts](docs/RESEARCH.md#4-product-name-check-snapforge).
+> "SnapForge" is a working name — see [naming conflicts](docs/RESEARCH.md#4-product-name-check-snapforge) and
+> [alternative names](docs/NAMING.md).
 
 ## Features (MVP)
 
@@ -15,7 +16,8 @@ A fast, private screenshot and annotation tool for Windows 10 and 11, built with
   Multi-monitor and mixed-DPI aware; the screen is frozen while you select.
 * **Annotate**: arrow, line, rectangle, ellipse, text, numbered step markers; 8 colors, 4 sizes; Shift to
   constrain; select, move, recolor, resize, delete, edit text.
-* **Redact permanently**: replaces pixels with solid black — nothing to un-blur, nothing hidden under a layer.
+* **Redact**: replaces pixels with solid black and covers earlier annotations. Undo works while editing; saved or
+  copied images contain only the black box — nothing to un-blur, nothing hidden under a layer ([details](docs/REDACTION.md)).
 * **Undo / redo** for every edit.
 * **Output**: save PNG or JPEG, copy to clipboard (bitmap + PNG).
 * **Private by design**: no network access, no telemetry, no admin rights, nothing written to disk unless you save.
@@ -32,9 +34,10 @@ A fast, private screenshot and annotation tool for Windows 10 and 11, built with
 
 ## Download a development build
 
-Every CI run publishes a portable, self-contained `SnapForge.exe` (no .NET install needed) as the artifact
-`SnapForge-portable-win-x64-dev-<commit>` on the **Actions** run page. It is unsigned, so SmartScreen
-will ask for confirmation.
+Every CI run publishes a portable, self-contained build (`SnapForge.exe` plus five WPF native DLLs; no .NET
+install needed — CI verifies this on a runner with .NET removed) as the artifact
+`SnapForge-portable-win-x64-dev-<commit>` on the **Actions** run page, with `SHA256SUMS.txt`. It is unsigned, so
+SmartScreen will ask for confirmation. `SnapForge.exe --self-test report.txt` runs a non-interactive diagnostic.
 
 ## Build from source
 
@@ -55,10 +58,15 @@ The Windows projects compile on Linux/macOS (`EnableWindowsTargeting`) but run o
 * [Requirements and acceptance criteria](docs/REQUIREMENTS.md)
 * [Security and privacy model](docs/SECURITY.md)
 * [Research: capture APIs, dependencies, licensing, naming](docs/RESEARCH.md)
-* [Windows acceptance test script](docs/ACCEPTANCE-TESTING.md)
+* [Redaction pipeline review](docs/REDACTION.md)
+* [Windows 10/11 compatibility](docs/COMPATIBILITY.md)
+* [Windows Graphics Capture investigation](docs/WINDOWS-GRAPHICS-CAPTURE.md)
+* [Automated UI testing](docs/UI-TESTING.md)
+* [Alternative product names](docs/NAMING.md)
+* [Windows acceptance test guide](docs/ACCEPTANCE-TESTING.md) and [results form](docs/ACCEPTANCE-RESULTS-TEMPLATE.md)
 * [Self-audit](docs/AUDIT.md)
 * [Third-party notices](THIRD-PARTY-NOTICES.md)
 
 ## License
 
-Not yet chosen by the project owner. Until a `LICENSE` file is added, all rights are reserved.
+[MIT](LICENSE) — Copyright (c) 2026 bazeocrisy.

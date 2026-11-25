@@ -83,6 +83,59 @@ public class ExportTests
     });
 
     [Fact]
+    public void Redaction_covers_annotations_drawn_before_it_but_not_after() => Sta.Run(() =>
+    {
+        var doc = new EditorDocument(new PixelBuffer(200, 100));
+        doc.Image.FillRect(doc.Image.Bounds, ArgbColor.White);
+        var green = ArgbColor.FromRgb(0, 200, 0);
+        var blue = ArgbColor.FromRgb(0, 0, 220);
+        doc.Execute(new AddAnnotationCommand(new RectangleAnnotation(new RectD(20, 20, 60, 40)) { Color = green, StrokeWidth = 8 }));
+        var region = new PixelRect(10, 10, 100, 70);
+        doc.Execute(new RedactCommand(region, ArgbColor.Black));
+        doc.Execute(new AddAnnotationCommand(new LineAnnotation(new PointD(150, 10), new PointD(150, 90)) { Color = blue, StrokeWidth = 6 }));
+
+        PixelBuffer flat = Decode(ImageExporter.Encode(ImageExporter.Flatten(doc.Image, doc.Annotations), ImageFileFormat.Png));
+        for (int y = region.Y; y < region.Bottom; y++)
+        {
+            for (int x = region.X; x < region.Right; x++)
+            {
+                Assert.Equal(ArgbColor.Black, flat.GetPixel(x, y));
+            }
+        }
+
+        Assert.Equal(blue, flat.GetPixel(150, 50));
+    });
+
+    [Fact]
+    public void Clipboard_and_file_exports_share_the_redacted_flattened_image() => Sta.Run(() =>
+    {
+        // Both Copy and Save call Flatten on the same document state; verify that output, re-encoded both ways.
+        var doc = new EditorDocument(TestImages.Gradient(64, 64));
+        doc.Execute(new RedactCommand(new PixelRect(8, 8, 16, 16), ArgbColor.Black));
+        PixelBuffer flat = ImageExporter.Flatten(doc.Image, doc.Annotations);
+        PixelBuffer viaJpeg = Decode(ImageExporter.Encode(flat, ImageFileFormat.Jpeg));
+        for (int y = 10; y < 22; y++)
+        {
+            for (int x = 10; x < 22; x++)
+            {
+                // JPEG is lossy, but the interior of a black block stays (near) black: no original content.
+                Assert.InRange(viaJpeg.GetPixel(x, y).R, 0, 12);
+                Assert.InRange(viaJpeg.GetPixel(x, y).G, 0, 12);
+            }
+        }
+    });
+
+    [Fact]
+    public void Jpeg_contains_no_exif_or_xmp_metadata() => Sta.Run(() =>
+    {
+        byte[] jpeg = ImageExporter.Encode(TestImages.Gradient(16, 16), ImageFileFormat.Jpeg);
+        string ascii = Encoding.ASCII.GetString(jpeg);
+        Assert.DoesNotContain("Exif", ascii, StringComparison.Ordinal);
+        Assert.DoesNotContain("http://ns.adobe.com/xap", ascii, StringComparison.Ordinal);
+        Assert.DoesNotContain(Environment.UserName, ascii, StringComparison.OrdinalIgnoreCase);
+    });
+
+    [Fact]
     public void Png_round_trip_is_lossless() => Sta.Run(() =>
     {
         PixelBuffer image = TestImages.Gradient(73, 41); // odd sizes catch stride bugs

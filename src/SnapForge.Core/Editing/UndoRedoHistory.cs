@@ -35,6 +35,15 @@ public sealed class UndoRedoHistory
     /// </summary>
     public long CurrentStateId => _undo.Last?.Value.StateId ?? _baseStateId;
 
+    /// <summary>All commands currently held (undo and redo branches).</summary>
+    internal IEnumerable<IEditCommand> AllCommands => _undo.Select(e => e.Command).Concat(_redo.Select(e => e.Command));
+
+    internal void Clear()
+    {
+        _undo.Clear();
+        _redo.Clear();
+    }
+
     internal void Execute(IEditCommand command, EditorDocument document)
     {
         command.Apply(document);

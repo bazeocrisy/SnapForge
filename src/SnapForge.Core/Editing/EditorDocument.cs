@@ -37,9 +37,33 @@ public sealed class EditorDocument
 
     public void MarkSaved() => _savedStateId = History.CurrentStateId;
 
+    /// <summary>
+    /// Best-effort removal of screenshot data from memory when the document is no longer needed:
+    /// zeroes the original pixels retained for undoing redactions, clears history and annotations, and
+    /// zeroes the image buffer. The document must not be used afterwards.
+    /// </summary>
+    public void Discard()
+    {
+        foreach (IEditCommand command in History.AllCommands)
+        {
+            if (command is RedactCommand redact)
+            {
+                redact.WipeOriginal();
+            }
+        }
+
+        History.Clear();
+        _annotations.Clear();
+        Array.Clear(Image.Pixels);
+        IsDiscarded = true;
+    }
+
+    public bool IsDiscarded { get; private set; }
+
     public void Execute(IEditCommand command)
     {
         ArgumentNullException.ThrowIfNull(command);
+        ObjectDisposedException.ThrowIf(IsDiscarded, this);
         History.Execute(command, this);
         RaiseChanged(command);
     }

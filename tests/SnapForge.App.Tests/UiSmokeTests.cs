@@ -14,13 +14,12 @@ namespace SnapForge.App.Tests;
 /// runtime), drives the editor through its public surface and exports the result. Not a substitute for
 /// manual acceptance testing: no real mouse input or screen selection happens here.
 /// </summary>
+[Collection(DesktopTestGroup.Name)]
 public class UiSmokeTests
 {
     [Fact]
-    public void Main_window_loads_edits_and_exports() => Sta.Run(() =>
+    public void Main_window_loads_edits_and_exports() => UiThread.Run(() =>
     {
-        var app = new App();
-        app.InitializeComponent();
         var window = new MainWindow();
         try
         {
@@ -54,6 +53,8 @@ public class UiSmokeTests
             window.Document?.MarkSaved();
             window.Close();
         }
+
+        return Task.CompletedTask;
     });
 
     [Fact]

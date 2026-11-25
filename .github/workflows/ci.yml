@@ -7,6 +7,7 @@ on:
     branches: [main]
   workflow_dispatch:
 
+# Least privilege: the workflow only reads the repository. No job can push, comment, release or mint tokens.
 permissions:
   contents: read
 
@@ -18,26 +19,38 @@ env:
   DOTNET_NOLOGO: true
   DOTNET_CLI_TELEMETRY_OPTOUT: true
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  # Third-party actions are pinned to full commit SHAs (tags can be moved); the tag is noted for updates.
+  #   actions/checkout        v5 = fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+  #   actions/setup-dotnet    v5 = 26b0ec14cb23fa6904739307f278c14f94c95bf1
+  #   actions/upload-artifact v6 = b7c566a772e6b6bfb58ed0dc250532a479d7789f
 
 jobs:
   windows:
     name: Windows build, test and portable package
     runs-on: windows-latest
     timeout-minutes: 30
+    outputs:
+      artifact: ${{ steps.names.outputs.artifact }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
 
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
 
-      - name: Restore (NuGet vulnerability audit enabled)
+      - id: names
+        shell: pwsh
+        run: '"artifact=SnapForge-portable-win-x64-dev-${{ github.sha }}" | Out-File -Append $env:GITHUB_OUTPUT'
+
+      - name: Restore (locked mode, signed packages from nuget.org only, vulnerability audit)
         run: dotnet restore SnapForge.sln
 
       - name: Build (warnings are errors)
-        run: dotnet build SnapForge.sln -c Release --no-restore
+        run: dotnet build SnapForge.sln -c Release --no-restore -p:ContinuousIntegrationBuild=true
 
-      - name: Test (unit + Windows rendering, capture and UI smoke tests)
+      - name: Test (unit, Windows rendering/capture/clipboard, real-input UI tests)
         run: >
           dotnet test SnapForge.sln -c Release --no-build
           --logger "trx;LogFilePrefix=results"
@@ -55,46 +68,103 @@ jobs:
 
       - name: Upload test results
         if: always()
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
           name: test-results
           path: TestResults
           retention-days: 14
 
-      - name: Publish portable build (self-contained, single file, win-x64)
+      - name: Publish portable build (self-contained, single-file exe + WPF native DLLs, win-x64)
         run: >
           dotnet publish src/SnapForge.App/SnapForge.App.csproj -c Release -r win-x64
           --self-contained true
           -p:PublishSingleFile=true
-          -p:IncludeNativeLibrariesForSelfExtract=true
           -p:EnableCompressionInSingleFile=true
           -p:DebugType=none
+          -p:ContinuousIntegrationBuild=true
           -o artifacts/portable/SnapForge
 
-      - name: Add notices and checksum
+      - name: Add license, notices, instructions and SHA-256 checksums
         shell: pwsh
         run: |
-          Copy-Item README.md, THIRD-PARTY-NOTICES.md artifacts/portable/SnapForge/
-          Copy-Item docs/ACCEPTANCE-TESTING.md artifacts/portable/SnapForge/
-          $hash = (Get-FileHash artifacts/portable/SnapForge/SnapForge.exe -Algorithm SHA256).Hash
-          "$hash  SnapForge.exe" | Out-File -Encoding ascii artifacts/portable/SnapForge/SHA256SUMS.txt
-          Write-Output "SnapForge.exe SHA-256: $hash"
-          "### Portable build`n`nSnapForge.exe SHA-256: ``$hash``" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          $dir = "artifacts/portable/SnapForge"
+          Copy-Item LICENSE "$dir/LICENSE.txt"
+          Copy-Item README.md, THIRD-PARTY-NOTICES.md, docs/ACCEPTANCE-TESTING.md, docs/ACCEPTANCE-RESULTS-TEMPLATE.md $dir
+          $lines = Get-ChildItem $dir -File | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object Name | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+          }
+          $lines | Out-File -Encoding ascii "$dir/SHA256SUMS.txt"
+          Get-Content "$dir/SHA256SUMS.txt"
+          $exe = ($lines | Where-Object { $_ -like '*  SnapForge.exe' }) -split '\s+' | Select-Object -First 1
+          "### Portable build`n`nSnapForge.exe SHA-256: ``$exe``" | Out-File -Append $env:GITHUB_STEP_SUMMARY
 
       - name: Upload portable build
-        uses: actions/upload-artifact@v6
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
         with:
-          name: SnapForge-portable-win-x64-dev-${{ github.sha }}
+          name: ${{ steps.names.outputs.artifact }}
           path: artifacts/portable/SnapForge
           retention-days: 30
+          if-no-files-found: error
+
+  portable-without-dotnet:
+    name: Portable build runs without an installed .NET
+    needs: windows
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download the uploaded artifact (exactly what testers download)
+        uses: actions/download-artifact@v6
+        with:
+          name: ${{ needs.windows.outputs.artifact }}
+          path: portable
+
+      - name: Verify SHA-256 checksums
+        shell: pwsh
+        working-directory: portable
+        run: |
+          $failed = $false
+          foreach ($line in Get-Content SHA256SUMS.txt) {
+            $expected, $name = $line -split '\s+', 2
+            $actual = (Get-FileHash $name -Algorithm SHA256).Hash
+            if ($actual -ne $expected) { Write-Output "MISMATCH $name"; $failed = $true } else { Write-Output "OK  $name" }
+          }
+          $listed = (Get-Content SHA256SUMS.txt | ForEach-Object { ($_ -split '\s+', 2)[1] })
+          Get-ChildItem -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' -and $listed -notcontains $_.Name } | ForEach-Object { Write-Output "UNLISTED $($_.Name)"; $failed = $true }
+          if ($failed) { throw "Checksum verification failed." }
+
+      - name: Hide every .NET installation on this machine
+        shell: pwsh
+        run: |
+          foreach ($p in "$env:ProgramFiles\dotnet", "${env:ProgramFiles(x86)}\dotnet") {
+            if (Test-Path $p) { Rename-Item $p "$p-hidden-for-test"; Write-Output "Hid $p" }
+          }
+          if (Get-Command dotnet -ErrorAction SilentlyContinue) { throw "dotnet is still reachable" }
+          Write-Output "No dotnet executable is reachable."
+
+      - name: Run SnapForge.exe --self-test
+        shell: pwsh
+        working-directory: portable
+        env:
+          DOTNET_ROOT: C:\does-not-exist
+          DOTNET_ROOT_X64: C:\does-not-exist
+        run: |
+          $report = Join-Path $PWD "self-test.txt"
+          $p = Start-Process -FilePath .\SnapForge.exe -ArgumentList '--self-test', "`"$report`"" -Wait -PassThru
+          if (Test-Path $report) { Get-Content $report } else { Write-Output "No report written." }
+          Write-Output "Exit code: $($p.ExitCode)"
+          if (Test-Path "$env:TEMP\.net\SnapForge") { throw "Unexpected extraction to %TEMP%\.net\SnapForge" }
+          Write-Output "Nothing was extracted to %TEMP%\.net."
+          if ($p.ExitCode -ne 0) { throw "Self-test failed." }
 
   core-linux:
     name: Core tests (Linux)
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-dotnet@v5
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
         with:
           global-json-file: global.json
       - name: Test platform-independent core
