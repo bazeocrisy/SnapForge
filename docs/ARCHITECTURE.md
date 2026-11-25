@@ -60,6 +60,15 @@ SnapForge.sln
 | D18 | **Notification icon and hotkeys via Win32 (Shell_NotifyIcon, RegisterHotKey)** | No WinForms dependency, no keyboard hooks; conflicts are detectable. |
 | D19 | **Runtime theme switching via a swapped palette dictionary** | All control styles use DynamicResource; light, dark or follow Windows. |
 | D20 | **Default library in %LOCALAPPDATA%** | Not Documents/Pictures, which are frequently redirected to OneDrive (automatic upload). |
+| D21 | **Deferred library index** (`CaptureLibrary.OpenDeferred` + `CompleteOpen` on the serialized writer) | Start-up no longer reads every manifest before the window appears (audit DEF-02). Indexing runs on the same background queue as saves, so nothing races it; captures created meanwhile are kept by a merge-safe `Reindex`; the tray checks capture folders on disk until the index is ready. |
+| D22 | **Drag-out as a lazy `IDataObject`** wrapped by WPF's `DataObject` | Native targets receive `CF_HDROP` (WPF converts `string[]`), the format Explorer, Office, mail clients and browsers accept for files. Files are rendered only when a target calls `GetData(FileDrop)`, so in-app reorders never write files. Copy is the only allowed effect. |
+| D23 | **Drag files = File → Export output** | Same flatten (`ImageExporter.Flatten`) and encoder (no metadata) as Export; a dragged open capture uses its live editor state, a closed one is loaded from the Library and its redaction masks re-applied before flattening. |
+| D24 | **Per-drag private temp folder** `%LOCALAPPDATA%\SnapForge\Temp\Drag\<UTC time>-<random>` | Unique per drag (no collisions or reuse), under the user profile (inherits the user-only ACL), deleted 2 minutes after the drag (targets may copy late), on exit, and by a start-up sweep (crash). |
+| D25 | **Widget as a non-activating tool window** (`WS_EX_NOACTIVATE`, `WS_EX_TOOLWINDOW`) positioned in physical pixels | Never steals focus from the app being captured; no taskbar button; placement stored as monitor device name + edge + fraction (survives resolution/DPI changes; falls back to the primary monitor). Pure placement math lives in Core (`WidgetDock`) and is unit-tested with mixed-DPI layouts. |
+| D26 | **Capture panel dropdowns as buttons opening context menus** | Themed, keyboard- and screen-reader-accessible without a custom ComboBox template; unavailable dropdowns are disabled buttons whose name and tooltip say "Not available yet". |
+| D27 | **High contrast palette built from `SystemColors`** | When Windows high contrast is on, every DynamicResource brush maps to the user's contrast colours; switching is live (`SystemParameters.HighContrast` change). |
+| D28 | **Benchmarks outside the test suite** (`tools/SnapForge.Benchmarks`, `SnapForge.exe --benchmark-startup`) | Seeding and measurements use the production write path with production durability; no test-only bypass. Runs as its own CI job so slow disks never hide behind test timeouts. |
+| D29 | **Launch with Windows via HKCU Run** with `--background` | Per-user, no admin rights, removable from Windows Settings → Startup; portable copies that move show a "points to a different copy" hint. |
 
 ## Capture flow
 
@@ -73,6 +82,17 @@ SnapForge.sln
 6. The crop becomes a new `EditorSession`: by default it is written to the Library in the background and added to
    the Recent Captures Tray; optionally copied to the clipboard; shown in the Editor if "Preview in Editor" is on.
 7. Every edit schedules a debounced autosave (1.2 s) through the LibraryWriter.
+
+## Drag-out flow (milestone 3)
+
+1. Mouse down on a tray tile or Library tile records the start point; a move beyond the system drag threshold
+   starts the drag with the tile's multi-selection (or just that tile).
+2. `CaptureDragDrop.StartDrag` wraps a `LazyCaptureFiles` (formats: `FileDrop`, `SnapForge.CaptureKeys`,
+   `Preferred DropEffect` = copy) in a WPF `DataObject` and calls `DragDrop.DoDragDrop(…, Copy)`.
+3. When a target asks for `FileDrop`, each capture is flattened and encoded (PNG, or JPEG at the configured quality)
+   into a new private temp folder with names from `ExportFileNames` ("title yyyy-MM-dd HHmmss.png", unique, safe).
+4. Drops onto the tray carry `SnapForge.CaptureKeys`; the tray reorders without asking for files.
+5. After the drag the folder is scheduled for deletion; exit and the next start-up sweep anything left.
 
 ## Coordinate systems
 

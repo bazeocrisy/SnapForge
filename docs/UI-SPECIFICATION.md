@@ -1,7 +1,8 @@
 # SnapForge UI specification (proposed, Gate A)
 
-Status: **Proposed — awaiting owner approval.** Nothing in this document is implemented unless the "Today" column
-says so. Requirement IDs refer to [PRODUCT-REQUIREMENTS.md](PRODUCT-REQUIREMENTS.md).
+Status: **Sections 1, 2, 4 (drag-out), 5 (drag-out, import) and 6 implemented in milestone 3 (Gate B)**; the
+Editor proposals in section 3 remain proposals for M4. "As built" notes below record where the build differs from
+the original proposal and why. Requirement IDs refer to [PRODUCT-REQUIREMENTS.md](PRODUCT-REQUIREMENTS.md).
 
 Design rules that apply to every surface:
 
@@ -25,7 +26,7 @@ The reference shows a **compact, horizontal, single-row panel** (approximately 7
 |---|---|---|
 | Title bar | App icon, **File / Edit / View / Help** menus, minimise and close | Same menu set, SnapForge icon; window chrome follows theme |
 | Left rail | Vertical mode switcher: **All-in-One**, **Image** (selected), **Video**, icon above label | Same three modes. **Video** and **All-in-One** shown disabled "Not available yet" until milestones 5/8 (CAP-UI-02). Image is the only enabled mode in M3 |
-| Column 1 | Three labelled dropdowns: **Selection** (value "Fullscreen"), **Effects** ("None"), **Share** ("None") | **Selection**: Region / Window / Display / Full screen (implemented modes only). **Effects**: "None" plus only effects that exist (none in M3 → dropdown disabled with "Not available yet"). **Share**: None / Save to Library (existing) / Copy to clipboard (existing) / Save to folder (only if built in M3) |
+| Column 1 | Three labelled dropdowns: **Selection** (value "Fullscreen"), **Effects** ("None"), **Share** ("None") | **Selection**: Region / Window / Display / Full screen (implemented modes only). **Effects**: disabled, "None", "Not available yet". **Share**: *as built* disabled, "None", "Not available yet" — Library and clipboard stay as the Save to Library and Copy to Clipboard switches (two controls for one setting would be confusing); destinations such as "save to folder" come with EXP-05 |
 | Column 2 | Four switches: **Preview in Editor** (on), **Copy to Clipboard**, **Cursor**, **Time Delay** with a chevron for duration | Same four, plus **Save to Library** (existing, must be preserved — CAP-UI-07) as a fifth row or inside Share. Delay chevron opens a duration picker |
 | Right | Reset (circular arrow) icon top-right; **large circular Capture button**; assigned shortcut text beneath ("Print Screen") | Circular SnapForge-orange Capture button (≥ 96 px, keyboard default button); live hotkey text beneath, "No hotkey" if none, warning glyph if the hotkey failed to register (CAP-UI-05) |
 | Footer | **Presets** (gear), **+▾** (add preset), **Open … Editor** link on the right | **Presets** flyout (list, capture, rename, hotkey, delete), **+** "Save current settings as preset", **Open SnapForge Editor** and **Open Library** links |
@@ -49,7 +50,8 @@ implemented; only the arrangement differs from the reference. M3 rearranges; it 
 | State | Proposal |
 |---|---|
 | Reference | Snagit docks a widget on the top or side edges and opens it on hover (S-CAP-06, DOC search extract); auto-hide, topmost and multi-monitor behaviour are undocumented, so SnapForge defines them here |
-| Collapsed | Small tab (≈ 48×12 logical px) docked to the **top centre** of the primary monitor by default; translucent, theme coloured; no taskbar button; never steals focus (`WS_EX_NOACTIVATE`, `WS_EX_TOOLWINDOW`) |
+| Defaults (owner decision 2026-11-25) | **Enabled** and **always on top** for new installs; hover to open; auto-hide off |
+| Collapsed | Small tab (72×12 logical px as built) docked to the **top centre** of the primary monitor by default; translucent, theme coloured; no taskbar button; never steals focus (`WS_EX_NOACTIVATE`, `WS_EX_TOOLWINDOW`) |
 | Expanded | On hover (300 ms intent delay) or click: a small strip with **Capture**, **Editor**, **Library**, **Presets ▾** buttons and a tooltip showing the capture hotkey |
 | Docking | Drag along the top, left or right edge of any monitor; snaps to edge; position stored as (monitor device name, edge, offset fraction) so mixed DPI and monitor reordering restore sensibly |
 | Options (Settings → Widget) | Enable/disable; topmost on/off; auto-hide (collapse after leaving, or hide completely until the screen edge is touched); expand on hover vs click only; launch with Windows (shared with app startup setting) |

@@ -112,3 +112,45 @@
 | PV6 | | |
 | PV7 | | |
 | PV8 | | |
+| M3-P1 | | |
+| M3-P2 | | |
+| M3-P3 | | |
+| M3-P4 | | |
+| M3-P5 | | |
+| M3-P6 | | |
+| M3-P7 | | |
+| M3-P8 | | |
+| M3-W1 | | |
+| M3-W2 | | |
+| M3-W3 | | |
+| M3-W4 | | |
+| M3-W5 | | |
+| M3-W6 | | |
+| M3-D1 | | |
+| M3-D2 | | |
+| M3-D3 | | |
+| M3-D4 | | |
+| M3-D5 | | |
+| M3-D6 | | |
+| M3-D7 | | |
+| M3-S1 | | |
+| M3-S2 | | |
+| M3-S3 | | |
+| M3-S4 | | |
+| M3-S5 | | |
+
+### Drag-and-drop compatibility (M3-D1 … M3-D3)
+
+Write the app and version you actually tried. Leave a row as "Not tried" if you did not test it — only rows you
+tried count as **Tested**; everything else remains **Expected** in the handoff.
+
+| Target | App / version | Result (Works / Fails / Not tried) | Notes |
+|---|---|---|---|
+| Windows desktop | | | |
+| Explorer folder | | | |
+| Microsoft Word | | | |
+| Microsoft PowerPoint | | | |
+| Microsoft OneNote | | | |
+| Outlook (classic or new) email | | | |
+| Microsoft Teams chat | | | |
+| Browser upload (which site / browser) | | | |

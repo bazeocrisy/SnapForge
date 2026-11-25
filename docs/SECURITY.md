@@ -12,6 +12,10 @@ the privacy model from "nothing persists unless exported" to "captures persist l
 | Recent tray layout | `<Library>\tray.json` | Tray changes | Never contains pixels |
 | Settings (options, presets, hotkeys, quick styles, library path) | `%LOCALAPPDATA%\SnapForge\settings.json` | Settings changes | Uninstall/delete folder |
 | Crash logs (exception text + OS version, **no image data**) | `%LOCALAPPDATA%\SnapForge\logs\` | Unexpected error | Manually |
+| Drag-and-drop copies (flattened PNG/JPEG, no metadata) | `%LOCALAPPDATA%\SnapForge\Temp\Drag\<time>-<random>\` | Only when a drop target asks for files during a drag | 2 minutes after the drag, on exit, and at the next start (crash) |
+| Imported images | Stored as new Library captures (pixels only; the source file's metadata is not kept) | File → Import images…, Library → Import…, or dropping files on SnapForge | Like any capture |
+| Widget placement, panel position, drag format, startup choice | `settings.json` | Settings changes | Uninstall/delete folder |
+| Startup entry | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\SnapForge` | User turns on "Launch with Windows" | User turns it off (SnapForge or Windows Settings → Startup) |
 | Exported PNG/JPEG, .sfcap packages, backups | Wherever the user chooses | Explicit Export/Backup | Outside SnapForge's control |
 | Clipboard image | Windows clipboard (and clipboard history / cloud clipboard if the user enabled them) | Copy, or "Copy to clipboard" capture option | Next copy / user clears history |
 
@@ -28,6 +32,9 @@ The privacy notice (first start; Help → Where are my captures?) and Settings �
 | Someone with physical/forensic access after deletion | Recover deleted captures | Delete permanently overwrites file contents with zeros before deletion, but SSD wear-levelling, copy-on-write, Volume Shadow Copies, File History, cloud sync and backups can retain old data (documented) |
 | Malicious `.sfcap` / backup file | Write outside the library, crash the app | Strict entry-name allow-list (no paths → no zip slip), hash verification, size limits, decoding validation; imports get a new id; restore never overwrites |
 | Network attacker | Intercept captures | SnapForge has **no network code**: no upload, sync, telemetry, update checks or accounts |
+| Drop target of a drag (Explorer, Office, mail, chat, browser upload) | Obtain hidden original pixels or the editable capture | **A drag is an export**: only flattened images with redactions burned in are offered (same code as File → Export; tests compare pixels and assert redacted pixels are exactly black); no `.sfcap`, base image or metadata; `Copy` is the only allowed effect, so the Library is never modified by a drop |
+| Another local process reading temp files | Read dragged copies | Temp files live under the user's own `%LOCALAPPDATA%` (user-only ACL inherited), in a random per-drag folder, only for the duration needed and are swept at exit/start-up. They are flattened exports, never originals. A drop target that copies the file keeps its own copy (outside SnapForge's control, as with any export) |
+| Malicious image file imported | Exploit the decoder, smuggle metadata | WPF/WIC decoders (Windows-maintained); size limits (16 384 px per side, 100 MP); only decoded pixels are stored, metadata discarded (test with a PNG text chunk) |
 | Another local program | Steal hotkeys / inject input | Hotkeys registered with RegisterHotKey (no keyboard hooks); conflicts are reported, never forced |
 
 ## Reversible editing vs irreversible export (and the warning)
@@ -62,6 +69,11 @@ Full pipeline review: [REDACTION.md](REDACTION.md).
 * Secure deletion cannot be guaranteed on SSDs, copy-on-write volumes, shadow copies, File History, cloud-synced folders
   or backups; earlier exports, backups and `.sfcap` copies are outside SnapForge's control.
 * If the user places the library in a cloud-synced folder, that service uploads captures (warned in Settings).
-* The development build is not code-signed (release blocker).
+* The development build is not code-signed (release blocker; owner decision PD-04: trusted signing before any public release).
+* Drag and drop: once a target has copied a dragged file (e.g. into a document, an email draft or a chat upload), that
+  copy is outside SnapForge's control, exactly like an exported file. Some targets read the file after the drop;
+  SnapForge keeps the temporary copy for 2 minutes for them. A drop target receives only the flattened image.
+* The widget is a non-activating window: it cannot take keyboard focus. Keyboard users reach the same commands from
+  the notification-area menu, the capture panel and the main window.
 * WPF keeps its own copies of on-screen bitmaps in unmanaged memory; a memory dump of the running process could
   contain screen content.
