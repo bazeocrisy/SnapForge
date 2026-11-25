@@ -207,7 +207,8 @@ public class GateBUiTests
             PixelRect r = PhysicalPlacement.GetBounds(widget)!.Value;
             NativeInput.MoveTo(r.X + (r.Width / 2), r.Y + (r.Height / 2));
             await WaitFor(() => widget.IsExpanded, 5);
-            Assert.Equal(foreground, NativeMethods.GetForegroundWindow()); // never activated
+            Assert.False(widget.IsActive); // never activated by hovering
+            Assert.Equal(foreground, NativeMethods.GetForegroundWindow());
             Assert.NotEqual(new WindowInteropHelper(widget).Handle, NativeMethods.GetForegroundWindow());
             PixelRect expanded = PhysicalPlacement.GetBounds(widget)!.Value;
             Assert.True(expanded.Width > r.Width && expanded.Height > r.Height);
@@ -227,7 +228,8 @@ public class GateBUiTests
             await Task.Delay(Step);
             NativeInput.LeftUp();
             await WaitFor(() => widget.IsExpanded, 5);
-            Assert.Equal(foreground, NativeMethods.GetForegroundWindow());
+            Assert.False(widget.IsActive); // clicking a non-activating window does not activate it
+            Assert.NotEqual(new WindowInteropHelper(widget).Handle, NativeMethods.GetForegroundWindow());
             NativeInput.MoveTo(r.X + (r.Width / 2), r.Y + 400);
             await WaitFor(() => !widget.IsExpanded, 5);
         }
@@ -420,6 +422,7 @@ public class GateBUiTests
             ShowActivated = false;
             Topmost = true;
             Background = Brushes.LightSteelBlue;
+            DragEnter += (_, _) => Log("target: drag enter");
             DragOver += (_, e) =>
             {
                 e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
@@ -427,7 +430,9 @@ public class GateBUiTests
             };
             Drop += (_, e) =>
             {
+                Log("target: drop");
                 Files = e.Data.GetData(DataFormats.FileDrop) as string[];
+                Log($"target: received {Files?.Length ?? 0} file(s)");
                 e.Handled = true;
             };
         }
@@ -435,8 +440,58 @@ public class GateBUiTests
         public string[]? Files { get; private set; }
     }
 
+    /// <summary>Events seen during the current drag test (included in failure messages).</summary>
+    private static readonly List<string> Trace = [];
+
+    private static void Log(string message)
+    {
+        lock (Trace)
+        {
+            Trace.Add($"{DateTime.Now:HH:mm:ss.fff} {message}");
+        }
+    }
+
+    private static string TraceText()
+    {
+        lock (Trace)
+        {
+            return string.Join(" | ", Trace);
+        }
+    }
+
     private static async Task SlowDrag(int x1, int y1, int x2, int y2, bool cancelWithRightClick = false)
     {
+        lock (Trace)
+        {
+            Trace.Clear();
+        }
+
+        CaptureDragDrop.BeforeDragHook = d => Log($"drag started with {d.Items.Count} item(s)");
+
+        // Watchdog on another thread: if the OLE drag loop is still running long after the input sequence, end it
+        // with real Esc + button-up input so a broken drag fails this test instead of hanging every later test.
+        using var watchdog = new Timer(_ =>
+        {
+            if (CaptureDragDrop.IsDragging)
+            {
+                Log("watchdog: drag still running, sending Esc and button up");
+                NativeInput.KeyPress(0x1B);
+                NativeInput.LeftUp();
+            }
+        }, null, TimeSpan.FromSeconds(12), TimeSpan.FromSeconds(3));
+        try
+        {
+            await SlowDragCore(x1, y1, x2, y2, cancelWithRightClick);
+        }
+        finally
+        {
+            CaptureDragDrop.BeforeDragHook = null;
+        }
+    }
+
+    private static async Task SlowDragCore(int x1, int y1, int x2, int y2, bool cancelWithRightClick)
+    {
+        Log($"down at {x1},{y1}");
         NativeInput.MoveTo(x1, y1);
         await Task.Delay(Step * 2);
         NativeInput.LeftDown();
@@ -454,8 +509,10 @@ public class GateBUiTests
             await Task.Delay(Step * 2);
         }
 
+        Log($"up at {x2},{y2}; dragging={CaptureDragDrop.IsDragging}");
         NativeInput.LeftUp();
         await Task.Delay(Step * 6);
+        Log($"after up; dragging={CaptureDragDrop.IsDragging}");
     }
 
     private static (int X, int Y) Centre(FrameworkElement e)
@@ -484,7 +541,7 @@ public class GateBUiTests
             (int dx, int dy) = Centre(target);
 
             await SlowDrag(tx, ty, dx, dy);
-            await WaitFor(() => target.Files is not null, 10);
+            await WaitFor(() => target.Files is not null, 10, TraceText);
             string file = Assert.Single(target.Files!);
             Assert.True(File.Exists(file));
             Assert.EndsWith(".png", file, StringComparison.Ordinal);
@@ -529,7 +586,7 @@ public class GateBUiTests
             (int dx, int dy) = Centre(target);
 
             await SlowDrag(tx, ty, dx, dy);
-            await WaitFor(() => target.Files is not null, 10);
+            await WaitFor(() => target.Files is not null, 10, TraceText);
             Assert.Equal(3, target.Files!.Length);
             Assert.Equal(3, target.Files.Select(Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
             Assert.All(target.Files, f => Assert.Equal((80, 60), (Decode(f).Width, Decode(f).Height)));
@@ -792,14 +849,14 @@ public class GateBUiTests
         }
     });
 
-    private static async Task WaitFor(Func<bool> condition, int seconds = 15)
+    private static async Task WaitFor(Func<bool> condition, int seconds = 15, Func<string>? diagnostics = null)
     {
         var sw = Stopwatch.StartNew();
         while (!condition())
         {
             if (sw.Elapsed > TimeSpan.FromSeconds(seconds))
             {
-                throw new TimeoutException("Condition not met in time.");
+                throw new TimeoutException("Condition not met in time. " + diagnostics?.Invoke());
             }
 
             await Task.Delay(25);

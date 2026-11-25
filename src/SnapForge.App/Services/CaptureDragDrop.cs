@@ -42,6 +42,9 @@ internal static class CaptureDragDrop
     /// <summary>Test hook: observes the data object right before the modal drag loop starts.</summary>
     internal static Action<LazyCaptureFiles>? BeforeDragHook { get; set; }
 
+    /// <summary>True while the modal OLE drag loop runs (tests use it as a watchdog signal).</summary>
+    internal static bool IsDragging { get; private set; }
+
     /// <summary>The last drag's data object (tests inspect what a target would receive).</summary>
     internal static LazyCaptureFiles? LastDrag { get; private set; }
 
@@ -59,6 +62,7 @@ internal static class CaptureDragDrop
         LastDrag = data;
         BeforeDragHook?.Invoke(data);
         DragDropEffects effect;
+        IsDragging = true;
         try
         {
             // Copy only: the target gets copies; nothing in SnapForge is moved or deleted by a drop.
@@ -66,6 +70,7 @@ internal static class CaptureDragDrop
         }
         finally
         {
+            IsDragging = false;
             data.EndDrag();
         }
 

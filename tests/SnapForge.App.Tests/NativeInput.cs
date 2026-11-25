@@ -10,6 +10,8 @@ namespace SnapForge.App.Tests;
 internal static unsafe partial class NativeInput
 {
     private const uint INPUT_MOUSE = 0;
+    private const uint INPUT_KEYBOARD = 1;
+    private const uint KEYEVENTF_KEYUP = 0x0002;
     private const uint MOUSEEVENTF_MOVE = 0x0001;
     private const uint MOUSEEVENTF_LEFTDOWN = 0x0002;
     private const uint MOUSEEVENTF_LEFTUP = 0x0004;
@@ -37,6 +39,15 @@ internal static unsafe partial class NativeInput
     {
         Send(MOUSEEVENTF_RIGHTDOWN);
         Send(MOUSEEVENTF_RIGHTUP);
+    }
+
+    /// <summary>Presses and releases a virtual key (e.g. 0x1B = Esc). Works without the foreground window for OLE drag loops, which poll key state.</summary>
+    public static void KeyPress(ushort virtualKey)
+    {
+        var inputs = stackalloc INPUT[2];
+        inputs[0] = new INPUT { type = INPUT_KEYBOARD, ki = new KEYBDINPUT { wVk = virtualKey } };
+        inputs[1] = new INPUT { type = INPUT_KEYBOARD, ki = new KEYBDINPUT { wVk = virtualKey, dwFlags = KEYEVENTF_KEYUP } };
+        _ = SendInput(2, inputs, sizeof(INPUT));
     }
 
     public static void TryEnablePerMonitorDpiAwareness()
@@ -81,6 +92,19 @@ internal static unsafe partial class NativeInput
         // Union with KEYBDINPUT/HARDWAREINPUT; MOUSEINPUT is the largest member.
         [FieldOffset(8)]
         public MOUSEINPUT mi;
+
+        [FieldOffset(8)]
+        public KEYBDINPUT ki;
+    }
+
+    [StructLayout(LayoutKind.Sequential)]
+    private struct KEYBDINPUT
+    {
+        public ushort wVk;
+        public ushort wScan;
+        public uint dwFlags;
+        public uint time;
+        public nint dwExtraInfo;
     }
 
     [LibraryImport("user32.dll", SetLastError = true)]
