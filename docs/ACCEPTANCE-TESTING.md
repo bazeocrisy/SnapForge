@@ -226,6 +226,14 @@ Use a capture that has some text on it. Tools are on the left; colour and size a
 
 ## Part 13 — Milestone 3: capture panel, widget, drag and drop, import, start-up
 
+> **Before you start: make sure you are running the new build.** Only one SnapForge runs at a time. If an older
+> SnapForge is still in the notification area (next to the clock), right-click its icon → **Exit SnapForge** first.
+> From this build on, starting a different build shows a message and offers to replace the running copy. Check
+> **Help → About**: it shows the build (e.g. `0.1.0-dev+1a2b3c4`) and the folder of the running SnapForge.exe.
+>
+> Three ways to drag a capture out: the **Drag** button in the Editor toolbar (next to Copy), a thumbnail in the
+> Recent Captures tray, or tiles in the Library. If you cannot see the widget, use **View → Show capture widget**.
+
 > Requirement IDs refer to [PRODUCT-REQUIREMENTS.md](PRODUCT-REQUIREMENTS.md). Do these on a **real Windows PC**
 > (Windows 11 first; then Windows 10 if you want to evaluate it). Automated CI results are reported separately in the
 > handoff and do not replace these checks. For drag and drop, write down exactly which app you tested and whether it
@@ -247,7 +255,7 @@ Use a capture that has some text on it. Tools are on the left; colour and size a
 | M3-W4 | Drag the widget by its grip (⋮⋮) to the left edge, then to the right edge, then onto a second monitor with a different scaling (e.g. 100 % and 150 %). Restart SnapForge. | It snaps to each edge, looks sharp on both monitors, and returns to the last place after restart. Unplug the second monitor: it comes back on the main screen. | WID-04, WID-08, NFR-DPI-01/02 |
 | M3-W5 | Turn auto-hide on; turn "keep on top" off; take a capture with the widget open. | Auto-hide: a thin strip until you touch it. Not on top: other windows can cover it. The widget never appears in the captured image. | WID-06, WID-07, WID-10 |
 | M3-W6 | Narrator on (Ctrl+Win+Enter); move to the widget with Narrator's scan mode / Caps Lock+arrow keys. | Its buttons are announced as "Capture", "Editor", "Library", "Presets". (The widget cannot take keyboard focus by design; keyboard users use the notification-area menu.) | WID-11, NFR-A11Y-02 |
-| M3-D1 | Drag one tray thumbnail to the **desktop** and into an **Explorer** folder. | A PNG named like "Checkout error 2026-11-25 134905.png" appears. The capture is still in SnapForge. | DND-01, DND-05, DND-06 |
+| M3-D1 | Drag one tray thumbnail — and the Editor toolbar's **Drag** button — to the **desktop** and into an **Explorer** folder. | A PNG named like "Checkout error 2026-11-25 134905.png" appears. The capture is still in SnapForge. | DND-01, DND-05, DND-06 |
 | M3-D2 | Ctrl+click two tray thumbnails, drag one of them out. Library: select 3 (Ctrl/Shift+click), drag them to Explorer. | 2 files, then 3 files, each with a different name. | DND-02, DND-03 |
 | M3-D3 | Take a capture, redact some text, then drag it into **Word**, **PowerPoint**, **OneNote**, an **Outlook** email, a **Teams** chat and a **browser** upload page (e.g. a webmail attachment). Record each app's result. | Each app receives a picture/file; the redacted area is solid; no .sfcap or second "original" file. If an app refuses, write down the app and version. | DND-11, PRIV-DND-01/02 |
 | M3-D4 | Settings → Drag and drop → JPEG (quality 80); drag again. | A .jpg is produced. | DND-04 |

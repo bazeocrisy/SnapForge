@@ -22,6 +22,8 @@ public partial class App : Application
     private static bool _notifiedRunning;
     private Mutex? _instanceMutex;
     private EventWaitHandle? _activateSignal;
+    private EventWaitHandle? _exitSignal;
+    private System.IO.MemoryMappedFiles.MemoryMappedFile? _instanceInfo;
 
     internal static MainWindow? MainShell => Current?.MainWindow as MainWindow;
 
@@ -51,17 +53,21 @@ public partial class App : Application
             return;
         }
 
-        // Single instance: a second launch brings the running SnapForge to the front instead.
+        // Single instance: a second launch of the SAME build brings the running SnapForge to the front. A different
+        // build (e.g. a newer download while an older copy runs in the notification area) is reported instead of
+        // silently handing over to the old copy, and can replace it.
         _instanceMutex = new Mutex(initiallyOwned: true, $@"Local\{InstanceName}", out bool first);
         _activateSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceName}-activate");
-        if (!first)
+        _exitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceName}-exit");
+        if (!first && !TakeOverFromRunningInstance())
         {
-            _activateSignal.Set();
             Shutdown(0);
             return;
         }
 
+        _instanceInfo = InstanceInfo.Publish($@"Local\{InstanceName}-info", InstanceInfo.Current());
         ThreadPool.RegisterWaitForSingleObject(_activateSignal, (_, _) => Dispatcher.BeginInvoke(() => MainShell?.BringToFront()), null, Timeout.Infinite, executeOnlyOnce: false);
+        ThreadPool.RegisterWaitForSingleObject(_exitSignal, (_, _) => Dispatcher.BeginInvoke(() => _ = ExitAsync()), null, Timeout.Infinite, executeOnlyOnce: true);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 
         AppServices services;
@@ -101,6 +107,12 @@ public partial class App : Application
         RegisterHotkeys(notifyOnFailure: true);
         services.SettingsChanged += (_, _) => Current.Dispatcher.BeginInvoke(() => ApplyWidget(services));
         ApplyWidget(services);
+        if (_widget is not null && !services.Settings.WidgetIntroShown)
+        {
+            // First start with the widget: open it briefly so the user sees where it lives.
+            _widget.Dispatcher.BeginInvoke(() => _widget?.Peek(TimeSpan.FromSeconds(6)), DispatcherPriority.ApplicationIdle);
+            services.UpdateSettings(s => s with { WidgetIntroShown = true });
+        }
 
         if (services.Settings.ShowCaptureWindowOnStart)
         {
@@ -115,6 +127,63 @@ public partial class App : Application
                 services.UpdateSettings(s => s with { PrivacyNoticeShown = true });
             }, DispatcherPriority.ApplicationIdle);
         }
+    }
+
+    /// <summary>
+    /// Another SnapForge holds the single-instance mutex. Same build: hand over (bring it to the front) and return
+    /// false. Different or unknown build: explain and, if the user agrees, ask it to exit and take over (true).
+    /// </summary>
+    private bool TakeOverFromRunningInstance()
+    {
+        InstanceInfo? running = InstanceInfo.Read($@"Local\{InstanceName}-info");
+        if (running is not null && running.Build == InstanceInfo.CurrentBuild)
+        {
+            _activateSignal!.Set();
+            return false;
+        }
+
+        string runningText = running is null
+            ? "an older SnapForge build (from before milestone 3)"
+            : $"SnapForge build {InstanceInfo.ShortBuild(running.Build)}\n{running.ExePath}";
+        string thisText = $"build {InstanceInfo.ShortBuild(InstanceInfo.CurrentBuild)}\n{Environment.ProcessPath}";
+        if (running is null)
+        {
+            // Builds before milestone 3 cannot be asked to exit; tell the user how.
+            MessageBox.Show(
+                $"Another copy of SnapForge is already running: {runningText}.\n\nThis copy is {thisText}.\n\n" +
+                "Only one SnapForge can run at a time. Right-click the SnapForge icon in the notification area (next to the clock) " +
+                "→ Exit SnapForge, then start this copy again.",
+                ProductInfo.Name, MessageBoxButton.OK, MessageBoxImage.Information);
+            _activateSignal!.Set();
+            return false;
+        }
+
+        MessageBoxResult answer = MessageBox.Show(
+            $"Another copy of SnapForge is already running:\n{runningText}\n\nThis copy is {thisText}.\n\n" +
+            "Close the running copy and start this one? (Its captures are saved first; your Library is shared by both.)",
+            ProductInfo.Name, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
+        if (answer != MessageBoxResult.Yes)
+        {
+            _activateSignal!.Set();
+            return false;
+        }
+
+        _exitSignal!.Set();
+        try
+        {
+            if (_instanceMutex!.WaitOne(TimeSpan.FromSeconds(20)))
+            {
+                return true;
+            }
+        }
+        catch (AbandonedMutexException)
+        {
+            return true; // the other copy ended without releasing it; we own it now
+        }
+
+        MessageBox.Show("The running copy did not close (it may be waiting for an answer in one of its windows). Close it from the notification area and try again.",
+            ProductInfo.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
+        return false;
     }
 
     protected override void OnExit(ExitEventArgs e)
@@ -133,6 +202,8 @@ public partial class App : Application
         _shell = null;
         AppServices.Current?.Dispose();
         _activateSignal?.Dispose();
+        _exitSignal?.Dispose();
+        _instanceInfo?.Dispose();
         if (_instanceMutex is not null)
         {
             try
@@ -217,6 +288,35 @@ public partial class App : Application
             _widget.Close();
             _widget = null;
         }
+    }
+
+    /// <summary>
+    /// View → Show capture widget: turns the widget on, moves it to the top centre of the display the main window
+    /// is on, and opens it for a few seconds so it is easy to find.
+    /// </summary>
+    internal static void ShowWidget()
+    {
+        if (AppServices.Current is not { } services)
+        {
+            return;
+        }
+
+        string? device = null;
+        if (MainShell is { IsVisible: true } main && Interop.PhysicalPlacement.GetBounds(main) is { } b)
+        {
+            device = Interop.PhysicalPlacement.MonitorFor(Interop.PhysicalPlacement.Layout(), b).DeviceName;
+        }
+
+        services.UpdateSettings(s => s with
+        {
+            Widget = s.Widget with
+            {
+                Enabled = true,
+                Placement = device is null ? null : new WidgetPlacement(device, DockEdge.Top, 0.5),
+            },
+        });
+        ApplyWidget(services);
+        _widget?.Peek(TimeSpan.FromSeconds(5));
     }
 
     internal static void ShowCaptureWindow()
@@ -333,8 +433,11 @@ public partial class App : Application
 
         Add("_Capture", () => _ = CaptureWithOptionsAsync(AppServices.Current!.Settings.Capture), bold: true);
         Add("Capture _panel…", ShowCaptureWindow);
-        bool widgetOn = AppServices.Current?.Settings.Widget.Enabled == true;
-        Add(widgetOn ? "Hide capture _widget" : "Show capture _widget", () => AppServices.Current?.UpdateSettings(s => s with { Widget = s.Widget with { Enabled = !widgetOn } }));
+        Add("Show capture _widget", ShowWidget);
+        if (AppServices.Current?.Settings.Widget.Enabled == true)
+        {
+            Add("_Hide capture widget", () => AppServices.Current?.UpdateSettings(s => s with { Widget = s.Widget with { Enabled = false } }));
+        }
         menu.Items.Add(new Separator());
         Add("Open _Editor", () => { MainShell?.BringToFront(); MainShell?.ShowEditorWorkspace(); });
         Add("Open _Library", () => { MainShell?.BringToFront(); MainShell?.ShowLibraryWorkspace(); });

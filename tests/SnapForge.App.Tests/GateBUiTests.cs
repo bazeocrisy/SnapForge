@@ -562,6 +562,76 @@ public class GateBUiTests
     });
 
     [Fact]
+    public void Real_mouse_drag_of_the_editor_drag_button_delivers_the_open_capture() => UiThread.Run(async () =>
+    {
+        NewTempStore();
+        AppServices services = TestServices.Create();
+        (MainWindow w, CaptureRecord rec, _) = await RedactedCaptureAsync(services, "Editor drag");
+        var target = new DropTarget();
+        try
+        {
+            await WaitFor(() => w.DragOutButton.IsEnabled && w.DragOutButton.IsVisible);
+            await Task.Delay(300);
+            (int bx, int by) = Centre(w.DragOutButton);
+            double dpi = PhysicalPlacement.Layout().Monitors[0].DpiScale;
+            target.Left = (bx - 300) / dpi;
+            target.Top = (by + 150) / dpi;
+            target.Show();
+            await Task.Delay(300);
+            (int dx, int dy) = Centre(target);
+
+            await SlowDrag(bx, by, dx, dy);
+            await WaitFor(() => target.Files is not null, 10, TraceText);
+            string file = Assert.Single(target.Files!);
+            Assert.StartsWith("Editor drag ", Path.GetFileName(file), StringComparison.Ordinal);
+            Assert.Equal(ArgbColor.Black, Decode(file).GetPixel(5, 5)); // redaction burned in
+            Assert.Equal(rec.Id, CaptureDragDrop.LastDrag!.Items[0].Key);
+        }
+        finally
+        {
+            target.Close();
+            w.AllowClose = true;
+            w.Close();
+        }
+    });
+
+    [Fact]
+    public void Build_identity_round_trips_for_the_single_instance_check()
+    {
+        var info = new InstanceInfo("0.1.0-dev+67ae21879015de906d905320ff008e2a53d0ea1d", @"C:\Users\me\Desktop\SnapForge\SnapForge.exe");
+        Assert.Equal(info, InstanceInfo.Decode(InstanceInfo.Encode(info)));
+        Assert.Null(InstanceInfo.Decode([1, 2]));
+        Assert.Equal("0.1.0-dev+67ae218", InstanceInfo.ShortBuild(info.Build));
+        Assert.Equal("0.1.0-dev", InstanceInfo.ShortBuild("0.1.0-dev"));
+        string name = @"Local\SnapForge-test-" + Guid.NewGuid().ToString("N");
+        Assert.Null(InstanceInfo.Read(name)); // nothing published = a build from before milestone 3
+        using var mmf = InstanceInfo.Publish(name, info);
+        Assert.Equal(info, InstanceInfo.Read(name));
+        Assert.False(string.IsNullOrWhiteSpace(InstanceInfo.CurrentBuild));
+    }
+
+    [Fact]
+    public void Widget_peek_opens_it_and_closes_it_again() => UiThread.Run(async () =>
+    {
+        AppServices services = TestServices.Create();
+        var widget = new CaptureWidget(services);
+        widget.Show();
+        await Task.Delay(200);
+        try
+        {
+            NativeInput.MoveTo(5, 600);
+            widget.Peek(TimeSpan.FromMilliseconds(600));
+            Assert.True(widget.IsExpanded);
+            await WaitFor(() => !widget.IsExpanded, 5);
+            Assert.Equal(Visibility.Visible, widget.TabIconVisibility);
+        }
+        finally
+        {
+            widget.Close();
+        }
+    });
+
+    [Fact]
     public void Real_mouse_drag_of_a_library_multi_selection_delivers_one_file_per_capture() => UiThread.Run(async () =>
     {
         NewTempStore();

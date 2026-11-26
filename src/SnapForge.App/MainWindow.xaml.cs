@@ -951,6 +951,7 @@ public partial class MainWindow : Window
         UndoButton.ToolTip = doc?.History.UndoDescription is { } u ? $"Undo {u} (Ctrl+Z)" : "Undo (Ctrl+Z)";
         RedoButton.ToolTip = doc?.History.RedoDescription is { } r ? $"Redo {r} (Ctrl+Y)" : "Redo (Ctrl+Y)";
         CopyButton.IsEnabled = hasDoc;
+        DragOutButton.IsEnabled = hasDoc;
         SaveButton.IsEnabled = hasDoc;
         DeleteButton.IsEnabled = Editor.HasSelection;
         if (hasDoc)
@@ -1623,7 +1624,7 @@ public partial class MainWindow : Window
     private void OnPrivacyInfo(object sender, RoutedEventArgs e) => App.ShowPrivacyNotice(this);
 
     private void OnAbout(object sender, RoutedEventArgs e) => MessageBox.Show(this,
-        $"{ProductInfo.Name} {typeof(MainWindow).Assembly.GetName().Version}\nScreen capture, annotation and capture library for Windows.\n\n" +
+        $"{ProductInfo.Name} {typeof(MainWindow).Assembly.GetName().Version}\nBuild: {SnapForge.App.Services.InstanceInfo.ShortBuild(SnapForge.App.Services.InstanceInfo.CurrentBuild)}\n{Environment.ProcessPath}\n\nScreen capture, annotation and capture library for Windows.\n\n" +
         "MIT License — Copyright (c) 2026 bazeocrisy.\nNo network access, no telemetry. Development build.",
         $"About {ProductInfo.Name}", MessageBoxButton.OK, MessageBoxImage.Information);
 

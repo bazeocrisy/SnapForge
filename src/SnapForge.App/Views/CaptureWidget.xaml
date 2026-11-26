@@ -4,7 +4,7 @@
         Title="SnapForge capture widget"
         WindowStyle="None" AllowsTransparency="True" Background="Transparent"
         ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
-        WindowStartupLocation="Manual" Width="72" Height="12"
+        WindowStartupLocation="Manual" Width="120" Height="20"
         FontFamily="{StaticResource UiFont}" Foreground="{DynamicResource TextBrush}"
         UseLayoutRounding="True"
         AutomationProperties.Name="SnapForge capture widget">
@@ -19,9 +19,11 @@
                 AutomationProperties.Name="Open capture widget" ToolTip="SnapForge — capture">
             <Button.Template>
                 <ControlTemplate TargetType="Button">
-                    <Border x:Name="TabBorder" Background="{DynamicResource AccentBrush}" CornerRadius="{Binding TabCorner, RelativeSource={RelativeSource AncestorType=Window}}" Opacity="0.92">
-                        <Path x:Name="Grip" Data="M0,0 H18 M0,3 H18" Stroke="{DynamicResource AccentForegroundBrush}" StrokeThickness="1.2"
-                              HorizontalAlignment="Center" VerticalAlignment="Center" Opacity="0.7" />
+                    <Border x:Name="TabBorder" Background="{DynamicResource AccentBrush}" CornerRadius="{Binding TabCorner, RelativeSource={RelativeSource AncestorType=Window}}" Opacity="0.95">
+                        <!-- Capture symbol so the tab is recognisable; hidden in auto-hide (thin strip) mode. -->
+                        <Path x:Name="TabIcon" Data="{StaticResource IconCapture}" Stroke="{DynamicResource AccentForegroundBrush}" StrokeThickness="2"
+                              Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Visibility="{Binding TabIconVisibility, RelativeSource={RelativeSource AncestorType=Window}}" />
                     </Border>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">

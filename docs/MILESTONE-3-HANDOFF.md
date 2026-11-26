@@ -91,3 +91,24 @@ compatibility table in ACCEPTANCE-RESULTS-TEMPLATE.md; only rows you record beco
 
 No video, effects, editor-object work, cloud destinations or other later-milestone items; no merge to `main`; no
 release; no paid dependencies.
+
+## 8. Owner test feedback, round 1 (2026-11-26) and changes
+
+Feedback (real PC, Windows 11): "I can't drag and drop from when it takes the images" and "add show capture widget
+where it shows in the middle of the screen". The owner's screenshot shows no widget tab at the top centre.
+
+Analysis: both missing behaviours are milestone-3 features. The most likely cause is that an **older SnapForge was
+still running** in the notification area: SnapForge is single-instance, and a second launch silently brought the
+running (old) copy to the front. This could not be confirmed remotely.
+
+Changes:
+* A second launch of a **different build** now explains the situation and offers to close the running copy and
+  start the new one (builds from before milestone 3 cannot be closed remotely; the message says how to exit them).
+* **Help → About** shows the build (version + commit) and the path of the running exe.
+* New **View → Show capture widget** (also in the notification-area menu and the capture panel's View menu): turns
+  the widget on, places it at the top centre of the display the main window is on, and opens it for 5 seconds.
+* The collapsed widget tab is larger (120×20 instead of 72×12) and shows a capture symbol; on first start the widget
+  opens for 6 seconds so it is noticed.
+* New **Drag** button in the Editor toolbar: drag the open capture (with unsaved edits, flattened, redactions burned
+  in) straight into another app — no need to find it in the tray.
+* New tests: editor drag button (real OLE drag), build-identity handshake, widget peek.

@@ -21,11 +21,12 @@ namespace SnapForge.App.Views;
 public partial class CaptureWidget : Window
 {
     public static readonly DependencyProperty TabCornerProperty = DependencyProperty.Register(nameof(TabCorner), typeof(CornerRadius), typeof(CaptureWidget), new PropertyMetadata(new CornerRadius(0, 0, 6, 6)));
+    public static readonly DependencyProperty TabIconVisibilityProperty = DependencyProperty.Register(nameof(TabIconVisibility), typeof(Visibility), typeof(CaptureWidget), new PropertyMetadata(Visibility.Visible));
     public static readonly DependencyProperty PanelCornerProperty = DependencyProperty.Register(nameof(PanelCorner), typeof(CornerRadius), typeof(CaptureWidget), new PropertyMetadata(new CornerRadius(0, 0, 10, 10)));
 
     /// <summary>Collapsed tab size in DIPs (along the edge × away from it).</summary>
-    internal const double TabAlong = 72;
-    internal const double TabAcross = 12;
+    internal const double TabAlong = 120;
+    internal const double TabAcross = 20;
     internal const double AutoHideAcross = 4;
     internal static readonly TimeSpan HoverDelay = TimeSpan.FromMilliseconds(300);
     internal static readonly TimeSpan CollapseDelay = TimeSpan.FromMilliseconds(700);
@@ -72,6 +73,27 @@ public partial class CaptureWidget : Window
 
     public CornerRadius PanelCorner { get => (CornerRadius)GetValue(PanelCornerProperty); set => SetValue(PanelCornerProperty, value); }
 
+    public Visibility TabIconVisibility { get => (Visibility)GetValue(TabIconVisibilityProperty); set => SetValue(TabIconVisibilityProperty, value); }
+
+    /// <summary>
+    /// Opens the widget for a few seconds so the user can see where it is (first start, or "Show capture widget"),
+    /// then collapses it unless the pointer is on it.
+    /// </summary>
+    internal void Peek(TimeSpan duration)
+    {
+        Expand();
+        var timer = new DispatcherTimer { Interval = duration };
+        timer.Tick += (_, _) =>
+        {
+            timer.Stop();
+            if (!IsMouseOver && !_dragging && !_menuOpen)
+            {
+                Collapse();
+            }
+        };
+        timer.Start();
+    }
+
     internal bool IsExpanded => Panel.Visibility == Visibility.Visible;
 
     internal DockEdge Edge => _services.Settings.Widget.Placement?.Edge ?? DockEdge.Top;
@@ -81,6 +103,7 @@ public partial class CaptureWidget : Window
     {
         WidgetSettings s = _services.Settings.Widget;
         Topmost = s.Topmost;
+        TabIconVisibility = s.AutoHide ? Visibility.Collapsed : Visibility.Visible;
         bool vertical = Edge != DockEdge.Top;
         PanelStack.Orientation = vertical ? Orientation.Vertical : Orientation.Horizontal;
         CaptureLabel.Visibility = vertical ? Visibility.Collapsed : Visibility.Visible;

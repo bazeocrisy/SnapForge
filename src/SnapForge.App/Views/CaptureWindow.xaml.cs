@@ -73,7 +73,6 @@ public partial class CaptureWindow : Window
 
         DelayBox.IsChecked = o.DelaySeconds > 0;
         DelayBox.Content = o.DelaySeconds > 0 ? $"Time Delay ({o.DelaySeconds} s)" : "Time Delay";
-        WidgetMenu.IsChecked = _services.Settings.Widget.Enabled;
 
         HotkeyRegistration? reg = App.HotkeyResults.FirstOrDefault(r => r.Action == "Capture");
         if (_services.Settings.CaptureHotkey is not { } hk)
@@ -341,8 +340,7 @@ public partial class CaptureWindow : Window
 
     private void OnSettings(object sender, RoutedEventArgs e) => App.ShowSettings(this);
 
-    private void OnToggleWidget(object sender, RoutedEventArgs e) =>
-        _services.UpdateSettings(s => s with { Widget = s.Widget with { Enabled = WidgetMenu.IsChecked } });
+    private void OnToggleWidget(object sender, RoutedEventArgs e) => App.ShowWidget();
 
     private void OnShortcuts(object sender, RoutedEventArgs e) => App.MainShell?.ShowShortcuts(this);
 

@@ -173,6 +173,40 @@ public partial class MainWindow
     /// <summary>Current tray tiles in display order (tests).</summary>
     internal IReadOnlyList<Guid> TrayKeys => [.. _trayTiles.Select(t => t.Key)];
 
+    // ------------------------------------------------------------------ drag the open capture from the Editor
+
+    private Point? _editorDragStart;
+
+    private void OnDragOutMouseDown(object sender, MouseButtonEventArgs e) => _editorDragStart = e.GetPosition(this);
+
+    private void OnDragOutMouseMove(object sender, MouseEventArgs e)
+    {
+        if (e.LeftButton != MouseButtonState.Pressed || _editorDragStart is not { } start || _current is null)
+        {
+            return;
+        }
+
+        Vector d = e.GetPosition(this) - start;
+        if (Math.Abs(d.X) < SystemParameters.MinimumHorizontalDragDistance && Math.Abs(d.Y) < SystemParameters.MinimumVerticalDragDistance)
+        {
+            return;
+        }
+
+        _editorDragStart = null;
+        Editor.CommitTextEdit();
+        (sender as UIElement)?.ReleaseMouseCapture();
+        StartCaptureDrag((DependencyObject)sender, [_current.Key]);
+        e.Handled = true;
+    }
+
+    private void OnDragOutClick(object sender, RoutedEventArgs e)
+    {
+        _editorDragStart = null;
+        SetStatus("Press and drag the Drag button into another app (Explorer, Word, Outlook, Teams, a browser…) to copy this capture as an image.");
+    }
+
+    private void OnShowWidget(object sender, RoutedEventArgs e) => App.ShowWidget();
+
     // ------------------------------------------------------------------ tray reordering (drop onto the tray)
 
     private void OnTrayDragOver(object sender, DragEventArgs e)

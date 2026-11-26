@@ -33,7 +33,7 @@
                 <MenuItem Header="Open SnapForge _Editor" Click="OnOpenEditor" />
                 <MenuItem Header="Open _Library" Click="OnOpenLibrary" />
                 <Separator />
-                <MenuItem x:Name="WidgetMenu" Header="Show capture _widget" IsCheckable="True" Click="OnToggleWidget" />
+                <MenuItem x:Name="WidgetMenu" Header="Show capture _widget" Click="OnToggleWidget" ToolTip="Shows the capture widget at the top centre of the screen and opens it" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Keyboard shortcuts" Click="OnShortcuts" />

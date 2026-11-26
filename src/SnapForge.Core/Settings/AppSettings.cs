@@ -176,6 +176,9 @@ public sealed record AppSettings
     /// <summary>Desktop capture widget (enabled and topmost by default).</summary>
     public WidgetSettings Widget { get; init; } = new();
 
+    /// <summary>Set once the widget has been shown open on first start (so users notice it).</summary>
+    public bool WidgetIntroShown { get; init; }
+
     /// <summary>What dragging a capture out of SnapForge produces.</summary>
     public DragDropSettings DragDrop { get; init; } = new();
 

@@ -169,7 +169,8 @@
                     <MenuItem Header="_View" SubmenuOpened="OnMenuOpened">
                         <MenuItem Header="_Editor" InputGestureText="Ctrl+E" Click="OnShowEditor" />
                         <MenuItem Header="_Library" InputGestureText="Ctrl+L" Click="OnShowLibrary" />
-                        <MenuItem Header="_Capture window" Click="OnShowCaptureWindow" />
+                        <MenuItem Header="Capture _panel" Click="OnShowCaptureWindow" />
+                        <MenuItem Header="Show capture _widget" Click="OnShowWidget" ToolTip="Shows the capture widget at the top centre of the screen and opens it" />
                         <Separator />
                         <MenuItem x:Name="ShowTrayMenu" Header="Show _Recent Captures" IsCheckable="True" Click="OnToggleTray" />
                         <MenuItem x:Name="ShowPanelMenu" Header="Show Quick Styles &amp; _Properties" IsCheckable="True" Click="OnTogglePanel" />
@@ -296,6 +297,15 @@
                         </StackPanel>
 
                         <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                            <Button x:Name="DragOutButton" Style="{StaticResource ToolbarButton}" Cursor="SizeAll" IsEnabled="False"
+                                    Click="OnDragOutClick" PreviewMouseLeftButtonDown="OnDragOutMouseDown" PreviewMouseMove="OnDragOutMouseMove"
+                                    ToolTip="Drag this into Explorer, the desktop, Word, Outlook, Teams or a browser to copy the capture as an image (annotations applied, redactions burned in)"
+                                    AutomationProperties.Name="Drag capture to another app">
+                                <StackPanel Orientation="Horizontal">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconGrip}" />
+                                    <TextBlock Text="Drag" Margin="4,0,2,0" VerticalAlignment="Center" />
+                                </StackPanel>
+                            </Button>
                             <Button x:Name="CopyButton" Style="{StaticResource ToolbarButton}" Click="OnCopy" ToolTip="Copy image to clipboard (Ctrl+C)" IsEnabled="False" AutomationProperties.Name="Copy">
                                 <StackPanel Orientation="Horizontal">
                                     <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCopy}" />
