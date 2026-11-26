@@ -90,14 +90,15 @@
                 <RadioButton x:Name="AllInOneMode" GroupName="CaptureKind" Style="{StaticResource RailButton}" Content="All-in-One" Tag="{StaticResource IconAllInOne}"
                              IsEnabled="False" ToolTip="All-in-One — Not available yet" AutomationProperties.Name="All-in-One (Not available yet)" />
                 <RadioButton x:Name="ImageMode" GroupName="CaptureKind" Style="{StaticResource RailButton}" Content="Image" Tag="{StaticResource IconImageMode}"
-                             IsChecked="True" ToolTip="Image capture" AutomationProperties.Name="Image" />
+                             IsChecked="True" ToolTip="Image capture" AutomationProperties.Name="Image" Checked="OnKindChanged" />
                 <RadioButton x:Name="VideoMode" GroupName="CaptureKind" Style="{StaticResource RailButton}" Content="Video" Tag="{StaticResource IconVideoMode}"
-                             IsEnabled="False" ToolTip="Video recording — Not available yet" AutomationProperties.Name="Video (Not available yet)" />
+                             ToolTip="Screen recording (MP4)" AutomationProperties.Name="Video" Checked="OnKindChanged" />
             </StackPanel>
 
             <!-- Settings card -->
             <Border Grid.Column="1" Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="6,0,10,0">
                 <Grid>
+                <Grid x:Name="ImageOptions">
                     <Grid.ColumnDefinitions>
                         <ColumnDefinition Width="Auto" />
                         <ColumnDefinition Width="170" />
@@ -155,6 +156,63 @@
                         </DockPanel>
                     </StackPanel>
                 </Grid>
+
+                <!-- Video options (milestone V1) -->
+                <Grid x:Name="VideoOptions" Visibility="Collapsed">
+                    <Grid.ColumnDefinitions>
+                        <ColumnDefinition Width="Auto" />
+                        <ColumnDefinition Width="170" />
+                        <ColumnDefinition Width="22" />
+                        <ColumnDefinition Width="*" />
+                    </Grid.ColumnDefinitions>
+                    <Grid.RowDefinitions>
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="Auto" />
+                        <RowDefinition Height="*" />
+                    </Grid.RowDefinitions>
+
+                    <Label Grid.Row="0" Content="_Record:" Target="{Binding ElementName=VideoSourceButton}" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Padding="0,0,10,0" />
+                    <Button x:Name="VideoSourceButton" Grid.Row="0" Grid.Column="1" Style="{StaticResource DropdownButton}" Margin="0,3" Click="OnVideoSourceMenu"
+                            AutomationProperties.Name="Record" ToolTip="What to record">
+                        <DockPanel>
+                            <Path DockPanel.Dock="Right" Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="14" Height="14" Stretch="Uniform" />
+                            <TextBlock x:Name="VideoSourceText" Text="Region" VerticalAlignment="Center" />
+                        </DockPanel>
+                    </Button>
+
+                    <Label Grid.Row="1" Content="_Frame rate:" Target="{Binding ElementName=FrameRateButton}" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Padding="0,0,10,0" />
+                    <Button x:Name="FrameRateButton" Grid.Row="1" Grid.Column="1" Style="{StaticResource DropdownButton}" Margin="0,3" Click="OnFrameRateMenu"
+                            AutomationProperties.Name="Frame rate" ToolTip="Frames per second">
+                        <DockPanel>
+                            <Path DockPanel.Dock="Right" Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="14" Height="14" Stretch="Uniform" />
+                            <TextBlock x:Name="FrameRateText" Text="30 FPS" VerticalAlignment="Center" />
+                        </DockPanel>
+                    </Button>
+
+                    <Label Grid.Row="2" Content="_Quality:" Target="{Binding ElementName=QualityButton}" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Padding="0,0,10,0" />
+                    <Button x:Name="QualityButton" Grid.Row="2" Grid.Column="1" Style="{StaticResource DropdownButton}" Margin="0,3" Click="OnQualityMenu"
+                            AutomationProperties.Name="Quality" ToolTip="MP4 (H.264 + AAC) quality">
+                        <DockPanel>
+                            <Path DockPanel.Dock="Right" Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="14" Height="14" Stretch="Uniform" />
+                            <TextBlock x:Name="QualityText" Text="Standard" VerticalAlignment="Center" />
+                        </DockPanel>
+                    </Button>
+
+                    <StackPanel Grid.Column="3" Grid.RowSpan="4" VerticalAlignment="Top">
+                        <CheckBox x:Name="SystemAudioBox" Content="System audio" Click="OnVideoOptionChanged" Margin="0,1" ToolTip="Record the sound your PC plays" />
+                        <CheckBox x:Name="MicBox" Content="Microphone" Click="OnVideoOptionChanged" Margin="0,1" ToolTip="Record your microphone (choose the device in Settings → Recording)" />
+                        <CheckBox x:Name="VideoCursorBox" Content="Cursor" Click="OnVideoOptionChanged" Margin="0,1" ToolTip="Show the mouse pointer in the recording" />
+                        <DockPanel Margin="0,1">
+                            <Button x:Name="CountdownMenuButton" DockPanel.Dock="Right" Click="OnCountdownMenu" Padding="4,2" Margin="2,0,0,0"
+                                    AutomationProperties.Name="Choose countdown" ToolTip="Choose the countdown">
+                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronRight}" Width="14" Height="14" Stretch="Uniform" />
+                            </Button>
+                            <CheckBox x:Name="CountdownBox" Content="Countdown" Click="OnVideoOptionChanged" AutomationProperties.Name="Countdown" />
+                        </DockPanel>
+                    </StackPanel>
+                </Grid>
+                </Grid>
             </Border>
 
             <!-- Capture -->
@@ -166,7 +224,7 @@
                 <StackPanel VerticalAlignment="Center" Margin="0,4,0,0">
                     <Button x:Name="CaptureButton" Style="{StaticResource RoundCaptureButton}" Width="96" Height="96" Click="OnCapture"
                             IsDefault="True" AutomationProperties.Name="Capture">
-                        <TextBlock Text="Capture" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource AccentForegroundBrush}" />
+                        <TextBlock x:Name="CaptureButtonText" Text="Capture" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource AccentForegroundBrush}" />
                     </Button>
                     <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
                         <Path x:Name="HotkeyWarningIcon" Style="{StaticResource IconPath}" Data="{StaticResource IconWarning}" Width="14" Height="14" Stretch="Uniform"

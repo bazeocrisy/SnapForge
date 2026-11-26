@@ -111,7 +111,7 @@ public partial class App : Application
         }
 
         // The library is indexed after the window is up, so start-up time does not grow with the library size.
-        _ = services.StartIndexingAsync();
+        _ = services.StartIndexingAsync().ContinueWith(_ => RecoverInterruptedRecordings(services), TaskScheduler.Default);
 
         _shell = new ShellIntegration();
         _shell.ShowIcon(ProductInfo.Name);
@@ -122,6 +122,7 @@ public partial class App : Application
         RegisterHotkeys(notifyOnFailure: true);
         services.SettingsChanged += (_, _) => Current.Dispatcher.BeginInvoke(() => ApplyWidget(services));
         ApplyWidget(services);
+        Video.RecordingController.ActiveChanged += (_, _) => _widget?.UpdateRecordButton();
         if (_widget is not null && !services.Settings.WidgetIntroShown)
         {
             // First start with the widget: open it briefly so the user sees where it lives.
@@ -203,6 +204,7 @@ public partial class App : Application
 
     protected override void OnExit(ExitEventArgs e)
     {
+        Video.RecordingController.StopForExit();
         _widget?.Close();
         _widget = null;
         try
@@ -334,6 +336,51 @@ public partial class App : Application
         _widget?.Peek(TimeSpan.FromSeconds(5));
     }
 
+    /// <summary>
+    /// Start-up recovery of recordings interrupted by a crash, forced close or power loss (VID-R04). Runs after the
+    /// Library is indexed, on the library writer; results are reported in a notification.
+    /// </summary>
+    private static async Task RecoverInterruptedRecordings(AppServices services)
+    {
+        if (services.Library.InterruptedRecordings().Count == 0)
+        {
+            return;
+        }
+
+        _ = Video.Interop.Mf.MFStartup(Video.Interop.Mf.MF_VERSION, 0);
+        IReadOnlyList<Video.RecoveryOutcome> outcomes = await services.Writer.RunAsync(() => Video.RecordingRecovery.RecoverAll(services.Library)).ConfigureAwait(false);
+        if (outcomes.Count > 0)
+        {
+            string text = string.Join("\n", outcomes.Select(o => o.Message));
+            await Current.Dispatcher.BeginInvoke(() => NotifyBalloon("SnapForge: interrupted recording", text, warning: outcomes.Any(o => !o.Recovered)));
+        }
+    }
+
+    /// <summary>Opens a recording from the Library in the player (one window per video).</summary>
+    internal static void ShowVideo(Guid id)
+    {
+        if (AppServices.Current is not { } services || services.Library.Find(id) is not { IsVideo: true } record)
+        {
+            return;
+        }
+
+        if (record.Damage is { } damage)
+        {
+            MessageBox.Show($"This recording cannot be played: {damage}", ProductInfo.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
+        Video.VideoPlayerWindow? open = Current.Windows.OfType<Video.VideoPlayerWindow>().FirstOrDefault(w => w.Record.Id == id);
+        if (open is not null)
+        {
+            open.Activate();
+            return;
+        }
+
+        new Video.VideoPlayerWindow(record, services.Library.VideoPath(id)).Show();
+        services.Library.MarkOpened(id, DateTime.UtcNow);
+    }
+
     internal static void ShowCaptureWindow()
     {
         if (AppServices.Current is not { } services)
@@ -441,6 +488,9 @@ public partial class App : Application
             ("Capture", s.CaptureHotkey, () => _ = CaptureWithOptionsAsync(AppServices.Current!.Settings.Capture)),
         };
         list.Add(("Show capture panel", s.ShowPanelHotkey, ToggleCaptureWindow));
+        list.Add(("Start/stop recording", s.Video.StartStopHotkey, Video.RecordingController.ToggleFromHotkey));
+        list.Add(("Pause/resume recording", s.Video.PauseResumeHotkey, Video.RecordingController.TogglePause));
+        list.Add(("Cancel recording", s.Video.CancelHotkey, Video.RecordingController.Cancel));
         foreach (CapturePreset preset in s.Presets)
         {
             CaptureOptions options = preset.Options;

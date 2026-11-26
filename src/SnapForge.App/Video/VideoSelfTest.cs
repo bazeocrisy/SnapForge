@@ -64,7 +64,7 @@ internal static partial class VideoSelfTest
         {
             string path = Path.Combine(dir, "sample-sync-640x360-30fps.mp4");
             (RecordingResult r, SyncReport sync) = RecordSynthetic(path, 640, 360, 30, TimeSpan.FromSeconds(12), pauseAt: null);
-            report["sync"] = new { result = Summary(r), sync = SyncSummary(sync) };
+            report["sync"] = new { result = Summary(r), sync = SyncSummary(sync), diagnostics = LastDiagnostics, decodedFlashesMs = sync.FlashesMs.Select(f => Math.Round(f, 1)), decodedBeepsMs = sync.BeepsMs.Select(b => Math.Round(b, 1)), frames = VideoAnalysis.FrameTimeline(path, 0, 75) };
             Check("av-sync", sync.OffsetsMs.Count >= 10 && sync.MaxAbsOffsetMs <= 45, $"{sync.OffsetsMs.Count} flash/beep pairs, mean {sync.MeanOffsetMs} ms, max |offset| {sync.MaxAbsOffsetMs} ms, drift {sync.DriftMsPerMinute} ms/min");
             Check("constant-frame-rate", Math.Abs(sync.VideoFrames - (r.DurationMs * 30 / 1000.0)) <= 2, $"{sync.VideoFrames} frames for {r.DurationMs} ms");
             Check("fragmented-mp4", Mp4Inspector.Inspect(path) is { IsComplete: true, IsFragmented: true } s1 && s1.CompleteFragments >= 5, Mp4Inspector.Inspect(path).CompleteFragments + " fragments");
@@ -174,8 +174,12 @@ internal static partial class VideoSelfTest
     }
 
     /// <summary>Records the synthetic flash/beep sources, optionally pausing, then measures sync from the file.</summary>
+    /// <summary>Diagnostics of the last synthetic recording: where flash frames were produced and placed.</summary>
+    internal static object? LastDiagnostics { get; private set; }
+
     internal static (RecordingResult Result, SyncReport Sync) RecordSynthetic(string path, int w, int h, int fps, TimeSpan length, (TimeSpan At, TimeSpan For)? pauseAt)
     {
+        var placed = new List<(long Source, long Media)>();
         const long flashEvery = 10_000_000; // 1 s
         var video = new SyntheticFrameSource(w, h, fps, flashEvery);
         var audio = new SyntheticAudioSource(() => video.StartTime, flashEvery);
@@ -183,6 +187,13 @@ internal static partial class VideoSelfTest
         using (ScreenRecorder rec = ScreenRecorder.Create(video, [audio], Options(fps) with { RecordSystemAudio = true }, path))
         {
             // The synthetic source is named differently from the system/mic names: enable it explicitly.
+            rec.FrameScheduled = (source, media) =>
+            {
+                lock (placed)
+                {
+                    placed.Add((source, media));
+                }
+            };
             rec.Start();
             audio.Enabled = true;
             var sw = Stopwatch.StartNew();
@@ -196,6 +207,17 @@ internal static partial class VideoSelfTest
 
             Thread.Sleep(length - sw.Elapsed);
             result = rec.Stop();
+            long clockStart = rec.ClockStart;
+            long videoStart = video.StartTime;
+            var flashSet = video.FlashTimes.ToHashSet();
+            LastDiagnostics = new
+            {
+                clockStartMinusVideoStartMs = (clockStart - videoStart) / 10_000.0,
+                producedFlashesMs = video.FlashTimes.Select(f => Math.Round((f - videoStart) / 10_000.0, 1)),
+                placedFlashesMediaMs = placed.Where(p => flashSet.Contains(p.Source)).Select(p => new { sourceMs = Math.Round((p.Source - clockStart) / 10_000.0, 1), placedMs = Math.Round(p.Media / 10_000.0, 1) }),
+                firstFramesPlaced = placed.Take(12).Select(p => new { sourceMs = Math.Round((p.Source - clockStart) / 10_000.0, 1), placedMs = Math.Round(p.Media / 10_000.0, 1) }),
+                framesPlaced = placed.Count,
+            };
         }
 
         return (result, VideoAnalysis.MeasureSync(path, 1000));

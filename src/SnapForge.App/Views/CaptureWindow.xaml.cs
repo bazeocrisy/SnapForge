@@ -75,9 +75,11 @@ public partial class CaptureWindow : Window
         Topmost = _services.Settings.CapturePanelTopmost;
         DelayBox.IsChecked = o.DelaySeconds > 0;
         DelayBox.Content = o.DelaySeconds > 0 ? $"Time Delay ({o.DelaySeconds} s)" : "Time Delay";
+        LoadVideoOptions();
 
-        HotkeyRegistration? reg = App.HotkeyResults.FirstOrDefault(r => r.Action == "Capture");
-        if (_services.Settings.CaptureHotkey is not { } hk)
+        string action = IsVideoMode ? "Start/stop recording" : "Capture";
+        HotkeyRegistration? reg = App.HotkeyResults.FirstOrDefault(r => r.Action == action);
+        if ((IsVideoMode ? _services.Settings.Video.StartStopHotkey : _services.Settings.CaptureHotkey) is not { } hk)
         {
             HotkeyText.Text = "No hotkey";
             HotkeyText.ToolTip = "Set a global capture hotkey in Settings → Hotkeys.";
@@ -235,7 +237,114 @@ public partial class CaptureWindow : Window
 
     private void OnUndoReset(object sender, RoutedEventArgs e) => UndoReset();
 
-    private void OnCapture(object sender, RoutedEventArgs e) => _ = App.CaptureWithOptionsAsync(_services.Settings.Capture);
+    private void OnCapture(object sender, RoutedEventArgs e)
+    {
+        if (IsVideoMode)
+        {
+            _ = Video.RecordingController.StartAsync();
+        }
+        else
+        {
+            _ = App.CaptureWithOptionsAsync(_services.Settings.Capture);
+        }
+    }
+
+    // ---------------------------------------------------------------- video mode (milestone V1)
+
+    internal bool IsVideoMode => VideoMode.IsChecked == true;
+
+    internal static string SourceLabel(RecordingSource source) => source switch
+    {
+        RecordingSource.Window => "Window",
+        RecordingSource.Display => "Display",
+        _ => "Region",
+    };
+
+    private void OnKindChanged(object sender, RoutedEventArgs e)
+    {
+        if (ImageOptions is null || VideoOptions is null)
+        {
+            return; // during InitializeComponent
+        }
+
+        bool video = IsVideoMode;
+        ImageOptions.Visibility = video ? Visibility.Collapsed : Visibility.Visible;
+        VideoOptions.Visibility = video ? Visibility.Visible : Visibility.Collapsed;
+        CaptureButtonText.Text = video ? "Record" : "Capture";
+        CaptureButton.SetValue(System.Windows.Automation.AutomationProperties.NameProperty, video ? "Record" : "Capture");
+        LoadFromSettings();
+    }
+
+    private void LoadVideoOptions()
+    {
+        VideoSettings v = _services.Settings.Video;
+        VideoSourceText.Text = SourceLabel(v.Source);
+        FrameRateText.Text = $"{v.FramesPerSecond} FPS";
+        QualityText.Text = v.Quality == VideoQuality.High ? "High" : "Standard";
+        SystemAudioBox.IsChecked = v.RecordSystemAudio;
+        MicBox.IsChecked = v.RecordMicrophone;
+        VideoCursorBox.IsChecked = v.CaptureCursor;
+        CountdownBox.IsChecked = v.Countdown;
+        CountdownBox.Content = v.Countdown && v.CountdownSeconds > 0 ? $"Countdown ({v.CountdownSeconds} s)" : "Countdown";
+    }
+
+    private void UpdateVideo(Func<VideoSettings, VideoSettings> change) =>
+        _services.UpdateSettings(s => s with { Video = change(s.Video).Normalized() });
+
+    private void OnVideoOptionChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        UpdateVideo(v => v with
+        {
+            RecordSystemAudio = SystemAudioBox.IsChecked == true,
+            RecordMicrophone = MicBox.IsChecked == true,
+            CaptureCursor = VideoCursorBox.IsChecked == true,
+            Countdown = CountdownBox.IsChecked == true,
+        });
+    }
+
+    private static void ShowChoiceMenu<T>(FrameworkElement target, IEnumerable<(T Value, string Label)> choices, T current, Action<T> choose, System.Windows.Controls.Primitives.PlacementMode placement = System.Windows.Controls.Primitives.PlacementMode.Bottom)
+    {
+        var menu = new ContextMenu { PlacementTarget = target, Placement = placement };
+        foreach ((T value, string label) in choices)
+        {
+            var item = new MenuItem { Header = label, IsCheckable = true, IsChecked = EqualityComparer<T>.Default.Equals(value, current) };
+            item.Click += (_, _) => choose(value);
+            menu.Items.Add(item);
+        }
+
+        target.ContextMenu = menu;
+        menu.IsOpen = true;
+    }
+
+    private void OnVideoSourceMenu(object sender, RoutedEventArgs e) => ShowChoiceMenu(
+        VideoSourceButton,
+        [(RecordingSource.Region, "Region"), (RecordingSource.Window, "Window"), (RecordingSource.Display, "Display")],
+        _services.Settings.Video.Source,
+        source => UpdateVideo(v => v with { Source = source }));
+
+    private void OnFrameRateMenu(object sender, RoutedEventArgs e) => ShowChoiceMenu(
+        FrameRateButton,
+        VideoSettings.SupportedFrameRates.Select(f => (f, $"{f} FPS")),
+        _services.Settings.Video.FramesPerSecond,
+        fps => UpdateVideo(v => v with { FramesPerSecond = fps }));
+
+    private void OnQualityMenu(object sender, RoutedEventArgs e) => ShowChoiceMenu(
+        QualityButton,
+        [(VideoQuality.Standard, "Standard (smaller files)"), (VideoQuality.High, "High (sharper, larger files)")],
+        _services.Settings.Video.Quality,
+        q => UpdateVideo(v => v with { Quality = q }));
+
+    private void OnCountdownMenu(object sender, RoutedEventArgs e) => ShowChoiceMenu(
+        CountdownMenuButton,
+        VideoSettings.CountdownChoices.Select(c => (c, c == 0 ? "No countdown" : $"{c} seconds")),
+        _services.Settings.Video.Countdown ? _services.Settings.Video.CountdownSeconds : 0,
+        c => UpdateVideo(v => v with { Countdown = c > 0, CountdownSeconds = c > 0 ? c : v.CountdownSeconds }),
+        System.Windows.Controls.Primitives.PlacementMode.Right);
 
     private void OnPresetsMenu(object sender, RoutedEventArgs e)
     {
@@ -344,10 +453,10 @@ public partial class CaptureWindow : Window
 
     private void OnToggleWidget(object sender, RoutedEventArgs e) => App.ShowWidget();
 
-    /// <summary>Menu ticks always reflect the current settings when the menu opens.</summary>
     /// <summary>The services (settings, library) this panel was created with.</summary>
     internal AppServices Services => _services;
 
+    /// <summary>Menu ticks always reflect the current settings when the menu opens.</summary>
     internal void OnViewMenuOpened(object sender, RoutedEventArgs e) => TopmostMenu.IsChecked = _services.Settings.CapturePanelTopmost;
 
     private void OnToggleTopmost(object sender, RoutedEventArgs e) =>

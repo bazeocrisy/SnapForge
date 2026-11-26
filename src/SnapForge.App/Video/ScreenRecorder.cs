@@ -175,6 +175,12 @@ internal sealed unsafe class ScreenRecorder : IDisposable
 
     public string? EncoderName => _writer?.Encoder?.Name;
 
+    /// <summary>QPC time (100 ns) at which the recording clock started (diagnostics).</summary>
+    public long ClockStart => _wallStart;
+
+    /// <summary>Diagnostics: called on the capture thread for each new frame with (source time, media time it was placed at).</summary>
+    internal Action<long, long>? FrameScheduled { get; set; }
+
     /// <summary>
     /// Creates the recorder (refusing a second simultaneous recording) and opens the MP4 writer, falling back to the
     /// software encoder if the hardware path cannot start (VID-R02, VID-R03).
@@ -442,6 +448,7 @@ internal sealed unsafe class ScreenRecorder : IDisposable
 
                     if (slot > lastSlot)
                     {
+                        FrameScheduled?.Invoke(sourceTime, slot * period);
                         Release(ref last);
                         last = buffer;
                         last!.AddRef();

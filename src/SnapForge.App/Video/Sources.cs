@@ -258,6 +258,9 @@ internal sealed unsafe class SyntheticFrameSource(int width, int height, int fps
 
     public long StartTime => _start;
 
+    /// <summary>Source times of the flash frames produced (diagnostics).</summary>
+    public List<long> FlashTimes { get; } = [];
+
     public void Start() => _start = Qpc.Now100ns();
 
     public FramePoll Poll(byte* destination, int stride, out long sourceTime100ns)
@@ -274,6 +277,10 @@ internal sealed unsafe class SyntheticFrameSource(int width, int height, int fps
         _lastFrame = index;
         long t = sourceTime100ns - _start;
         bool flash = flashEvery100ns > 0 && t % flashEvery100ns < period;
+        if (flash)
+        {
+            FlashTimes.Add(sourceTime100ns);
+        }
         for (int y = 0; y < Height; y++)
         {
             uint* row = (uint*)(destination + ((long)y * stride));

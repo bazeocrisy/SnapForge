@@ -224,6 +224,20 @@ public partial class CaptureWidget : Window
         _ = App.CaptureWithOptionsAsync(_services.Settings.Capture);
     }
 
+    private void OnRecord(object sender, RoutedEventArgs e)
+    {
+        Collapse();
+        Video.RecordingController.ToggleFromHotkey();
+    }
+
+    /// <summary>The Record button becomes Stop while a recording runs.</summary>
+    internal void UpdateRecordButton()
+    {
+        bool active = Video.RecordingController.IsActive;
+        RecordLabel.Text = active ? "Stop" : "Record";
+        RecordButton.SetValue(System.Windows.Automation.AutomationProperties.NameProperty, active ? "Stop recording" : "Record");
+    }
+
     private void OnEditor(object sender, RoutedEventArgs e)
     {
         Collapse();

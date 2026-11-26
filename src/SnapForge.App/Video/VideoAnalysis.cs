@@ -125,6 +125,33 @@ internal static unsafe class VideoAnalysis
         return new SyncReport(flashes, beeps, offsets, Math.Round(mean, 2), Math.Round(max, 2), Math.Round(drift, 3), frames, lastVideo, lastAudio);
     }
 
+    /// <summary>Timestamps and mean brightness of decoded frames [from, to) (diagnostics).</summary>
+    public static IReadOnlyList<string> FrameTimeline(string path, int from, int to)
+    {
+        var list = new List<string>();
+        nint reader = OpenDecoding(path, video: true, audio: false);
+        try
+        {
+            int i = 0;
+            while (i < to && Mf.ReadSample(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, out long ts, out nint sample) && sample != 0)
+            {
+                if (i >= from)
+                {
+                    list.Add($"{i}:{ts / 10_000.0:0.0}ms:{MeanLuma(sample):0}");
+                }
+
+                Com.Release(ref sample);
+                i++;
+            }
+        }
+        finally
+        {
+            Com.Release(ref reader);
+        }
+
+        return list;
+    }
+
     /// <summary>A decoded frame near <paramref name="atMs"/> as a BGRA buffer (thumbnail of recovered recordings).</summary>
     public static PixelBuffer? DecodeFrame(string path, double atMs = 0)
     {

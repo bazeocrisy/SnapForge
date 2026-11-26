@@ -50,6 +50,13 @@
                         <TextBlock x:Name="CaptureLabel" Text="Capture" Margin="6,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" />
                     </StackPanel>
                 </Button>
+                <Button x:Name="RecordButton" Click="OnRecord" Focusable="False" Padding="8,4" Margin="2"
+                        AutomationProperties.Name="Record" ToolTip="Record the screen (MP4) with the current video settings">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconVideoMode}" Width="18" Height="18" Stretch="Uniform" />
+                        <TextBlock x:Name="RecordLabel" Text="Record" Margin="6,0,0,0" VerticalAlignment="Center" />
+                    </StackPanel>
+                </Button>
                 <Button x:Name="EditorButton" Click="OnEditor" Focusable="False" Padding="6,4" Margin="2" AutomationProperties.Name="Editor" ToolTip="Open the Editor">
                     <Path Style="{StaticResource IconPath}" Data="{StaticResource IconEditor}" Width="18" Height="18" Stretch="Uniform" />
                 </Button>
