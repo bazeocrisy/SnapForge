@@ -9,6 +9,9 @@ the privacy model from "nothing persists unless exported" to "captures persist l
 | Data | Location | Created when | Removed when |
 |---|---|---|---|
 | Editable captures (base pixels, annotations, metadata, thumbnail) | `%LOCALAPPDATA%\SnapForge\Library\captures\<id>\` (or the folder chosen in Settings) | Every capture, unless **Save to Library** is off | Delete permanently / Empty Trash / retention |
+| Screen recordings (MP4 + thumbnail + metadata) | `<Library>\videos\<id>\` ([format](LIBRARY-VIDEO-FORMAT.md)) | Every recording (Save to Library on) | Delete permanently / Empty Trash (the MP4 is deleted, not overwritten) |
+| Recording in progress (fragmented MP4 + marker) | `<Library>\videos\<id>\recording.mp4` | While recording | Converted to `video.mp4` on stop; recovered at the next start after a crash |
+| Video drag copies (MP4) | `%LOCALAPPDATA%\SnapForge\Temp\Drag\…` | Only when a drop target asks for files | As for image drag copies |
 | Recent tray layout | `<Library>\tray.json` | Tray changes | Never contains pixels |
 | Settings (options, presets, hotkeys, quick styles, library path) | `%LOCALAPPDATA%\SnapForge\settings.json` | Settings changes | Uninstall/delete folder |
 | Crash logs (exception text + OS version, **no image data**) | `%LOCALAPPDATA%\SnapForge\logs\` | Unexpected error | Manually |
@@ -77,3 +80,7 @@ Full pipeline review: [REDACTION.md](REDACTION.md).
   the notification-area menu, the capture panel and the main window.
 * WPF keeps its own copies of on-screen bitmaps in unmanaged memory; a memory dump of the running process could
   contain screen content.
+* **Screen recordings** (Milestone V1): anything visible or audible while recording is in the MP4 — videos cannot be
+  redacted or sanitized. Windows' capture border stays visible and the microphone (Windows privacy indicator) is only
+  opened when Microphone is on. Recordings stay in the local Library; deleting one removes the MP4 without
+  overwriting it. Full analysis: [VIDEO-THREAT-MODEL.md](VIDEO-THREAT-MODEL.md).

@@ -26,6 +26,18 @@ Three workspaces modelled on a familiar capture/edit/organize workflow (see [com
   Trash; search, sort, date groups, adjustable thumbnails, multi-select, rename, duplicate, export, sanitize;
   backup/restore, retention, storage usage, movable location ([format](docs/CAPTURE-FORMAT.md)).
 
+### Screen recording (Milestone V1 — feature branch, under review)
+
+* **Video mode** in the capture panel and a **Record** button on the widget: record a region, a window or a display
+  to **MP4** (H.264 + AAC) with the encoders built into Windows; 30 FPS (60 optional), Standard / High quality.
+* **Audio**: system sound (on by default) and microphone (off by default), toggled live with level meters.
+* **Floating toolbar**: elapsed time, Pause/Resume, Stop and save, Cancel and discard; it and the dashed outline are
+  kept out of the recording. Countdown before recording; cursor on/off; hotkeys **Shift+F9** record/pause/resume,
+  **Shift+F10** stop.
+* **Library**: videos with play badge, duration and size; Videos view; player; rename, tags, favourites, folders,
+  search, Trash; export or drag out as MP4. Interrupted recordings are recovered at the next start.
+* Videos cannot be redacted. Details: [video plan](docs/VIDEO-PLAN.md), [acceptance and known limitations](docs/VIDEO-ACCEPTANCE.md).
+
 ### Capture and annotation (MVP)
 
 * **Capture**: full screen (all displays), region (can span monitors), window, single display.
@@ -73,6 +85,7 @@ The Windows projects compile on Linux/macOS (`EnableWindowsTargeting`) but run o
 
 ## Documentation
 
+* **Milestone V1 screen recording (branch `claude/video-v1`, awaiting independent review):** [handoff](docs/V1-HANDOFF.md) · [plan and decisions](docs/VIDEO-PLAN.md) · [architecture and API research](docs/VIDEO-ARCHITECTURE.md) · [threat model](docs/VIDEO-THREAT-MODEL.md) · [Library video format](docs/LIBRARY-VIDEO-FORMAT.md) · [benchmarks](docs/VIDEO-BENCHMARKS.md) · [test results](docs/VIDEO-TEST-RESULTS.md) · [acceptance and known limitations](docs/VIDEO-ACCEPTANCE.md)
 * **Milestone 3 handoff (awaiting independent review):** [handoff](docs/MILESTONE-3-HANDOFF.md) · [benchmarks](docs/BENCHMARKS.md)
 * **Milestone 3 planning:** [forensic audit](docs/SNAGIT-FORENSIC-AUDIT.md) · [feature parity matrix](docs/FEATURE-PARITY-MATRIX.md) · [master requirements](docs/PRODUCT-REQUIREMENTS.md) · [UI specification](docs/UI-SPECIFICATION.md) · [roadmap](docs/DEVELOPMENT-ROADMAP.md) · [source registry](docs/SOURCE-REGISTRY.md)
 * [Architecture and decisions](docs/ARCHITECTURE.md)
