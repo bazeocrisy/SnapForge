@@ -227,6 +227,7 @@ internal sealed class RecordingToolbar : Window
     private static Button MakeButton(string text, string tooltip, RoutedEventHandler click)
     {
         var b = new Button { Content = text, ToolTip = tooltip, Margin = new Thickness(2, 0, 2, 0), Padding = new Thickness(10, 3, 10, 3), Focusable = false };
+        b.SetResourceReference(StyleProperty, "ToolbarButton");
         AutomationProperties_SetName(b, tooltip);
         b.Click += click;
         return b;
@@ -244,9 +245,11 @@ internal sealed class RecordingToolbar : Window
             Focusable = false,
             ToolTip = available ? $"Record {name.ToLowerInvariant()} (click to turn off or on)" : "Audio was off when the recording started. Turn on system audio or the microphone before recording.",
         };
+        t.SetResourceReference(StyleProperty, "ToolbarToggle");
         AutomationProperties_SetName(t, name);
         t.Click += (_, _) => changed(t.IsChecked == true);
-        var level = new ProgressBar { Width = 44, Height = 6, Minimum = 0, Maximum = 100, Margin = new Thickness(0, 2, 6, 0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+        var level = new ProgressBar { Width = 44, Height = 6, Minimum = 0, Maximum = 100, Margin = new Thickness(4, 2, 6, 0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+        level.SetResourceReference(StyleProperty, "LevelMeter");
         AutomationProperties_SetName(level, name + " level");
         return (t, level);
     }

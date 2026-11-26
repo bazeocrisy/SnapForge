@@ -16,9 +16,6 @@ public partial class SettingsWindow
         RecordingSection.Children.Clear();
 
         // Microphone: "Windows default" follows the default device; listing devices does not open them.
-        var mic = new ComboBox { Margin = new Thickness(0, 2, 0, 6), MinWidth = 280, HorizontalAlignment = HorizontalAlignment.Left };
-        System.Windows.Automation.AutomationProperties.SetName(mic, "Microphone device");
-        mic.Items.Add(new ComboBoxItem { Content = "Windows default microphone", Tag = null });
         IReadOnlyList<CoreAudio.Endpoint> endpoints;
         try
         {
@@ -29,35 +26,53 @@ public partial class SettingsWindow
             endpoints = [];
         }
 
-        foreach (CoreAudio.Endpoint e in endpoints)
-        {
-            mic.Items.Add(new ComboBoxItem { Content = e.Name, Tag = e.Id });
-        }
-
+        var choices = new List<(string? Id, string Name)> { (null, "Windows default microphone") };
+        choices.AddRange(endpoints.Select(e => ((string?)e.Id, e.Name)));
         if (v.MicrophoneDeviceId is { } chosen && endpoints.All(e => e.Id != chosen))
         {
-            mic.Items.Add(new ComboBoxItem { Content = "Previously chosen microphone (not connected)", Tag = chosen });
+            choices.Add((chosen, "Previously chosen microphone (not connected)"));
         }
 
-        mic.SelectedItem = mic.Items.Cast<ComboBoxItem>().FirstOrDefault(i => (string?)i.Tag == v.MicrophoneDeviceId) ?? mic.Items[0];
-        mic.SelectionChanged += (_, _) =>
+        var micText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Text = choices.FirstOrDefault(c => c.Id == v.MicrophoneDeviceId).Name ?? choices[0].Name };
+        var mic = new Button { MinWidth = 280, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 2, 0, 8), HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        mic.SetResourceReference(StyleProperty, "DropdownButton");
+        var micPanel = new DockPanel();
+        var chevron = new System.Windows.Shapes.Path { Width = 14, Height = 14, Stretch = System.Windows.Media.Stretch.Uniform };
+        chevron.SetResourceReference(StyleProperty, "IconPath");
+        chevron.SetResourceReference(System.Windows.Shapes.Path.DataProperty, "IconChevronDown");
+        DockPanel.SetDock(chevron, Dock.Right);
+        micPanel.Children.Add(chevron);
+        micPanel.Children.Add(micText);
+        mic.Content = micPanel;
+        System.Windows.Automation.AutomationProperties.SetName(mic, "Microphone device: " + micText.Text);
+        mic.Click += (_, _) =>
         {
-            if (mic.SelectedItem is ComboBoxItem item)
+            var menu = new ContextMenu { PlacementTarget = mic, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+            foreach ((string? id, string name) in choices)
             {
-                _services.UpdateSettings(s => s with { Video = s.Video with { MicrophoneDeviceId = item.Tag as string } });
+                var item = new MenuItem { Header = name, IsCheckable = true, IsChecked = id == _services.Settings.Video.MicrophoneDeviceId };
+                item.Click += (_, _) =>
+                {
+                    _services.UpdateSettings(x => x with { Video = x.Video with { MicrophoneDeviceId = id } });
+                    micText.Text = name;
+                    System.Windows.Automation.AutomationProperties.SetName(mic, "Microphone device: " + name);
+                };
+                menu.Items.Add(item);
             }
+
+            mic.ContextMenu = menu;
+            menu.IsOpen = true;
         };
         RecordingSection.Children.Add(new TextBlock { Text = "Microphone (used when Microphone is on):", FontSize = 12 });
         RecordingSection.Children.Add(mic);
 
         AddHotkeyRow("Record / pause / resume:", v.RecordHotkey, g => _services.UpdateSettings(s => s with { Video = s.Video with { RecordHotkey = g } }));
         AddHotkeyRow("Stop recording:", v.StopHotkey, g => _services.UpdateSettings(s => s with { Video = s.Video with { StopHotkey = g } }));
+        AddHotkeyRow("Cancel recording:", v.CancelHotkey, g => _services.UpdateSettings(s => s with { Video = s.Video with { CancelHotkey = g } }));
 
         var keep = new CheckBox { Content = "Save recordings to the Library", IsChecked = v.SaveToLibrary, Margin = new Thickness(0, 6, 0, 2), ToolTip = "Off = recordings are saved only where you choose when you stop (no history is kept)." };
         keep.Click += (_, _) => _services.UpdateSettings(s => s with { Video = s.Video with { SaveToLibrary = keep.IsChecked == true } });
         RecordingSection.Children.Add(keep);
-        AddHotkeyRow("Cancel recording:", v.CancelHotkey, g => _services.UpdateSettings(s => s with { Video = s.Video with { CancelHotkey = g } }));
-
         var open = new CheckBox { Content = "Open the recording when it is saved", IsChecked = v.OpenAfterRecording, Margin = new Thickness(0, 6, 0, 2) };
         open.Click += (_, _) => _services.UpdateSettings(s => s with { Video = s.Video with { OpenAfterRecording = open.IsChecked == true } });
         RecordingSection.Children.Add(open);

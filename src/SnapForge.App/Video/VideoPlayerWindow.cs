@@ -57,6 +57,7 @@ internal sealed class VideoPlayerWindow : Window
         _media.MediaFailed += (_, e) => MessageBox.Show(this, "This video cannot be played: " + e.ErrorException?.Message, "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
 
         _play = new Button { Content = "Play", Width = 72, Margin = new Thickness(0, 0, 8, 0), Padding = new Thickness(6, 3, 6, 3) };
+        _play.SetResourceReference(StyleProperty, "ToolbarButton");
         System.Windows.Automation.AutomationProperties.SetName(_play, "Play");
         _play.Click += (_, _) => SetPlaying(!_playing);
         _seek = new Slider { Minimum = 0, VerticalAlignment = VerticalAlignment.Center, IsMoveToPointEnabled = true, SmallChange = 1, LargeChange = 5 };
@@ -77,6 +78,8 @@ internal sealed class VideoPlayerWindow : Window
         };
         _time = new TextBlock { VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 10, 0), FontFamily = new FontFamily("Consolas, Segoe UI") };
         var mute = new ToggleButton { Content = "Mute", Padding = new Thickness(6, 3, 6, 3), Margin = new Thickness(0, 0, 6, 0), IsEnabled = record.HasAudio };
+        mute.SetResourceReference(StyleProperty, "ToolbarToggle");
+        System.Windows.Automation.AutomationProperties.SetName(mute, "Mute");
         mute.Click += (_, _) => _media.IsMuted = mute.IsChecked == true;
         var volume = new Slider { Width = 90, Minimum = 0, Maximum = 1, Value = 0.8, VerticalAlignment = VerticalAlignment.Center, IsEnabled = record.HasAudio };
         System.Windows.Automation.AutomationProperties.SetName(volume, "Volume");
