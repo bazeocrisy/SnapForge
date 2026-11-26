@@ -334,8 +334,9 @@ public partial class App : Application
             return;
         }
 
-        if (_captureWindow is null || !_captureWindow.IsLoaded)
+        if (_captureWindow is null || !_captureWindow.IsLoaded || !ReferenceEquals(_captureWindow.Services, services))
         {
+            _captureWindow?.Close();
             _captureWindow = new CaptureWindow(services);
         }
 
