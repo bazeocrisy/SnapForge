@@ -66,6 +66,9 @@ public sealed record CaptureRecord
     /// <summary>True if the video was salvaged after the recording was interrupted (videos only).</summary>
     public bool Recovered { get; init; }
 
+    /// <summary>True if the video was kept as fragmented MP4 (could not be optimised; plays, but less widely).</summary>
+    public bool VideoFragmented { get; init; }
+
     public bool IsVideo => Kind == CaptureKind.Video;
 
     public string Title => Meta.Title;

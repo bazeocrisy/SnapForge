@@ -3,6 +3,7 @@ using System.IO;
 using System.Runtime.InteropServices;
 using System.Text.Json;
 using SnapForge.App.Video.Interop;
+using SnapForge.Core.Geometry;
 using SnapForge.Core.Library;
 using SnapForge.Core.Settings;
 using SnapForge.Core.Video;
@@ -111,12 +112,15 @@ internal static partial class VideoSelfTest
         {
             string path = Path.Combine(dir, "sample-sync-640x360-30fps.mp4");
             (RecordingResult r, SyncReport sync) = RecordSynthetic(path, 640, 360, 30, TimeSpan.FromSeconds(12), pauseAt: null);
-            report["storedTiming"] = StoredTiming(path);
+            report["storedTiming"] = StoredTiming(LastFragmentedPath!);
+            report["fragmentedFileSync"] = LastFragmentedSync is { } fs ? SyncSummary(fs) : null;
             report["sync"] = new { result = Summary(r), sync = SyncSummary(sync), diagnostics = LastDiagnostics, decodedFlashesMs = sync.FlashesMs.Select(f => Math.Round(f, 1)), decodedBeepsMs = sync.BeepsMs.Select(b => Math.Round(b, 1)), frames = VideoAnalysis.FrameTimeline(path, 0, 75) };
             Check("av-sync", sync.OffsetsMs.Count >= 10 && sync.MaxAbsOffsetMs <= 45, $"{sync.OffsetsMs.Count} flash/beep pairs, mean {sync.MeanOffsetMs} ms, max |offset| {sync.MaxAbsOffsetMs} ms, drift {sync.DriftMsPerMinute} ms/min");
             Check("constant-frame-rate", Math.Abs(sync.VideoFrames - (r.DurationMs * 30 / 1000.0)) <= 2, $"{sync.VideoFrames} frames for {r.DurationMs} ms");
             Check("timestamps-exact", sync.NonMonotonicTimestamps == 0 && Math.Abs(sync.FirstVideoMs) < 1, $"first decoded frame at {sync.FirstVideoMs} ms, {sync.NonMonotonicTimestamps} out-of-order timestamps");
-            Check("fragmented-mp4", Mp4Inspector.Inspect(path) is { IsComplete: true, IsFragmented: true } s1 && s1.CompleteFragments >= 5, Mp4Inspector.Inspect(path).CompleteFragments + " fragments");
+            Check("fragmented-recording", Mp4Inspector.Inspect(LastFragmentedPath!) is { IsComplete: true, IsFragmented: true } s1 && s1.CompleteFragments >= 5, Mp4Inspector.Inspect(LastFragmentedPath!).CompleteFragments + " fragments while recording");
+            Check("progressive-final", Mp4Inspector.Inspect(path) is { IsComplete: true, IsFragmented: false } s2 && s2.Boxes.Select(b => b.Type).SequenceEqual(["ftyp", "moov", "mdat"]), string.Join(" ", Mp4Inspector.Inspect(path).Boxes.Select(b => b.Type)));
+            File.Delete(LastFragmentedPath!);
         }
 #pragma warning disable CA1031
         catch (Exception ex)
@@ -135,6 +139,7 @@ internal static partial class VideoSelfTest
             Check("pause-resume-duration", Math.Abs(r.DurationMs - 8000) <= 200, $"{r.DurationMs} ms recorded of 11 s with a 3 s pause");
             Check("pause-resume-sync", sync.OffsetsMs.Count >= 6 && sync.MaxAbsOffsetMs <= 45, $"max |offset| {sync.MaxAbsOffsetMs} ms over {sync.OffsetsMs.Count} pairs");
             File.Delete(path);
+            File.Delete(LastFragmentedPath!);
         }
 #pragma warning disable CA1031
         catch (Exception ex)
@@ -151,7 +156,9 @@ internal static partial class VideoSelfTest
             (RecordingResult r, SyncReport sync) = RecordSynthetic(path, 1280, 720, 60, TimeSpan.FromSeconds(5), pauseAt: null);
             report["fps60"] = new { result = Summary(r), sync = SyncSummary(sync) };
             Check("60fps", sync.VideoFrames >= 280 && r.FramesDropped < 30, $"{sync.VideoFrames} frames, {r.FramesDropped} dropped, encoder {r.Encoder}");
+            Check("60fps-sync", sync.MaxAbsOffsetMs <= 45, $"max |offset| {sync.MaxAbsOffsetMs} ms over {sync.OffsetsMs.Count} pairs");
             File.Delete(path);
+            File.Delete(LastFragmentedPath!);
         }
 #pragma warning disable CA1031
         catch (Exception ex)
@@ -165,7 +172,7 @@ internal static partial class VideoSelfTest
         //    recording continues with a silent track.
         try
         {
-            string path = Path.Combine(dir, "sample-screen-30fps.mp4");
+            string path = Path.Combine(dir, "sample-screen-30fps.fragmented.mp4");
             var video = new ScreenFrameSource(MonitorFromPoint(0, 1), isWindow: false, crop: null, captureCursor: true);
             IAudioSource[] audio = [new WasapiSource(ScreenRecorder.AudioNames.System, loopback: true, null), new WasapiSource(ScreenRecorder.AudioNames.Microphone, loopback: false, null)];
             using ScreenRecorder rec = ScreenRecorder.Create(video, audio, Options(30), path);
@@ -187,6 +194,11 @@ internal static partial class VideoSelfTest
             rec.Start();
             ScreenActivity(TimeSpan.FromSeconds(5));
             RecordingResult r = rec.Stop();
+            string final = Path.Combine(dir, "sample-screen-30fps.mp4");
+            File.Delete(final);
+            Mp4Defragmenter.Convert(path, final);
+            File.Delete(path);
+            path = final;
             (long durationMs, int w, int h, bool hasAudio, int samples) = RecordingRecovery.Probe(path);
             report["screen"] = new { result = Summary(r), probe = new { durationMs, w, h, hasAudio, samples }, source = video.Description };
             Check("screen-recording", r.Finalized && samples >= 140 && hasAudio, $"{w}x{h}, {samples} frames ({r.FramesCaptured} captured, {r.FramesRepeated} repeated), {durationMs} ms, audio track {hasAudio}, devices: {string.Join("; ", r.Notices.DefaultIfEmpty("none reported"))}");
@@ -197,6 +209,21 @@ internal static partial class VideoSelfTest
         {
             report["screen"] = new { error = ex.ToString() };
             Check("screen-recording", false, ex.Message);
+        }
+
+        // 7. The toolbar and outline are not in the recording (owner rule), with a control run proving the check works.
+        try
+        {
+            (double excluded, double control) = (ToolbarAbsence(dir, exclude: true), ToolbarAbsence(dir, exclude: false));
+            report["toolbarExclusion"] = new { greenWhereToolbarIsWithExclusion = excluded, greenWhereToolbarIsWithoutExclusion = control };
+            Check("toolbar-not-recorded", excluded >= 0.98 && control < 0.6, $"toolbar area is {excluded:P1} background in the recording (control without exclusion: {control:P1})");
+        }
+#pragma warning disable CA1031
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            report["toolbarExclusion"] = new { error = ex.ToString() };
+            Check("toolbar-not-recorded", false, ex.Message);
         }
 
         // 6. Cancel discards the file.
@@ -222,18 +249,118 @@ internal static partial class VideoSelfTest
         return failures.Count == 0 ? 0 : 1;
     }
 
+    /// <summary>
+    /// Shows a solid green window with the recording toolbar and outline on top, records that area for 2 s through
+    /// Windows.Graphics.Capture, decodes a frame and returns the fraction of the toolbar's rectangle that shows the
+    /// green background (1.0 = toolbar absent from the recording).
+    /// </summary>
+    private static double ToolbarAbsence(string dir, bool exclude)
+    {
+        PixelRect? toolbarRect = null;
+        PixelRect area = default;
+        var ready = new ManualResetEventSlim();
+        var close = new ManualResetEventSlim();
+        var thread = new Thread(() =>
+        {
+            var green = new System.Windows.Window
+            {
+                WindowStyle = System.Windows.WindowStyle.None,
+                ResizeMode = System.Windows.ResizeMode.NoResize,
+                Background = System.Windows.Media.Brushes.Lime,
+                Left = 60,
+                Top = 60,
+                Width = 640,
+                Height = 360,
+                Topmost = true,
+                ShowInTaskbar = false,
+            };
+            green.Show();
+            area = SnapForge.App.Interop.PhysicalPlacement.GetBounds(green)!.Value;
+            var outline = new RecordingOutline(new PixelRect(area.X + 40, area.Y + 40, area.Width - 80, area.Height - 80), exclude);
+            outline.Show();
+            var bar = new RecordingToolbar("640×360 · 30 FPS", true, true, false, "Shift+F10", "Shift+F9", exclude);
+            bar.Show();
+            SnapForge.App.Interop.PhysicalPlacement.SetBounds(bar, new PixelRect(area.X + 100, area.Y + 150, 0, 0), resize: false);
+            bar.Update(TimeSpan.FromSeconds(83), false, 0.5f, 0);
+            bar.UpdateLayout();
+            toolbarRect = SnapForge.App.Interop.PhysicalPlacement.GetBounds(bar);
+            ready.Set();
+            var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
+            timer.Tick += (_, _) =>
+            {
+                if (close.IsSet)
+                {
+                    bar.Close();
+                    outline.Close();
+                    green.Close();
+                    System.Windows.Threading.Dispatcher.CurrentDispatcher.InvokeShutdown();
+                }
+            };
+            timer.Start();
+            System.Windows.Threading.Dispatcher.Run();
+        });
+        thread.SetApartmentState(ApartmentState.STA);
+        thread.IsBackground = true;
+        thread.Start();
+        ready.Wait(TimeSpan.FromSeconds(10));
+        Thread.Sleep(700);
+        string path = Path.Combine(dir, exclude ? "toolbar-excluded.mp4" : "toolbar-control.mp4");
+        try
+        {
+            nint monitor = MonitorFromPoint(PackPoint(area.X + 5, area.Y + 5), 2);
+            using (ScreenRecorder rec = ScreenRecorder.Create(new ScreenFrameSource(monitor, false, (area.X, area.Y, area.Width, area.Height), false), [], Options(30, audio: false), path))
+            {
+                rec.Start();
+                Thread.Sleep(2000);
+                rec.Stop();
+            }
+        }
+        finally
+        {
+            close.Set();
+            thread.Join(TimeSpan.FromSeconds(5));
+        }
+
+        Core.Imaging.PixelBuffer frame = VideoAnalysis.DecodeFrame(path, 1000) ?? throw new InvalidOperationException("No frame decoded.");
+        File.Delete(path);
+        PixelRect t = toolbarRect ?? throw new InvalidOperationException("Toolbar not placed.");
+        int x0 = t.X - area.X, y0 = t.Y - area.Y;
+        int total = 0, greenCount = 0;
+        for (int y = Math.Max(0, y0); y < Math.Min(frame.Height, y0 + t.Height); y += 2)
+        {
+            for (int x = Math.Max(0, x0); x < Math.Min(frame.Width, x0 + t.Width); x += 2)
+            {
+                int o = ((y * frame.Width) + x) * 4;
+                byte b = frame.Pixels[o], g = frame.Pixels[o + 1], r = frame.Pixels[o + 2];
+                total++;
+                if (g > 200 && r < 60 && b < 60)
+                {
+                    greenCount++;
+                }
+            }
+        }
+
+        return total == 0 ? 0 : Math.Round(greenCount / (double)total, 4);
+    }
+
+    private static long PackPoint(int x, int y) => ((long)y << 32) | (uint)x;
+
     /// <summary>Records the synthetic flash/beep sources, optionally pausing, then measures sync from the file.</summary>
     /// <summary>Diagnostics of the last synthetic recording: where flash frames were produced and placed.</summary>
     internal static object? LastDiagnostics { get; private set; }
 
+    /// <summary>Sync measured on the fragmented recording file, before conversion (diagnostics).</summary>
+    internal static SyncReport? LastFragmentedSync { get; private set; }
+
     internal static (RecordingResult Result, SyncReport Sync) RecordSynthetic(string path, int w, int h, int fps, TimeSpan length, (TimeSpan At, TimeSpan For)? pauseAt)
     {
         var placed = new List<(long Source, long Media)>();
+        string fragmented = Path.ChangeExtension(path, ".fragmented.mp4");
         const long flashEvery = 10_000_000; // 1 s
         var video = new SyntheticFrameSource(w, h, fps, flashEvery);
         var audio = new SyntheticAudioSource(() => video.StartTime, flashEvery);
         RecordingResult result;
-        using (ScreenRecorder rec = ScreenRecorder.Create(video, [audio], Options(fps) with { RecordSystemAudio = true }, path))
+        using (ScreenRecorder rec = ScreenRecorder.Create(video, [audio], Options(fps) with { RecordSystemAudio = true }, fragmented))
         {
             // The synthetic source is named differently from the system/mic names: enable it explicitly.
             rec.FrameScheduled = (source, media) =>
@@ -269,8 +396,15 @@ internal static partial class VideoSelfTest
             };
         }
 
+        // As in the app: the fragmented recording becomes the final progressive MP4; sync is measured on that.
+        LastFragmentedSync = VideoAnalysis.MeasureSync(fragmented, 1000);
+        File.Delete(path);
+        Mp4Defragmenter.Convert(fragmented, path);
+        LastFragmentedPath = fragmented;
         return (result, VideoAnalysis.MeasureSync(path, 1000));
     }
+
+    internal static string? LastFragmentedPath { get; private set; }
 
     private static int RecordUntilKilled(string libraryRoot, string readyFile)
     {
@@ -348,10 +482,16 @@ internal static partial class VideoSelfTest
                 }
 
                 RecordingResult r = rec.Stop();
-                object? sync = source == "synthetic" ? SyncSummary(VideoAnalysis.MeasureSync(path, 1000)) : null;
-                Mp4Structure s = Mp4Inspector.Inspect(path);
-                row = new { name, status = "measured", result = Summary(r), sync, valid = s.IsComplete, fragments = s.CompleteFragments, mbPerMinute = Math.Round(r.Bytes / 1048576.0 / (r.DurationMs / 60000.0), 1) };
+                int fragments = Mp4Inspector.Inspect(path).CompleteFragments;
+                string final = Path.ChangeExtension(path, ".final.mp4");
+                var conv = Stopwatch.StartNew();
+                Mp4Defragmenter.Convert(path, final);
+                long finalizeMs = conv.ElapsedMilliseconds;
+                object? sync = source == "synthetic" ? SyncSummary(VideoAnalysis.MeasureSync(final, 1000)) : null;
+                Mp4Structure s = Mp4Inspector.Inspect(final);
+                row = new { name, status = "measured", result = Summary(r), sync, valid = s.IsComplete && !s.IsFragmented, fragmentsWhileRecording = fragments, finalizeMs, mbPerMinute = Math.Round(r.Bytes / 1048576.0 / (r.DurationMs / 60000.0), 1) };
                 File.Delete(path);
+                File.Delete(final);
             }
         }
 #pragma warning disable CA1031

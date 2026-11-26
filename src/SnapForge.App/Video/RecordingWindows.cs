@@ -54,7 +54,7 @@ internal sealed class RecordingOutline : Window
 {
     private const int Gap = 4;
 
-    public RecordingOutline(PixelRect recorded)
+    public RecordingOutline(PixelRect recorded, bool excludeFromCapture = true)
     {
         WindowStyle = WindowStyle.None;
         AllowsTransparency = true;
@@ -74,7 +74,7 @@ internal sealed class RecordingOutline : Window
         SourceInitialized += (_, _) =>
         {
             CaptureExclusion.MakeClickThrough(this);
-            Excluded = CaptureExclusion.Apply(this);
+            Excluded = excludeFromCapture && CaptureExclusion.Apply(this);
             PhysicalPlacement.SetBounds(this, new PixelRect(recorded.X - Gap, recorded.Y - Gap, recorded.Width + (2 * Gap), recorded.Height + (2 * Gap)), resize: true);
         };
     }
@@ -99,7 +99,8 @@ internal sealed class RecordingToolbar : Window
     private readonly ProgressBar _micLevel;
     private bool _blink;
 
-    public RecordingToolbar(string format, bool audioTrack, bool system, bool mic, string? stopHotkey, string? pauseHotkey)
+    /// <param name="excludeFromCapture">Always true in the app; false only for documentation screenshots and the control half of the exclusion test.</param>
+    public RecordingToolbar(string format, bool audioTrack, bool system, bool mic, string? stopHotkey, string? pauseHotkey, bool excludeFromCapture = true)
     {
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -158,7 +159,7 @@ internal sealed class RecordingToolbar : Window
         SourceInitialized += (_, _) =>
         {
             CaptureExclusion.MakeNonActivating(this);
-            Excluded = CaptureExclusion.Apply(this);
+            Excluded = excludeFromCapture && CaptureExclusion.Apply(this);
         };
     }
 

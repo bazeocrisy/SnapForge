@@ -3,6 +3,7 @@ using System.Text.Json.Nodes;
 using SnapForge.Core.Imaging;
 using SnapForge.Core.Library;
 using SnapForge.Core.Storage;
+using SnapForge.Core.Video;
 
 namespace SnapForge.Core.Tests;
 
@@ -46,6 +47,29 @@ public class VideoLibraryTests
         Assert.Equal("Demo", r.Title);
         Assert.True(File.Exists(lib.VideoPath(v.Id)));
         Assert.Empty(lib.InterruptedRecordings());
+    }
+
+    [Fact]
+    public void Completing_a_fragmented_recording_stores_a_progressive_mp4_and_garbage_is_kept_as_is()
+    {
+        using var dir = new TestDirectory();
+        var lib = CaptureLibrary.Open(dir.Path);
+        (Guid id, string path) = lib.BeginVideo(Now);
+        Assert.Equal(CaptureLibrary.RecordingFile, Path.GetFileName(path));
+        File.WriteAllBytes(path, Mp4DefragmenterTests.SampleFragmentedFile());
+        CaptureRecord v = lib.CompleteVideo(id, Info, null, Now);
+        Assert.False(v.VideoFragmented);
+        Assert.False(File.Exists(path)); // recording.mp4 replaced by video.mp4
+        Mp4Structure s = Mp4Inspector.Inspect(lib.VideoPath(id));
+        Assert.Equal(["ftyp", "moov", "mdat"], s.Boxes.Select(b => b.Type));
+        Assert.Contains("\"layout\": \"progressive\"", File.ReadAllText(Path.Combine(Path.GetDirectoryName(path)!, CaptureLibrary.VideoManifestFile)), StringComparison.Ordinal);
+
+        // A file that is not a convertible fragmented MP4 is kept unchanged (and marked) rather than lost.
+        (Guid id2, string path2) = lib.BeginVideo(Now);
+        File.WriteAllBytes(path2, [1, 2, 3, 4, 5]);
+        CaptureRecord v2 = lib.CompleteVideo(id2, Info, null, Now);
+        Assert.True(v2.VideoFragmented);
+        Assert.Equal([1, 2, 3, 4, 5], File.ReadAllBytes(lib.VideoPath(id2)));
     }
 
     [Fact]

@@ -390,3 +390,208 @@ public class Mp4TimingTests
         Assert.Equal((2, 15000L, 18000L), gap); // fragment 2 should start at 9000+6000
     }
 }
+
+/// <summary>Fragmented → progressive MP4 conversion keeps every sample byte, duration, sync flag and the interleaving.</summary>
+public class Mp4DefragmenterTests
+{
+    private static byte[] B(string type, params byte[][] parts) => Mp4Defragmenter.Box(type, parts);
+
+    private static byte[] U(params uint[] v) => Mp4Defragmenter.U32(v);
+
+    private static byte[] Trak(uint id, uint timescale, string handler) =>
+        B("trak",
+            B("tkhd", U(0, 0, 0, id, 0, 0), new byte[60]),
+            B("mdia",
+                B("mdhd", U(0, 0, 0, timescale, 0), new byte[4]),
+                B("hdlr", U(0, 0), System.Text.Encoding.ASCII.GetBytes(handler), new byte[13]),
+                B("minf", B("dinf", new byte[4]), B("stbl", B("stsd", U(0, 1), B("test", new byte[8])), B("stts", U(0, 0)), B("stsc", U(0, 0)), B("stsz", U(0, 0, 0)), B("stco", U(0, 0))))));
+
+    /// <summary>
+    /// moof with one traf per track (default-base-is-moof), sample data in the mdat right after it. Video samples are
+    /// filled with 0xA0+n, audio with 0x10+n so the copy can be checked byte for byte.
+    /// </summary>
+    private static byte[] Fragment(int seq, (uint Track, uint[] Sizes, uint Duration, bool FirstSync)[] trafs, ref byte fill, List<(uint Track, byte[] Data)> expected)
+    {
+        var payloads = new List<byte[]>();
+        foreach (var t in trafs)
+        {
+            foreach (uint size in t.Sizes)
+            {
+                byte[] d = new byte[size];
+                Array.Fill(d, fill++);
+                payloads.Add(d);
+                expected.Add((t.Track, d));
+            }
+        }
+
+        // First pass to know the moof size, then fill data offsets.
+        byte[] Build(int moofSize)
+        {
+            var trafBoxes = new List<byte[]>();
+            int dataOffset = moofSize + 8;
+            foreach (var t in trafs)
+            {
+                byte[] tfhd = B("tfhd", U(0x020008, t.Track, t.Duration));
+                uint flags = 0x000001 | 0x000004 | 0x000200 | 0x000400;
+                var entries = new List<byte[]>();
+                for (int i = 0; i < t.Sizes.Length; i++)
+                {
+                    bool sync = t.Track == 2 || (i == 0 && t.FirstSync); // audio: every sample is a sync sample
+                    entries.Add(U(t.Sizes[i], sync ? 0x02000000u : 0x01010000u));
+                }
+
+                byte[] trun = B("trun", U(flags, (uint)t.Sizes.Length, (uint)dataOffset, t.FirstSync ? 0x02000000u : 0x01010000u), [.. entries.SelectMany(e => e)]);
+                trafBoxes.Add(B("traf", tfhd, trun));
+                dataOffset += (int)t.Sizes.Sum(x => x);
+            }
+
+            return B("moof", [B("mfhd", U(0, (uint)seq)), .. trafBoxes]);
+        }
+
+        int size0 = Build(0).Length;
+        byte[] moof = Build(size0);
+        return [.. moof, .. B("mdat", [.. payloads.SelectMany(p => p)])];
+    }
+
+    /// <summary>A small valid two-track fragmented MP4 (used by the Library tests too).</summary>
+    public static byte[] SampleFragmentedFile() => BuildSample(out _);
+
+    private static byte[] BuildSample(out List<(uint Track, byte[] Data)> expected)
+    {
+        byte fill = 1;
+        expected = [];
+        byte[] moov = B("moov", B("mvhd", U(0, 0, 0, 1000, 0), new byte[80]), Trak(1, 30000, "vide"), Trak(2, 48000, "soun"),
+            B("mvex", B("trex", U(0, 1, 1, 1000, 0, 0x01010000)), B("trex", U(0, 2, 1, 1024, 0, 0))));
+        return [.. B("ftyp", System.Text.Encoding.ASCII.GetBytes("iso5"), U(0)), .. moov,
+            .. Fragment(1, [(1, [500, 120, 130], 1000, true), (2, [40, 41, 42], 1024, true)], ref fill, expected),
+            .. Fragment(2, [(1, [480, 110], 1000, true), (2, [43, 44], 1024, true)], ref fill, expected),
+            .. B("mfra", new byte[8])];
+    }
+
+    [Fact]
+    public void Converts_two_track_fragments_to_a_progressive_file_with_exact_samples()
+    {
+        byte fill = 1;
+        var expected = new List<(uint Track, byte[] Data)>();
+        byte[] moov = B("moov", B("mvhd", U(0, 0, 0, 1000, 0), new byte[80]), Trak(1, 30000, "vide"), Trak(2, 48000, "soun"),
+            B("mvex", B("trex", U(0, 1, 1, 1000, 0, 0x01010000)), B("trex", U(0, 2, 1, 1024, 0, 0))));
+        byte[] file = [.. B("ftyp", System.Text.Encoding.ASCII.GetBytes("iso5"), U(0)), .. moov,
+            .. Fragment(1, [(1, [500, 120, 130], 1000, true), (2, [40, 41, 42], 1024, true)], ref fill, expected),
+            .. Fragment(2, [(1, [480, 110], 1000, true), (2, [43, 44], 1024, true)], ref fill, expected),
+            .. B("mfra", new byte[8])];
+
+        using var input = new MemoryStream(file);
+        using var output = new MemoryStream();
+        Mp4Defragmenter.Result r = Mp4Defragmenter.Convert(input, output);
+        Assert.Equal(2, r.Tracks);
+        Assert.Equal(10, r.Samples);
+        Assert.Equal(166, r.DurationsMs[1]); // 5 frames × 1000/30000 s
+        Assert.Equal(106, r.DurationsMs[2]); // 5 × 1024/48000 s
+
+        byte[] o = output.ToArray();
+        Mp4Structure s = Mp4Inspector.Inspect(new MemoryStream(o));
+        Assert.Equal(["ftyp", "moov", "mdat"], s.Boxes.Select(b => b.Type));
+        Assert.True(s.IsComplete);
+        Assert.False(s.IsFragmented);
+
+        // Read the sample tables back and check every sample's bytes.
+        Dictionary<uint, (uint[] Sizes, long[] Offsets, uint[] Stts, uint[]? Stss)> tables = ReadTables(o);
+        foreach (uint track in new uint[] { 1, 2 })
+        {
+            (uint[] sizes, long[] offsets, uint[] stts, uint[]? stss) = tables[track];
+            byte[][] mine = [.. expected.Where(e => e.Track == track).Select(e => e.Data)];
+            Assert.Equal(mine.Length, sizes.Length);
+            long pos = offsets[0];
+            int chunk = 0;
+            for (int i = 0; i < mine.Length; i++)
+            {
+                // chunks: one per trun (3 then 2 samples for video, 3 then 2 for audio)
+                if (i == 3)
+                {
+                    chunk = 1;
+                    pos = offsets[1];
+                }
+
+                Assert.Equal(mine[i], o.AsSpan((int)pos, (int)sizes[i]).ToArray());
+                pos += sizes[i];
+            }
+
+            Assert.Equal(track == 1 ? new uint[] { 5, 1000 } : new uint[] { 5, 1024 }, stts);
+            Assert.Equal(1, chunk);
+            if (track == 1)
+            {
+                Assert.Equal(new uint[] { 1, 4 }, stss); // sync samples: first of each fragment
+            }
+            else
+            {
+                Assert.Null(stss); // all audio samples are sync
+            }
+        }
+
+        // Interleaving kept: video chunk 1 < audio chunk 1 < video chunk 2 < audio chunk 2.
+        Assert.True(tables[1].Offsets[0] < tables[2].Offsets[0] && tables[2].Offsets[0] < tables[1].Offsets[1] && tables[1].Offsets[1] < tables[2].Offsets[1]);
+    }
+
+    [Fact]
+    public void Rejects_non_fragmented_and_damaged_input_without_writing_garbage()
+    {
+        using var output = new MemoryStream();
+        Assert.Throws<InvalidDataException>(() => Mp4Defragmenter.Convert(new MemoryStream([.. B("ftyp", new byte[8]), .. B("moov", new byte[8]), .. B("mdat", new byte[8])]), output));
+        Assert.Equal(0, output.Length);
+    }
+
+    private static Dictionary<uint, (uint[] Sizes, long[] Offsets, uint[] Stts, uint[]? Stss)> ReadTables(byte[] f)
+    {
+        var result = new Dictionary<uint, (uint[], long[], uint[], uint[]?)>();
+        int moov = 0;
+        while (System.Text.Encoding.ASCII.GetString(f, moov + 4, 4) != "moov")
+        {
+            moov += (int)System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(f.AsSpan(moov));
+        }
+
+        foreach ((string t, int s, int e) in Kids(f, moov + 8, moov + (int)System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(f.AsSpan(moov))))
+        {
+            if (t != "trak")
+            {
+                continue;
+            }
+
+            uint id = 0;
+            uint[] sizes = [], stts = [];
+            uint[]? stss = null;
+            long[] offsets = [];
+            void Walk(int a, int b)
+            {
+                foreach ((string t2, int s2, int e2) in Kids(f, a, b))
+                {
+                    uint U32(int at) => System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(f.AsSpan(at));
+                    switch (t2)
+                    {
+                        case "tkhd": id = U32(s2 + 12); break;
+                        case "mdia" or "minf" or "stbl": Walk(s2, e2); break;
+                        case "stsz": sizes = [.. Enumerable.Range(0, (int)U32(s2 + 8)).Select(i => U32(s2 + 12 + (i * 4)))]; break;
+                        case "stts": stts = [.. Enumerable.Range(0, (int)U32(s2 + 4) * 2).Select(i => U32(s2 + 8 + (i * 4)))]; break;
+                        case "stss": stss = [.. Enumerable.Range(0, (int)U32(s2 + 4)).Select(i => U32(s2 + 8 + (i * 4)))]; break;
+                        case "co64": offsets = [.. Enumerable.Range(0, (int)U32(s2 + 4)).Select(i => (long)System.Buffers.Binary.BinaryPrimitives.ReadUInt64BigEndian(f.AsSpan(s2 + 8 + (i * 8))))]; break;
+                    }
+                }
+            }
+
+            Walk(s, e);
+            result[id] = (sizes, offsets, stts, stss);
+        }
+
+        return result;
+    }
+
+    private static IEnumerable<(string, int, int)> Kids(byte[] f, int a, int b)
+    {
+        int p = a;
+        while (p + 8 <= b)
+        {
+            int size = (int)System.Buffers.Binary.BinaryPrimitives.ReadUInt32BigEndian(f.AsSpan(p));
+            yield return (System.Text.Encoding.ASCII.GetString(f, p + 4, 4), p + 8, p + size);
+            p += size;
+        }
+    }
+}

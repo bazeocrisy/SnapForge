@@ -28,6 +28,9 @@ public sealed partial class CaptureLibrary
     public const int VideoFormatVersion = 1;
     public const string VideoManifestFile = "video.json";
     public const string VideoFile = "video.mp4";
+
+    /// <summary>The fragmented MP4 written while recording (crash-safe); converted to <see cref="VideoFile"/> on completion.</summary>
+    public const string RecordingFile = "recording.mp4";
     public const string InProgressMarker = "recording.inprogress";
 
     public string VideosDirectory { get; }
@@ -49,7 +52,7 @@ public sealed partial class CaptureLibrary
             ["format"] = VideoFormatId + ".inprogress",
             ["startedUtc"] = CaptureFormat.Iso(startedUtc),
         }));
-        return (id, Path.Combine(dir, VideoFile));
+        return (id, Path.Combine(dir, RecordingFile));
     }
 
     /// <summary>
@@ -61,6 +64,7 @@ public sealed partial class CaptureLibrary
         ArgumentNullException.ThrowIfNull(info);
         string dir = VideoFolder(id);
         string video = Path.Combine(dir, VideoFile);
+        string layout = FinishVideoFile(dir);
         if (!File.Exists(video))
         {
             throw new FileNotFoundException("The recording has no video file.", video);
@@ -93,11 +97,50 @@ public sealed partial class CaptureLibrary
             ["videoCodec"] = "h264",
             ["audioCodec"] = info.HasAudio ? "aac" : null,
             ["videoBytes"] = new FileInfo(video).Length,
+            ["layout"] = layout,
             ["generator"] = $"{ProductInfo.Name} {typeof(CaptureLibrary).Assembly.GetName().Version}",
         };
         AtomicFile.WriteAllBytes(Path.Combine(dir, VideoManifestFile), JsonSerializer.SerializeToUtf8Bytes(manifest, AnnotationSerializer.Indented));
         File.Delete(Path.Combine(dir, InProgressMarker));
         return Refresh(id);
+    }
+
+    /// <summary>
+    /// Turns the recording's fragmented MP4 into the final progressive <c>video.mp4</c> (index at the front, read the
+    /// same way by every player). Falls back to keeping the fragmented file when it cannot be converted or the disk
+    /// lacks room for the copy. Returns the layout of the final file ("progressive" or "fragmented").
+    /// </summary>
+    private static string FinishVideoFile(string dir)
+    {
+        string recording = Path.Combine(dir, RecordingFile);
+        string video = Path.Combine(dir, VideoFile);
+        if (!File.Exists(recording))
+        {
+            return File.Exists(video) ? "progressive" : "missing";
+        }
+
+        string temp = video + ".converting";
+        try
+        {
+            long size = new FileInfo(recording).Length;
+            string? root = Path.GetPathRoot(Path.GetFullPath(dir));
+            if (root is not null && new DriveInfo(root).AvailableFreeSpace < size + (64L * 1024 * 1024))
+            {
+                throw new IOException("Not enough free disk space to optimise the video.");
+            }
+
+            File.Delete(temp);
+            Video.Mp4Defragmenter.Convert(recording, temp);
+            File.Move(temp, video, overwrite: true);
+            File.Delete(recording);
+            return "progressive";
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or ArgumentException)
+        {
+            File.Delete(temp);
+            File.Move(recording, video, overwrite: true);
+            return "fragmented";
+        }
     }
 
     /// <summary>Discards a recording that was cancelled (or could not be recovered): its folder is removed.</summary>
@@ -139,7 +182,7 @@ public sealed partial class CaptureLibrary
             {
             }
 
-            string video = Path.Combine(dir, VideoFile);
+            string video = Path.Combine(dir, RecordingFile);
             list.Add(new InterruptedRecording(id, video, started, File.Exists(video) ? new FileInfo(video).Length : 0));
         }
 
@@ -212,6 +255,7 @@ public sealed partial class CaptureLibrary
                 DurationMs = m["durationMs"]?.GetValue<long>() ?? 0,
                 HasAudio = m["hasAudio"]?.GetValue<bool>() ?? false,
                 Recovered = m["recovered"]?.GetValue<bool>() ?? false,
+                VideoFragmented = m["layout"]?.GetValue<string>() == "fragmented",
                 SizeBytes = size,
             };
         }
