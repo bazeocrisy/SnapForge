@@ -21,6 +21,20 @@ internal sealed record InstanceInfo(string Build, string ExePath)
         ?? "unknown";
 
     /// <summary>Short form for display: version plus the first 7 characters of the commit, if present.</summary>
+    /// <summary>The full Git commit of this build ("local build" when built outside CI).</summary>
+    public static string Commit
+    {
+        get
+        {
+            int plus = CurrentBuild.IndexOf('+', StringComparison.Ordinal);
+            return plus < 0 ? "local build (no commit recorded)" : CurrentBuild[(plus + 1)..];
+        }
+    }
+
+    /// <summary>The Git branch this build came from, when CI recorded it.</summary>
+    public static string? Branch { get; } =
+        typeof(InstanceInfo).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(a => a.Key == "SourceBranch")?.Value;
+
     public static string ShortBuild(string build)
     {
         int plus = build.IndexOf('+', StringComparison.Ordinal);

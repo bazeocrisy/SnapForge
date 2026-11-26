@@ -18,5 +18,11 @@
     <!-- Build identity shown in About and used by the single-instance check: CI appends the commit (0.1.0-dev+<sha>). -->
     <SourceRevisionId Condition="'$(GITHUB_SHA)' != ''">$(GITHUB_SHA)</SourceRevisionId>
     <Copyright>Copyright (c) 2026 bazeocrisy</Copyright>
+    <!-- Source branch shown in Help → About (CI: pull requests use the head branch, pushes the pushed branch). -->
+    <SnapForgeSourceBranch Condition="'$(GITHUB_HEAD_REF)' != ''">$(GITHUB_HEAD_REF)</SnapForgeSourceBranch>
+    <SnapForgeSourceBranch Condition="'$(SnapForgeSourceBranch)' == '' and '$(GITHUB_REF_NAME)' != ''">$(GITHUB_REF_NAME)</SnapForgeSourceBranch>
   </PropertyGroup>
+  <ItemGroup Condition="'$(SnapForgeSourceBranch)' != ''">
+    <AssemblyMetadata Include="SourceBranch" Value="$(SnapForgeSourceBranch)" />
+  </ItemGroup>
 </Project>
