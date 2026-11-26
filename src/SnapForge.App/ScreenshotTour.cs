@@ -41,6 +41,7 @@ internal static class ScreenshotTour
                 s => s with { CloseToNotificationArea = false, PrivacyNoticeShown = true, Theme = ThemePreference.Dark, Widget = s.Widget with { Enabled = false } });
             AppServices.Current = services;
             SeedLibrary(services.Library, services.Tray);
+            Guid? videoId = SeedVideo(services, log);
 
             // Real screenshots: each window is shown on the actual desktop and the screen pixels are captured with
             // SnapForge's own GDI capture (not an off-screen rendering). The CI desktop is small (1024×768), so
@@ -86,13 +87,60 @@ internal static class ScreenshotTour
                 main.LibraryPane.SelectIds(services.Library.Records.OrderByDescending(r => r.CreatedUtc).Take(2).Select(r => r.Id));
                 Pump(900);
                 SaveScreen(main, null, Path.Combine(outputFolder, $"library-{suffix}.png"), log);
+                main.LibraryPane.VideosView.IsChecked = true;
+                Pump(700);
+                SaveScreen(main, null, Path.Combine(outputFolder, $"library-videos-{suffix}.png"), log);
+                main.LibraryPane.AllView.IsChecked = true;
                 main.ShowEditorWorkspace();
+
+                if (videoId is { } vid && services.Library.Find(vid) is { } videoRecord)
+                {
+                    var player = new Video.VideoPlayerWindow(videoRecord, services.Library.VideoPath(vid))
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual,
+                        Left = work.X / dip + 40,
+                        Top = work.Y / dip + 30,
+                        Width = Math.Min(820, work.Width / dip - 80),
+                        Height = Math.Min(560, work.Height / dip - 60),
+                    };
+                    player.Show();
+                    Pump(2500); // let the media pipeline open and play a little
+                    SaveScreen(player, null, Path.Combine(outputFolder, $"player-{suffix}.png"), log);
+                    player.Close();
+                }
 
                 var capture = new CaptureWindow(services);
                 capture.Show();
                 Pump(500);
                 SaveScreen(capture, null, Path.Combine(outputFolder, $"capture-panel-{suffix}.png"), log);
+                capture.VideoMode.IsChecked = true;
+                Pump(300);
+                SaveScreen(capture, null, Path.Combine(outputFolder, $"capture-panel-video-{suffix}.png"), log);
+                capture.ImageMode.IsChecked = true;
                 capture.Hide();
+
+                // Recording toolbar and outline. In the app both are excluded from screen capture, so for these
+                // documentation screenshots they are shown without the exclusion (the exclusion itself is verified
+                // by the video self-test's pixel check).
+                if (Bounds(main) is { } area)
+                {
+                    var recorded = new PixelRect(area.X + 120, area.Y + 120, Math.Min(640, area.Width - 240), Math.Min(360, area.Height - 260));
+                    var outline = new Video.RecordingOutline(recorded, excludeFromCapture: false);
+                    outline.Show();
+                    var toolbar = new Video.RecordingToolbar($"{recorded.Width}×{recorded.Height} · 30 FPS", true, true, false, "Shift+F10", "Shift+F9", excludeFromCapture: false);
+                    toolbar.Show();
+                    toolbar.PlaceNear(recorded, work);
+                    toolbar.Update(TimeSpan.FromSeconds(83), false, 0.45f, 0);
+                    Pump(400);
+                    SaveScreen(toolbar, 12, Path.Combine(outputFolder, $"recording-toolbar-{suffix}.png"), log);
+                    if (Bounds(toolbar) is { } tb)
+                    {
+                        SaveRegion(PixelRect.Union([new PixelRect(recorded.X - 12, recorded.Y - 12, recorded.Width + 24, recorded.Height + 24), tb]), Path.Combine(outputFolder, $"recording-{suffix}.png"), log);
+                    }
+
+                    toolbar.Close();
+                    outline.Close();
+                }
 
                 // Widget: collapsed tab at the top centre, then expanded, then docked on the left edge.
                 services.UpdateSettings(x => x with { Widget = x.Widget with { Enabled = true, Placement = null } });
@@ -123,6 +171,9 @@ internal static class ScreenshotTour
                 settings.WidgetEnabledBox.BringIntoView();
                 Pump(300);
                 SaveScreen(settings, null, Path.Combine(outputFolder, $"settings-widget-dragdrop-{suffix}.png"), log);
+                settings.RecordingSection.BringIntoView();
+                Pump(300);
+                SaveScreen(settings, null, Path.Combine(outputFolder, $"settings-recording-{suffix}.png"), log);
                 settings.Close();
 
                 main.FlushAllAsync().GetAwaiter();
@@ -224,6 +275,37 @@ internal static class ScreenshotTour
     }
 
     /// <summary>Creates realistic-looking synthetic screenshots (no real screen content) with annotations.</summary>
+    /// <summary>A real 4-second screen recording of a moving demo window, saved in the Library like any recording.</summary>
+    private static Guid? SeedVideo(AppServices services, List<string> log)
+    {
+        try
+        {
+            _ = Video.Interop.Mf.MFStartup(Video.Interop.Mf.MF_VERSION, 0);
+            (Guid id, string path) = services.Library.BeginVideo(DateTime.UtcNow);
+            var source = new Video.SyntheticFrameSource(1280, 720, 30, 0);
+            Video.RecordingResult r;
+            using (Video.ScreenRecorder rec = Video.ScreenRecorder.Create(source, [], new Video.RecorderOptions(30, VideoQuality.Standard, false, false, null, 100L << 20, 1), path))
+            {
+                rec.Start();
+                Pump(4000);
+                r = rec.Stop();
+            }
+
+            CaptureRecord v = services.Library.CompleteVideo(id, new VideoInfo(r.Width, r.Height, r.FramesPerSecond, r.DurationMs, r.HasAudio), r.FirstFrame, DateTime.UtcNow, "Demo recording (test pattern)");
+            services.Library.SetTags(v.Id, ["demo"]);
+            services.Tray.Add(v.Id);
+            log.Add($"Seeded video: {r.Width}x{r.Height}, {r.DurationMs} ms, {r.FramesWritten} frames, encoder {r.Encoder}");
+            return v.Id;
+        }
+#pragma warning disable CA1031 // screenshots continue without the video
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            log.Add("Video seed failed: " + ex.Message);
+            return null;
+        }
+    }
+
     private static void SeedLibrary(CaptureLibrary library, RecentTray tray)
     {
         (string Title, string App, string[] Tags, string Folder, bool Fav, int DaysAgo)[] items =
