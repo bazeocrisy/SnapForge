@@ -1631,7 +1631,10 @@ public partial class MainWindow : Window
     private void OnPrivacyInfo(object sender, RoutedEventArgs e) => App.ShowPrivacyNotice(this);
 
     private void OnAbout(object sender, RoutedEventArgs e) => MessageBox.Show(this,
-        $"{ProductInfo.Name} {typeof(MainWindow).Assembly.GetName().Version}\nBuild: {SnapForge.App.Services.InstanceInfo.ShortBuild(SnapForge.App.Services.InstanceInfo.CurrentBuild)}\n{Environment.ProcessPath}\n\nScreen capture, annotation and capture library for Windows.\n\n" +
+        $"{ProductInfo.Name} {typeof(MainWindow).Assembly.GetName().Version}\nBuild: {SnapForge.App.Services.InstanceInfo.ShortBuild(SnapForge.App.Services.InstanceInfo.CurrentBuild)}\n" +
+        $"Commit: {SnapForge.App.Services.InstanceInfo.Commit}\n" +
+        (SnapForge.App.Services.InstanceInfo.Branch is { } branch ? $"Branch: {branch}\n" : string.Empty) +
+        $"{Environment.ProcessPath}\n\nScreen capture, annotation and capture library for Windows.\n\n" +
         "MIT License — Copyright (c) 2026 bazeocrisy.\nNo network access, no telemetry. Development build.",
         $"About {ProductInfo.Name}", MessageBoxButton.OK, MessageBoxImage.Information);
 

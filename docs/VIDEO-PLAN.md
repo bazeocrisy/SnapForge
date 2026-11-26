@@ -1,13 +1,35 @@
-# Milestone V1 — screen recording (proposed)
+# Milestone V1 — screen recording
 
-Status: **Proposed — awaiting owner approval of scope.** The owner asked on 2026-11-26 to add video. Nothing is built
-yet. Later steps (V2 editing, V3 extras) need their own approval.
+Status: **Approved by the owner on 2026-11-26** (VID-01…VID-12, subject to the reliability requirements VID-R01…R14
+and the decisions below). Implemented on branch `claude/video-v1` — **under independent review**, not merged.
+V2 editing and V3 extras remain outside the approved scope.
+
+**Owner decisions (2026-11-26):** Windows 11 first · system audio on by default · microphone off · cursor on · 30 FPS
+default, 60 optional · countdown on by default, configurable · MP4 (H.264 + AAC) · Standard and High presets · no
+subscriptions, paid dependencies, accounts or telemetry · separate feature branch from the verified Milestone 3
+baseline · Help → About shows version and Git commit.
+
+Where things are: requirements in PRODUCT-REQUIREMENTS.md (sections *V1 Screen recording*, *V1 Recording
+reliability*, *V2/V3 Video*); architecture and API research VIDEO-ARCHITECTURE.md; threat model VIDEO-THREAT-MODEL.md;
+Library format LIBRARY-VIDEO-FORMAT.md; benchmarks VIDEO-BENCHMARKS.md; checklist and known limitations
+VIDEO-ACCEPTANCE.md; test results VIDEO-TEST-RESULTS.md.
+
+**ID reconciliation.** The earlier backlog in PRODUCT-REQUIREMENTS.md also used VID-01…VID-11, with other meanings.
+The approved list keeps VID-01…VID-12; backlog items outside V1 were renumbered so no ID means two things and nothing
+is dropped: webcam → VID-V3-01 · draw on screen → VID-V3-02 · cursor highlight/click effects → VID-V3-03 · combine
+clips → VID-V3-04 · video from images → VID-V3-05 · VFR / presets beyond V1 → VID-V3-06 · trim/cut → VID-V2-01 · save
+frame → VID-V2-02 · animated GIF → VID-V2-03 (the rest map onto VID-01…12).
+
+**Deviations from this plan, for the review:** (1) videos are stored in a separate `videos/` folder instead of a
+version bump of the capture format — older builds never see them at all, which is stronger than rejecting them;
+(2) the player opens in its own window, not in the Editor area (KL-V09); (3) technical approach uses direct COM/WinRT
+interop instead of CsWinRT projections (no new packages; see VIDEO-ARCHITECTURE.md §1).
 
 Snagit reference (DOC, search extracts only — S-LIB-21…27, S-CAP-07): region/window/full-screen recording to MP4,
 separate microphone and system-audio toggles, webcam, pause/resume (Shift+F9) and stop (Shift+F10), on-screen drawing,
 trim/cut, save frame, combine clips, animated GIF. SnapForge implements its own versions — no TechSmith code or assets.
 
-## V1 scope (proposed)
+## V1 scope (approved)
 
 | ID | Requirement | Acceptance (summary) |
 |---|---|---|
@@ -60,10 +82,9 @@ trim/cut, save frame, combine clips, animated GIF. SnapForge implements its own 
 Large (comparable to milestone 3). Highest risks: audio/video synchronisation, hardware-encoder differences between
 PCs, and Windows.Graphics.Capture behaviour on multi-monitor/mixed-DPI setups.
 
-## Owner decisions needed
+## Owner decisions (answered 2026-11-26)
 
-1. Approve V1 scope as above (VID-01…VID-12)?
-2. Windows 11 only for video at first — acceptable?
-3. Defaults: system audio **on**, microphone **off**, cursor **on**, 30 fps, countdown on — acceptable?
-4. Order: build V1 now, or after you finish testing the current build (recommended: in parallel — your test feedback
-   is fixed as it arrives, V1 is developed alongside)?
+1. V1 scope VID-01…VID-12 — **approved**, plus reliability requirements VID-R01…R14.
+2. Windows 11 first — **yes**; Windows 10 evaluated separately.
+3. Defaults system audio on, microphone off, cursor on, 30 FPS, countdown on — **yes**.
+4. Order — **separate feature branch**, Milestone 3 defects fixed independently on its branch.
