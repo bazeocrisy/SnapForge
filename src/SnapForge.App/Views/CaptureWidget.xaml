@@ -1,0 +1,68 @@
+<Window x:Class="SnapForge.App.Views.CaptureWidget"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SnapForge capture widget"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
+        WindowStartupLocation="Manual" Width="120" Height="20"
+        FontFamily="{StaticResource UiFont}" Foreground="{DynamicResource TextBrush}"
+        UseLayoutRounding="True"
+        AutomationProperties.Name="SnapForge capture widget">
+    <!--
+        Persistent desktop capture widget (milestone 3). A small tab docked to a screen edge (top centre by default).
+        It expands on hover or click into Capture / Editor / Library / Presets and collapses when not in use.
+        Non-activating: using it never takes focus from the app you are capturing.
+    -->
+    <Grid>
+        <!-- Collapsed tab -->
+        <Button x:Name="TabButton" Click="OnTabClick" Cursor="Hand" Focusable="False"
+                AutomationProperties.Name="Open capture widget" ToolTip="SnapForge — capture">
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="TabBorder" Background="{DynamicResource AccentBrush}" CornerRadius="{Binding TabCorner, RelativeSource={RelativeSource AncestorType=Window}}" Opacity="0.95">
+                        <!-- Capture symbol so the tab is recognisable; hidden in auto-hide (thin strip) mode. -->
+                        <Path x:Name="TabIcon" Data="{StaticResource IconCapture}" Stroke="{DynamicResource AccentForegroundBrush}" StrokeThickness="2"
+                              Stretch="Uniform" Width="14" Height="14" HorizontalAlignment="Center" VerticalAlignment="Center"
+                              Visibility="{Binding TabIconVisibility, RelativeSource={RelativeSource AncestorType=Window}}" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="TabBorder" Property="Opacity" Value="1" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
+
+        <!-- Expanded panel -->
+        <Border x:Name="Panel" Visibility="Collapsed" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1"
+                CornerRadius="{Binding PanelCorner, RelativeSource={RelativeSource AncestorType=Window}}" Padding="6">
+            <StackPanel x:Name="PanelStack" Orientation="Horizontal">
+                <Border x:Name="GripHandle" Width="18" Height="32" Background="Transparent" Cursor="SizeAll" Margin="0,0,2,0"
+                        MouseLeftButtonDown="OnGripDown" MouseMove="OnGripMove" MouseLeftButtonUp="OnGripUp"
+                        ToolTip="Drag to dock at the top, left or right edge of any display" AutomationProperties.Name="Move widget">
+                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconGrip}" Stroke="{DynamicResource MutedTextBrush}" Width="18" Height="24" Stretch="Uniform" />
+                </Border>
+                <Button x:Name="CaptureButton" Style="{StaticResource AccentButton}" Click="OnCapture" Focusable="False" Padding="10,4" Margin="2"
+                        AutomationProperties.Name="Capture" ToolTip="Capture with the current settings">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconCapture}" Stroke="{DynamicResource AccentForegroundBrush}" Width="18" Height="18" Stretch="Uniform" />
+                        <TextBlock x:Name="CaptureLabel" Text="Capture" Margin="6,0,0,0" VerticalAlignment="Center" FontWeight="SemiBold" />
+                    </StackPanel>
+                </Button>
+                <Button x:Name="EditorButton" Click="OnEditor" Focusable="False" Padding="6,4" Margin="2" AutomationProperties.Name="Editor" ToolTip="Open the Editor">
+                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconEditor}" Width="18" Height="18" Stretch="Uniform" />
+                </Button>
+                <Button x:Name="LibraryButton" Click="OnLibrary" Focusable="False" Padding="6,4" Margin="2" AutomationProperties.Name="Library" ToolTip="Open the Library">
+                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconLibrary}" Width="18" Height="18" Stretch="Uniform" />
+                </Button>
+                <Button x:Name="PresetsButton" Click="OnPresets" Focusable="False" Padding="6,4" Margin="2" AutomationProperties.Name="Presets" ToolTip="Presets and capture panel">
+                    <StackPanel Orientation="Horizontal">
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconSettings}" Width="18" Height="18" Stretch="Uniform" />
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="10" Height="10" Stretch="Uniform" />
+                    </StackPanel>
+                </Button>
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

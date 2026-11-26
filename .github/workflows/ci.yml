@@ -1,0 +1,282 @@
+name: CI
+
+on:
+  push:
+    branches: [main, "claude/**"]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+# Least privilege: the workflow only reads the repository. No job can push, comment, release or mint tokens.
+permissions:
+  contents: read
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  DOTNET_NOLOGO: true
+  DOTNET_CLI_TELEMETRY_OPTOUT: true
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: true
+  # Third-party actions are pinned to full commit SHAs (tags can be moved); the tag is noted for updates.
+  #   actions/checkout        v5 = fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09
+  #   actions/setup-dotnet    v5 = 26b0ec14cb23fa6904739307f278c14f94c95bf1
+  #   actions/upload-artifact v6 = b7c566a772e6b6bfb58ed0dc250532a479d7789f
+  #   actions/download-artifact v6 = 018cc2cf5baa6db3ef3c5f8a56943fffe632ef53
+
+jobs:
+  windows:
+    name: Windows build, test and portable package
+    runs-on: windows-latest
+    timeout-minutes: 30
+    outputs:
+      artifact: ${{ steps.names.outputs.artifact }}
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+
+      - id: names
+        shell: pwsh
+        run: '"artifact=SnapForge-portable-win-x64-dev-${{ github.sha }}" | Out-File -Append $env:GITHUB_OUTPUT'
+
+      - name: Restore (locked mode, signed packages from nuget.org only, vulnerability audit)
+        run: dotnet restore SnapForge.sln
+
+      - name: Build (warnings are errors)
+        run: dotnet build SnapForge.sln -c Release --no-restore -p:ContinuousIntegrationBuild=true
+
+      - name: Test (unit, Windows rendering/capture/clipboard, real-input UI tests)
+        run: >
+          dotnet test SnapForge.sln -c Release --no-build
+          --logger "trx;LogFilePrefix=results"
+          --logger "console;verbosity=normal"
+          --results-directory TestResults
+          --collect "XPlat Code Coverage"
+          --blame-hang-timeout 5m
+
+      - name: Vulnerable package check
+        shell: pwsh
+        run: |
+          $out = dotnet list SnapForge.sln package --vulnerable --include-transitive 2>&1 | Out-String
+          Write-Output $out
+          if ($out -match "has the following vulnerable packages") { throw "Vulnerable NuGet packages found." }
+
+      - name: Upload test results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: test-results
+          path: TestResults
+          retention-days: 14
+
+      # Lock files cover build/test restores. Publishing adds only SDK-implied packages (runtime packs and
+      # Microsoft.NET.ILLink.Tasks, versions dictated by the SDK); the shipped projects reference no packages.
+      # Those cannot be expressed in a build-time lock file, so locked mode is off for this restore only.
+      # Package signature validation (nuget.config: require nuget.org repository signature) still applies.
+      - name: Publish portable build (self-contained, single-file exe + WPF native DLLs, win-x64)
+        run: >
+          dotnet publish src/SnapForge.App/SnapForge.App.csproj -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:DebugType=none
+          -p:ContinuousIntegrationBuild=true
+          -p:RestoreLockedMode=false
+          -o artifacts/portable/SnapForge
+
+      - name: Add license, notices, instructions and SHA-256 checksums
+        shell: pwsh
+        run: |
+          $dir = "artifacts/portable/SnapForge"
+          Copy-Item LICENSE "$dir/LICENSE.txt"
+          Copy-Item README.md, THIRD-PARTY-NOTICES.md, docs/ACCEPTANCE-TESTING.md, docs/ACCEPTANCE-RESULTS-TEMPLATE.md $dir
+          $lines = Get-ChildItem $dir -File | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object Name | ForEach-Object {
+            "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
+          }
+          $lines | Out-File -Encoding ascii "$dir/SHA256SUMS.txt"
+          Get-Content "$dir/SHA256SUMS.txt"
+          $exe = ($lines | Where-Object { $_ -like '*  SnapForge.exe' }) -split '\s+' | Select-Object -First 1
+          "### Portable build`n`nSnapForge.exe SHA-256: ``$exe``" | Out-File -Append $env:GITHUB_STEP_SUMMARY
+
+      - name: Upload portable build
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ${{ steps.names.outputs.artifact }}
+          path: artifacts/portable/SnapForge
+          retention-days: 30
+          if-no-files-found: error
+
+  portable-without-dotnet:
+    name: Portable build runs without an installed .NET
+    needs: windows
+    runs-on: windows-latest
+    timeout-minutes: 15
+    steps:
+      - name: Download the uploaded artifact (exactly what testers download)
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: ${{ needs.windows.outputs.artifact }}
+          path: portable
+
+      - name: Verify SHA-256 checksums
+        shell: pwsh
+        working-directory: portable
+        run: |
+          $failed = $false
+          foreach ($line in Get-Content SHA256SUMS.txt) {
+            $expected, $name = $line -split '\s+', 2
+            $actual = (Get-FileHash $name -Algorithm SHA256).Hash
+            if ($actual -ne $expected) { Write-Output "MISMATCH $name"; $failed = $true } else { Write-Output "OK  $name" }
+          }
+          $listed = (Get-Content SHA256SUMS.txt | ForEach-Object { ($_ -split '\s+', 2)[1] })
+          Get-ChildItem -File | Where-Object { $_.Name -ne 'SHA256SUMS.txt' -and $listed -notcontains $_.Name } | ForEach-Object { Write-Output "UNLISTED $($_.Name)"; $failed = $true }
+          if ($failed) { throw "Checksum verification failed." }
+
+      - name: Hide every .NET installation on this machine
+        shell: pwsh
+        run: |
+          foreach ($p in "$env:ProgramFiles\dotnet", "${env:ProgramFiles(x86)}\dotnet") {
+            if (Test-Path $p) { Rename-Item $p "$p-hidden-for-test"; Write-Output "Hid $p" }
+          }
+          if (Get-Command dotnet -ErrorAction SilentlyContinue) { throw "dotnet is still reachable" }
+          Write-Output "No dotnet executable is reachable."
+
+      - name: Run SnapForge.exe --self-test
+        shell: pwsh
+        working-directory: portable
+        env:
+          DOTNET_ROOT: C:\does-not-exist
+          DOTNET_ROOT_X64: C:\does-not-exist
+        run: |
+          $report = Join-Path $PWD "self-test.txt"
+          $p = Start-Process -FilePath .\SnapForge.exe -ArgumentList '--self-test', "`"$report`"" -Wait -PassThru
+          if (Test-Path $report) { Get-Content $report } else { Write-Output "No report written." }
+          Write-Output "Exit code: $($p.ExitCode)"
+          if (Test-Path "$env:TEMP\.net\SnapForge") { throw "Unexpected extraction to %TEMP%\.net\SnapForge" }
+          Write-Output "Nothing was extracted to %TEMP%\.net."
+          if ($p.ExitCode -ne 0) { throw "Self-test failed." }
+
+      - name: Real screenshots of the workspaces, capture panel and widget (demo library in a temporary folder)
+        if: always()
+        shell: pwsh
+        working-directory: portable
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "screenshots"
+          $p = Start-Process -FilePath .\SnapForge.exe -ArgumentList '--screenshots', "`"$out`"" -Wait -PassThru
+          if (Test-Path "$out\screenshots.txt") { Get-Content "$out\screenshots.txt" }
+          Write-Output "Exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "Screenshot tour failed." }
+          foreach ($f in Get-ChildItem "$out\preview" -Filter *.jpg) {
+            Write-Output "PREVIEW-BEGIN $($f.Name)"
+            Write-Output ([Convert]::ToBase64String([IO.File]::ReadAllBytes($f.FullName)))
+            Write-Output "PREVIEW-END $($f.Name)"
+          }
+
+      - name: Upload screenshots
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: screenshots-${{ github.sha }}
+          path: ${{ runner.temp }}/screenshots
+          retention-days: 30
+          if-no-files-found: warn
+
+  benchmarks:
+    name: Library scale benchmarks (production durability)
+    needs: windows
+    # Long-running (up to ~2 h): once per pushed commit, not again for the pull-request merge build.
+    if: github.event_name != 'pull_request'
+    runs-on: windows-latest
+    timeout-minutes: 150
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+
+      - name: Build the benchmark tool
+        run: dotnet build tools/SnapForge.Benchmarks/SnapForge.Benchmarks.csproj -c Release
+
+      - name: Download the portable build (for UI start-up measurements)
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: ${{ needs.windows.outputs.artifact }}
+          path: portable
+
+      # One library grows 100 → 1 000 → 5 000 → 10 000 → 25 000 captures. Every capture is written through the
+      # production code path with production durability (flush to disk on every file); nothing is bypassed.
+      # After each size the real UI is started over that library to measure start-up and responsiveness.
+      # A size is skipped (and reported) only if seeding it would not fit the job's time budget.
+      - name: Run benchmarks
+        shell: pwsh
+        run: |
+          $root = Join-Path $env:RUNNER_TEMP "bench-library"
+          $out = Join-Path $env:RUNNER_TEMP "bench"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $tool = "tools/SnapForge.Benchmarks/bin/Release/net10.0/SnapForge.Benchmarks.exe"
+          $budget = [TimeSpan]::FromMinutes(120)
+          $clock = [Diagnostics.Stopwatch]::StartNew()
+          $count = 0; $msPerCreate = 0.0
+          foreach ($size in 100, 1000, 5000, 10000, 25000) {
+            if ($msPerCreate -gt 0) {
+              $need = [TimeSpan]::FromMilliseconds(($size - $count) * $msPerCreate * 1.15)
+              $left = $budget - $clock.Elapsed
+              if ($need -gt $left) {
+                $msg = "SKIPPED $size captures: seeding needs about $([int]$need.TotalMinutes) min at $msPerCreate ms/capture; $([int]$left.TotalMinutes) min left"
+                Write-Output $msg; $msg | Out-File -Append "$out/skipped.txt"; continue
+              }
+            }
+            & $tool --root $root --sizes $size --keep --out "$out/core-$size.json" | Select-Object -Last 3
+            if ($LASTEXITCODE -ne 0) { throw "Benchmark tool failed at $size" }
+            $r = (Get-Content "$out/core-$size.json" | ConvertFrom-Json).Results[0]
+            $count = $r.Captures; $msPerCreate = [double]$r.CreateMsRecent
+            $p = Start-Process -FilePath portable\SnapForge.exe -ArgumentList '--benchmark-startup', "`"$root`"", "`"$out/ui-$size.json`"" -Wait -PassThru
+            if ($p.ExitCode -ne 0) { Get-Content "$out/ui-$size.json"; throw "UI start-up benchmark failed at $size" }
+          }
+          # Summary table
+          $rows = foreach ($f in Get-ChildItem "$out" -Filter core-*.json | Sort-Object { [int]($_.BaseName -replace 'core-','') }) {
+            $c = (Get-Content $f.FullName | ConvertFrom-Json).Results[0]
+            $uiFile = Join-Path $out ($f.Name -replace 'core-','ui-')
+            $u = if (Test-Path $uiFile) { Get-Content $uiFile | ConvertFrom-Json } else { $null }
+            "| $($c.Captures) | $($u.WindowShownSinceProcessStartMs) | $($u.IndexCompleteMs) | $($u.LongestUiFreezeMs) | $($u.LibraryViewMs) | $($u.SearchMs) | $($c.SearchCommonMs) | $($c.ThumbnailMsPerItem) | $($c.AutosaveMedianMs) / $($c.AutosaveP95Ms) | $($c.CreateMsRecent) | $($u.WorkingSetMb) | $($c.DiskMb) |"
+          }
+          $table = @("| Captures | Window shown (ms from process start) | Index complete (ms) | Longest UI freeze (ms) | Library view (ms) | UI search (ms) | Core search (ms) | Thumbnail (ms each) | Autosave median / p95 (ms) | Capture save (ms) | Working set (MB) | Disk (MB) |", "|---|---|---|---|---|---|---|---|---|---|---|---|") + $rows
+          $table | Out-File "$out/summary.md"
+          if (Test-Path "$out/skipped.txt") { "`n" + (Get-Content "$out/skipped.txt" -Raw) | Out-File -Append "$out/summary.md" }
+          Get-Content "$out/summary.md"
+          "### Library benchmarks (production durability)`n" + (Get-Content "$out/summary.md" -Raw) | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          Get-ChildItem $out -Filter *.json | ForEach-Object { Write-Output "== $($_.Name)"; Get-Content $_.FullName }
+
+      - name: Upload benchmark results
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: benchmarks-${{ github.sha }}
+          path: ${{ runner.temp }}/bench
+          retention-days: 30
+          if-no-files-found: warn
+
+  core-linux:
+    name: Core tests (Linux)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      - name: Test platform-independent core
+        run: dotnet test tests/SnapForge.Core.Tests/SnapForge.Core.Tests.csproj -c Release --logger "console;verbosity=normal"
+      - name: Compile Windows projects (cross-targeting check)
+        run: dotnet build SnapForge.sln -c Release

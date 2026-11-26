@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <RootNamespace>SnapForge.Core</RootNamespace>
+    <Description>Platform-independent model for SnapForge: geometry, pixel buffers, annotations, undo/redo and export rules.</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <InternalsVisibleTo Include="SnapForge.Core.Tests" />
+    <InternalsVisibleTo Include="SnapForge.App.Tests" />
+  </ItemGroup>
+
+</Project>
