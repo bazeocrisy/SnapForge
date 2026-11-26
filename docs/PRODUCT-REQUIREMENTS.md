@@ -1,7 +1,7 @@
 # SnapForge master product requirements
 
 Status: **master list** (Gate A corrected 2026-11-25; Gate B approved with owner decisions). Generated from one
-structured list, so every row has a **unique ID** (checked mechanically: 223 requirements, 0 duplicates) and every
+structured list, so every row has a **unique ID** (checked mechanically: 234 requirements, 0 duplicates) and every
 parity-matrix row maps to at least one requirement (checked: 183 matrix rows, 0 dangling references).
 [REQUIREMENTS.md](REQUIREMENTS.md) stays as the record of milestones 1–2; its IDs map to the BL-* rows.
 
@@ -345,6 +345,22 @@ here authorises work beyond milestone 3).
 | ENT-06 | Policy settings for administrators | S-LIB-37 | DOC | Not started | — | M9 | Defined at that milestone's Gate A | — | Proposed — not authorised | — |
 | ENT-07 | Controlled updates (no automatic network by default) | S-CAP-06 | DOC | Not started | — | M9 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-SET-05 |
 
+## M3.1 Capture-first (11)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| CF-01 | Capture-first start-up: icon, widget and (if enabled) panel only; Editor not created at start | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CF-02 | Editor/Library window created on demand from every entry point | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CF-03 | Closing the Editor saves, releases documents and destroys it; capture keeps working | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CF-04 | Captures with Preview off never create the Editor | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CF-05 | Separate taskbar identities for capture panel and Editor | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CF-06 | Editor errors are isolated; capture keeps working; Editor can be reopened | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CF-07 | Notification-icon left-click opens the capture panel | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CP-01 | Capture panel shown at start by default (setting) | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CP-02 | Menus in the capture panel's title bar (accessible custom title bar) | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CP-03 | Capture panel always-on-top option | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CP-04 | Show/hide capture panel hotkey (unassigned by default) | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+
 ## Totals
 
 | Approval state | Requirements |
@@ -354,4 +370,5 @@ here authorises work beyond milestone 3).
 | Approved — Gate B (owner, 2026-11-25) | 62 |
 | Delivered M1/M2 — under independent review | 37 |
 | Proposed — not authorised | 110 |
-| **Total** | **223** |
+| Proposed — M3.1, awaiting approval | 11 |
+| **Total** | **234** |
