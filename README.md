@@ -1,6 +1,7 @@
 <p align="center"><img src="docs/snapforge-icon.png" width="72" alt="SnapForge icon"></p>
 
 <p align="center"><img src="docs/screenshots/editor-dark.jpg" width="640" alt="SnapForge Editor"></p>
+<p align="center"><img src="docs/screenshots/capture-panel-dark.jpg" width="560" alt="SnapForge capture panel"></p>
 
 # SnapForge
 
@@ -72,7 +73,8 @@ The Windows projects compile on Linux/macOS (`EnableWindowsTargeting`) but run o
 
 ## Documentation
 
-* **Milestone 3 Gate A (proposed, awaiting approval):** [forensic audit](docs/SNAGIT-FORENSIC-AUDIT.md) · [feature parity matrix](docs/FEATURE-PARITY-MATRIX.md) · [master requirements](docs/PRODUCT-REQUIREMENTS.md) · [UI specification](docs/UI-SPECIFICATION.md) · [roadmap](docs/DEVELOPMENT-ROADMAP.md) · [source registry](docs/SOURCE-REGISTRY.md)
+* **Milestone 3 handoff (awaiting independent review):** [handoff](docs/MILESTONE-3-HANDOFF.md) · [benchmarks](docs/BENCHMARKS.md)
+* **Milestone 3 planning:** [forensic audit](docs/SNAGIT-FORENSIC-AUDIT.md) · [feature parity matrix](docs/FEATURE-PARITY-MATRIX.md) · [master requirements](docs/PRODUCT-REQUIREMENTS.md) · [UI specification](docs/UI-SPECIFICATION.md) · [roadmap](docs/DEVELOPMENT-ROADMAP.md) · [source registry](docs/SOURCE-REGISTRY.md)
 * [Architecture and decisions](docs/ARCHITECTURE.md)
 * [Requirements and acceptance criteria](docs/REQUIREMENTS.md)
 * [Security and privacy model](docs/SECURITY.md)

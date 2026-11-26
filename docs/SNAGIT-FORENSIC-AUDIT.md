@@ -53,8 +53,8 @@ Severity: **High** = could mislead the owner or lose data · **Medium** = user-v
 |---|---|---|---|---|
 | DEF-01 | Scale claim overstated; benchmarks bypass production durability during seeding; no production-path scale numbers | `CaptureLibraryTests.cs:398-422`, `LibraryWorkflowTests.cs:239-251`, `AtomicFile.cs:18,35` | High (evidence quality) | PERF-01/02 benchmark set |
 | DEF-02 | Library opens **synchronously on the UI thread** at start-up and reads every capture's manifest; no persisted index — start-up time grows linearly | `AppServices.cs:50` → `CaptureLibrary.Open` → `Reindex` (`CaptureLibrary.cs:85-110`) | Medium (High at 10 000+) | Measure first (PERF-01); then background index or cached index file (PERF-03) |
-| DEF-03 | Built-in preset name "Menu capture (3 s delay, cursor)" implies a menu-capture mode that does not exist | `AppSettings.cs` `CapturePreset.Defaults`; screenshot `capture-window-dark.jpg` | Medium (G-02 "no fake features") | CAP-UI-14 rename |
-| DEF-04 | Capture window layout is a tall vertical panel; owner's reference is a compact horizontal panel | `capture-window-dark.jpg` vs reference image | Medium (requirement gap) | CAP-UI-01…13 |
+| DEF-03 | Built-in preset name "Menu capture (3 s delay, cursor)" implies a menu-capture mode that does not exist | `AppSettings.cs` `CapturePreset.Defaults`; screenshot `capture-window-dark.jpg` (baseline 3018841; replaced in M3) | Medium (G-02 "no fake features") | CAP-UI-14 rename |
+| DEF-04 | Capture window layout is a tall vertical panel; owner's reference is a compact horizontal panel | `capture-window-dark.jpg` (baseline) vs reference image | Medium (requirement gap) | CAP-UI-01…13 |
 | DEF-05 | Library sidebar storage path wraps/clips | `library-light.jpg` | Low | Ellipsis + tooltip |
 | DEF-06 | No context menu on the editor canvas or on annotations; no multi-select, resize handles, nudge, object clipboard | `MainWindow.xaml` context menus only on tray, quick styles; `AnnotationCanvas.cs` move-only | Medium | M4 (ED-OBJ-*, ED-UI-03) |
 | DEF-07 | Accessibility not verified with a screen reader; no high-contrast handling verified | 58 `AutomationProperties` uses; no HC resources | Medium | NFR-A11Y-02/03 manual pass |
@@ -228,3 +228,29 @@ keyboard- and Narrator-operable (NFR-A11Y-01…03).
 Approve Gate A and authorise Gate B with the M3 scope defined in PRODUCT-REQUIREMENTS §2 (CAP-UI, CAP-HK, WID, DND,
 PRIV-DND, PERF, SET-01, NFR items, DEF-03/05 fixes), answering Q-02…Q-06 and Q-10. Everything in §3 of the
 requirements remains _Proposed_ for later milestones and is **not** authorised by approving M3.
+
+## 9. Milestone 3 (Gate B) — status of the audit findings
+
+| ID | Status after Gate B | Evidence |
+|---|---|---|
+| DEF-01 | **Fixed**: benchmarks use production durability end to end, 100–25 000 captures; the test-only flush bypass is not used | docs/BENCHMARKS.md (CI) |
+| DEF-02 | **Fixed**: library indexed in the background; window shown in ≈1 s at every size | BENCHMARKS.md; `Library_opens_instantly_and_indexes_in_the_background_without_freezing_the_ui` |
+| DEF-03 | **Fixed**: preset renamed "Region with 3 s delay and pointer" (migrated only if unchanged) | `Old_settings_files_get_new_defaults_and_the_misleading_preset_is_renamed_only_if_unchanged` |
+| DEF-04 | **Fixed**: compact horizontal capture panel | screenshots capture-panel-*; panel tests |
+| DEF-05 | **Fixed**: storage path trimmed with tooltip | `Library_storage_path_is_trimmed_with_full_path_in_tooltip` |
+| DEF-06 | Open (M4 editor scope) | — |
+| DEF-07 | **Partly**: high-contrast palette from system colours (tested); screen-reader pass still manual | `High_contrast_palette_covers_every_theme_colour_from_system_colours` |
+| DEF-08 | **Partly**: conflict explained in the panel with the Windows 11 setting name; real Windows 11 check manual (M3-P8) | `Capture_panel_remembers_its_position_and_explains_print_screen_conflicts` |
+| DEF-09 | **Fixed**: screenshots are real screen captures (CI desktop 1024×768) | docs/screenshots/README.md |
+| DEF-10 | **Fixed**: drag-out (tray, Library, multi-select) and PNG/JPEG/BMP import | real-input OLE drag tests; import test |
+| DEF-11 | Open: standard-user run is a manual check (CI runs as administrator); no admin-only API is used | — |
+| DEF-12 | Unchanged (documented) | — |
+
+New findings during Gate B:
+
+| ID | Finding | Status |
+|---|---|---|
+| KL-PERF-1 | Opening the Library grid or searching blocks the UI thread for up to ≈260 ms at 25 000 captures (grid rebuild on the UI thread) | Known limitation; proposal: incremental grid / persisted index (later milestone, needs approval) |
+| KL-DND-1 | During a drag the UI thread is inside the modal OLE drag loop; SnapForge's own timers (autosave) pause until the drop | By design of Windows drag and drop; autosave resumes immediately after |
+| KL-WID-1 | The widget cannot take keyboard focus (non-activating by design); keyboard users use the notification-area menu or the panel | Documented in SECURITY/acceptance |
+| KL-UI-1 | Share dropdown is disabled rather than offering Library/Clipboard (those stay switches) — deviation from the proposed CAP-UI-05, documented in UI-SPECIFICATION | Owner may decide otherwise |
