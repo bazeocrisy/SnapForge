@@ -163,7 +163,12 @@ internal static partial class RecordingController
         MonitorInfo monitor = layout.Monitors.OrderByDescending(m => m.Bounds.Intersect(rect).Area).First();
         PixelRect recorded;
         ScreenFrameSource video;
-        WindowCandidate? window = mode == CaptureMode.Window ? snapshot.Windows.Where(w => w.Bounds == rect).OrderBy(w => w.ZOrder).FirstOrDefault() : null;
+        // Window mode: the overlay returns the window's rectangle clipped to the desktop, so match the frontmost
+        // window that contains the selection's centre and covers it (exact equality fails for maximised windows).
+        int cx = rect.X + (rect.Width / 2), cy = rect.Y + (rect.Height / 2);
+        WindowCandidate? window = mode == CaptureMode.Window
+            ? snapshot.Windows.Where(w => w.Bounds.Contains(cx, cy) && w.Bounds.Intersect(rect) == rect).OrderBy(w => w.ZOrder).FirstOrDefault()
+            : null;
         if (window is not null)
         {
             video = new ScreenFrameSource(window.Handle, isWindow: true, crop: null, v.CaptureCursor);

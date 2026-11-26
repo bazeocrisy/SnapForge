@@ -83,6 +83,6 @@ Results go into ACCEPTANCE-RESULTS-TEMPLATE.md (one row per ID: pass/fail, PC mo
 | KL-V06 | Permanently deleting a video removes the file without overwriting it first (thumbnails and metadata are overwritten). |
 | KL-V07 | Moving the Library location **with a Milestone 3 (pre-video) build** moves images only; videos stay in the old folder (not deleted). Move with the V1 build. |
 | KL-V08 | Window recording follows the window; minimised windows produce no new frames (the last frame repeats). |
-| KL-V09 | The player opens in its own window rather than inside the Editor area (VID-08 said "in the Editor area") — flagged for the review. |
+| KL-V09 | **Deviation from VID-08 wording, for review:** the player opens in its own window, not inside the Editor area. Embedding it would replace the Editor canvas and session state that the screenshot workflow relies on; a separate window avoids that regression risk. Can be moved into the Editor area in a follow-up if preferred. |
 | KL-V10 | Media Foundation is required (missing on Windows N editions without the Media Feature Pack): Record explains how to add it. |
 | KL-V11 | Library integrity check for videos is the file size recorded in the manifest (no hash of multi-GB files at start-up). |
