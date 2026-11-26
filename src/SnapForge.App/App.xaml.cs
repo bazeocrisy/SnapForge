@@ -37,6 +37,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        if (e.Args.Length >= 2 && e.Args[0] == "--video-probe")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(Video.VideoProbe.Run(e.Args[1]));
+            return;
+        }
+
         if (e.Args.Length >= 3 && e.Args[0] == "--benchmark-startup")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;

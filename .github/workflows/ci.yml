@@ -162,6 +162,17 @@ jobs:
           Write-Output "Nothing was extracted to %TEMP%\.net."
           if ($p.ExitCode -ne 0) { throw "Self-test failed." }
 
+      - name: Video capability probe (screen capture API, encoders, audio devices)
+        if: always()
+        shell: pwsh
+        working-directory: portable
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "video-probe.json"
+          $p = Start-Process -FilePath .\SnapForge.exe -ArgumentList '--video-probe', "`"$out`"" -Wait -PassThru
+          if (Test-Path $out) { Get-Content $out } else { Write-Output "No probe report written." }
+          Write-Output "Exit code: $($p.ExitCode)"
+          Get-WindowsFeature -Name *Media* -ErrorAction SilentlyContinue | Format-Table -AutoSize | Out-String | Write-Output
+
       - name: Real screenshots of the workspaces, capture panel and widget (demo library in a temporary folder)
         if: always()
         shell: pwsh
