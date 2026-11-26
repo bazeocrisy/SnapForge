@@ -69,6 +69,13 @@ SnapForge.sln
 | D27 | **High contrast palette built from `SystemColors`** | When Windows high contrast is on, every DynamicResource brush maps to the user's contrast colours; switching is live (`SystemParameters.HighContrast` change). |
 | D28 | **Benchmarks outside the test suite** (`tools/SnapForge.Benchmarks`, `SnapForge.exe --benchmark-startup`) | Seeding and measurements use the production write path with production durability; no test-only bypass. Runs as its own CI job so slow disks never hide behind test timeouts. |
 | D29 | **Launch with Windows via HKCU Run** with `--background` | Per-user, no admin rights, removable from Windows Settings → Startup; portable copies that move show a "points to a different copy" hint. |
+| D30 | **Screen recording on Windows APIs only** (Windows.Graphics.Capture, Direct3D 11, Media Foundation, WASAPI) via explicit COM/WinRT interop | No codecs or packages added; vtable slots checked against SDK IDL; projection package rejected because it could not be restored under signature-verified locked restore (VIDEO-ARCHITECTURE.md). |
+| D31 | **One recording clock** (QPC) for frames and audio; pauses removed in `RecordingClock` | Audio and video shift identically on pause; sync measured on CI at ≤ 0.1 ms. |
+| D32 | **Constant frame rate** by slot scheduling: new frames go to their nearest slot, ended slots without a new frame repeat the previous frame | WGC delivers frames only on change; CFR files behave predictably in players and editors. |
+| D33 | **Fragmented MP4 while recording, progressive MP4 when finished** (`Mp4Defragmenter`, byte-for-byte sample copy) | Fragments bound crash loss; Media Foundation writes no `tfdt`, which the Windows reader mis-times (measured 233 ms), so the final file is progressive. |
+| D34 | **Videos in `videos/<id>/`**, manifest written last, in-progress marker | Older builds never read `videos/` (cannot corrupt videos); crash detection without scanning MP4s. |
+| D35 | **Encoder thread owns the Sink Writer**; capture and audio feed bounded queues | No cross-thread MF calls; memory bounded (256 MB frame budget, 4 s audio per source); drops counted. |
+| D36 | **Low-latency H.264 (no B-frames)** | Exact presentation order in the file; removed a 2-frame shift and out-of-order timestamps seen on CI. |
 
 ## Capture flow
 
@@ -93,6 +100,17 @@ SnapForge.sln
    into a new private temp folder with names from `ExportFileNames` ("title yyyy-MM-dd HHmmss.png", unique, safe).
 4. Drops onto the tray carry `SnapForge.CaptureKeys`; the tray reorders without asking for files.
 5. After the drag the folder is scheduled for deletion; exit and the next start-up sweep anything left.
+
+## Recording flow (Milestone V1)
+
+1. Panel Record / widget Record / Shift+F9 → `RecordingController.StartAsync`: own windows hidden, frozen snapshot,
+   the same selection overlay as screenshots (Region / Window / Display), snapshot pixels wiped.
+2. Optional countdown → `Library.BeginVideo` (folder + `recording.inprogress`) → `ScreenRecorder.Create`
+   (single session; hardware encoder allowed, software fallback) → outline + toolbar (excluded from capture).
+3. Threads: capture (WGC poll, GPU crop, CFR slots, disk check), audio (WASAPI → clock → mixer), encoder (Sink Writer).
+4. Stop (toolbar / Shift+F10 / disk / source ended / sleep): queues drained, `Finalize`, then on the library writer
+   `CompleteVideo` converts `recording.mp4` → progressive `video.mp4`, writes thumbnail, meta, manifest (last).
+5. Crash: next start → `RecordingRecovery` cuts to the last complete fragment, decodes to verify, completes as "Recovered".
 
 ## Coordinate systems
 

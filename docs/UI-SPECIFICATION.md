@@ -88,6 +88,25 @@ groups, multi-select, context menu. M3 adds drag-out (same rules as the tray), d
 Add pages/sections: **Widget** (section 2), **Drag and drop** (default PNG/JPEG, JPEG quality, filename pattern),
 **Startup** (launch with Windows — per-user `Run` key, off by default). Existing pages unchanged.
 
+## 6a. Screen recording (Milestone V1)
+
+* **Capture panel — Video mode**: rail button *Video* swaps the options card: Record (Region / Window / Display),
+  Frame rate (30 / 60 FPS), Quality (Standard / High), switches System audio (on), Microphone (off), Cursor (on),
+  Countdown (on, 3 s; menu 0/3/5/10). The round button reads **Record** with the recording hotkey (Shift+F9) beneath.
+  Image mode is unchanged. Screenshot: `capture-panel-video-*`.
+* **Widget**: *Record* button next to Capture; reads *Stop* while recording.
+* **Recording toolbar** (floating, does not take focus, excluded from capture, draggable): blinking red dot, elapsed
+  time `h:mm:ss`, `W×H · FPS`, Pause/Resume, **Stop** (save), Cancel (asks before discarding; Esc), toggles *System
+  audio* / *Microphone* with level meters; a status line for notices (device changes, low disk). Placed below the
+  recorded area, else above, else inside it. Screenshots: `recording-*`, `recording-toolbar-*`.
+* **Outline**: dashed red frame 4 px outside the recorded area; click-through; excluded from capture.
+* **Library**: video tiles with play badge, duration, resolution and size; *Videos* view; context menu *Play*,
+  *Export MP4 video…*; image-only commands hidden for videos; tooltips for recovered / fragmented videos.
+  Screenshot: `library-videos-*`.
+* **Player** (own window): Play/Pause (Space), seek bar (←/→ 5 s), time, Mute, volume, info line. Screenshot: `player-*`.
+* **Settings → Recording**: microphone picker, Record/Stop/Cancel hotkeys, Save recordings to the Library, Open the
+  recording when it is saved, minimum free space, privacy disclosure. Screenshot: `settings-recording-*`.
+
 ## 7. Screenshot evidence required at Gate C
 
 Real-window captures (not only off-screen renders) of: capture panel (light/dark), widget collapsed and expanded on
