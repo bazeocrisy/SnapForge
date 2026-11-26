@@ -1,6 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Text.Json;
 using System.Windows;
 using System.Windows.Automation;
 using System.Windows.Controls;
@@ -733,6 +734,86 @@ public class GateBUiTests
             w.Close();
         }
     });
+
+    /// <summary>
+    /// Milestone V1: a video dragged from the Library with the real mouse into a drop target running in a
+    /// <b>separate process</b> (SnapForge.exe --drop-target) arrives as an .mp4 named after the recording with the
+    /// Library file's exact bytes; the Library copy is untouched (VID-09).
+    /// </summary>
+    [Fact]
+    public void Real_mouse_drag_of_a_video_into_a_separate_process_delivers_the_mp4() => UiThread.Run(async () =>
+    {
+        NewTempStore();
+        AppServices services = TestServices.Create();
+        (Guid id, string path) = services.Library.BeginVideo(DateTime.UtcNow);
+        byte[] bytes = new byte[300_000];
+        new Random(7).NextBytes(bytes);
+        File.WriteAllBytes(path, bytes);
+        services.Library.CompleteVideo(id, new VideoInfo(640, 360, 30, 4000, true), TestImages.Gradient(64, 36), DateTime.UtcNow, "Demo recording");
+        string expectedSha = Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(bytes));
+
+        string dir = Path.Combine(Path.GetTempPath(), "snapforge-droptarget-" + Guid.NewGuid().ToString("N"));
+        string exe = FindAppExe();
+        using Process target = Process.Start(new ProcessStartInfo(exe, ["--drop-target", dir]) { UseShellExecute = false })!;
+        var w = new MainWindow(services) { Width = 600, Height = 700, WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
+        w.Show();
+        try
+        {
+            string ready = Path.Combine(dir, "ready.json");
+            await WaitFor(() => File.Exists(ready), 20);
+            await Task.Delay(300);
+            using JsonDocument r = JsonDocument.Parse(File.ReadAllText(ready));
+            int dx = r.RootElement.GetProperty("x").GetInt32(), dy = r.RootElement.GetProperty("y").GetInt32();
+            Assert.NotEqual(Environment.ProcessId, r.RootElement.GetProperty("pid").GetInt32());
+
+            w.ShowLibraryWorkspace();
+            await WaitFor(() => w.LibraryPane.VisibleCount == 1);
+            await Task.Delay(400);
+            (int tx, int ty) = Centre(w.LibraryPane.TileElement(id)!);
+            await SlowDrag(tx, ty, dx, dy);
+
+            string dropped = Path.Combine(dir, "dropped.json");
+            await WaitFor(() => File.Exists(dropped), 15, TraceText);
+            using JsonDocument d = JsonDocument.Parse(File.ReadAllText(dropped));
+            JsonElement file = Assert.Single(d.RootElement.GetProperty("files").EnumerateArray());
+            string name = file.GetProperty("name").GetString()!;
+            Assert.EndsWith(".mp4", name, StringComparison.OrdinalIgnoreCase);
+            Assert.StartsWith("Demo recording", name, StringComparison.Ordinal);
+            Assert.Equal(bytes.Length, file.GetProperty("bytes").GetInt64());
+            Assert.Equal(expectedSha, file.GetProperty("sha256").GetString());
+            Assert.Equal(expectedSha, Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(File.ReadAllBytes(services.Library.VideoPath(id)))));
+            Assert.True(target.WaitForExit(10_000));
+        }
+        finally
+        {
+            if (!target.HasExited)
+            {
+                target.Kill();
+            }
+
+            w.AllowClose = true;
+            w.Close();
+        }
+    });
+
+    /// <summary>The built SnapForge.exe (copied next to the tests, or in the app project's output).</summary>
+    private static string FindAppExe()
+    {
+        string here = Path.Combine(AppContext.BaseDirectory, "SnapForge.exe");
+        if (File.Exists(here))
+        {
+            return here;
+        }
+
+        string? dir = AppContext.BaseDirectory;
+        while (dir is not null && !File.Exists(Path.Combine(dir, "SnapForge.sln")))
+        {
+            dir = Path.GetDirectoryName(dir.TrimEnd(Path.DirectorySeparatorChar));
+        }
+
+        string built = Path.Combine(dir ?? ".", "src", "SnapForge.App", "bin", "Release", "net10.0-windows", "SnapForge.exe");
+        return File.Exists(built) ? built : throw new FileNotFoundException("SnapForge.exe not found for the separate-process drop target.", built);
+    }
 
     [Fact]
     public void Reordering_inside_the_tray_creates_no_files_and_cancelled_drags_leave_nothing() => UiThread.Run(async () =>

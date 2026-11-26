@@ -44,6 +44,13 @@ public partial class App : Application
             return;
         }
 
+        if (e.Args.Length >= 2 && e.Args[0] == "--drop-target")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            DropTargetMode.Run(this, e.Args[1]);
+            return;
+        }
+
         if (e.Args.Length >= 2 && e.Args[0] == "--video-probe")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
