@@ -35,6 +35,14 @@
                                     Background="{DynamicResource AccentBrush}" Visibility="{Binding Pinned, Converter={StaticResource BoolToVis}}">
                                 <TextBlock Text="Pinned" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentForegroundBrush}" />
                             </Border>
+                            <!-- Video: play badge and duration -->
+                            <Grid Grid.Row="0" IsHitTestVisible="False" Visibility="{Binding IsVideo, Converter={StaticResource BoolToVis}}">
+                                <Ellipse Width="28" Height="28" Fill="#B0000000" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Path Data="M0,0 L10,6 L0,12 Z" Fill="White" Width="10" Height="12" Margin="3,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5" CornerRadius="3" Padding="4,0" Background="#C8000000">
+                                    <TextBlock Text="{Binding DurationText}" FontSize="10" Foreground="White" />
+                                </Border>
+                            </Grid>
                             <Border x:Name="SelectedMark" Grid.Row="0" Visibility="Collapsed" CornerRadius="6" Background="{DynamicResource AccentSubtleBrush}" IsHitTestVisible="False" />
                             <Ellipse Grid.Row="0" Width="9" Height="9" HorizontalAlignment="Right" VerticalAlignment="Top" Margin="6"
                                      Fill="{DynamicResource AccentBrush}" ToolTip="Changes not yet saved"

@@ -45,6 +45,8 @@ internal static unsafe partial class Mf
     public static readonly Guid MFT_FRIENDLY_NAME = new("314ffbae-5b41-4c95-9c19-4e7d586face3");
     public static readonly Guid SOURCE_READER_ENABLE_VIDEO_PROCESSING = new("fb394f3d-ccf1-42ee-bbb3-f9b845d5681d");
     public static readonly Guid MT_MAX_KEYFRAME_SPACING = new("c16eb52b-73a1-476f-8d62-839d6a020652");
+    public static readonly Guid MFT_TRANSFORM_CLSID_Attribute = new("6821c42b-65a4-4e82-99bc-9a88205ecd0c");
+    private static readonly Guid CLSID_MSH264EncoderMFT = new("6ca50344-051a-4ded-9779-a43305165e35");
     public static readonly Guid MFT_ENUM_HARDWARE_URL_Attribute = new("2fb866ac-b078-4942-ab6c-003d05cda674");
     private static readonly Guid IID_IMFSinkWriterEx = new("588d72ab-5bc1-496a-8714-b70617141b25");
     public static readonly Guid PD_DURATION = new("6c990d33-bb8e-477a-8598-0d5d96fcd88a");
@@ -333,9 +335,14 @@ internal static unsafe partial class Mf
 
                     try
                     {
-                        string name = GetString(attrs, MFT_FRIENDLY_NAME) ?? "Encoder";
                         bool hardware = GetString(attrs, MFT_ENUM_HARDWARE_URL_Attribute) is not null;
-                        return (name, hardware);
+                        string? name = GetString(attrs, MFT_FRIENDLY_NAME);
+                        if (name is null && GetGuid(attrs, MFT_TRANSFORM_CLSID_Attribute) is { } clsid)
+                        {
+                            name = clsid == CLSID_MSH264EncoderMFT ? "Microsoft H.264 encoder (software)" : $"encoder {clsid:B}";
+                        }
+
+                        return (name ?? (hardware ? "hardware H.264 encoder" : "software H.264 encoder"), hardware);
                     }
                     finally
                     {

@@ -533,9 +533,13 @@ public partial class MainWindow : Window
             tile.Pinned = pinned;
             CaptureRecord? record = _services.Library.Find(key);
             tile.Title = record?.Title ?? (_sessions.TryGetValue(key, out EditorSession? s) ? s.Title : "Capture");
+            tile.IsVideo = record?.IsVideo == true;
+            tile.DurationText = record is { IsVideo: true } ? Video.VideoPlayerWindow.Format(TimeSpan.FromMilliseconds(record.DurationMs)) : string.Empty;
             tile.Detail = record is null
                 ? string.Empty
-                : $"{record.CreatedUtc.ToLocalTime():g} · {record.Width}×{record.Height}";
+                : record.IsVideo
+                    ? $"Video · {tile.DurationText} · {record.CreatedUtc.ToLocalTime():g} · {record.Width}×{record.Height} · {Video.VideoPlayerWindow.FormatSize(record.SizeBytes)}"
+                    : $"{record.CreatedUtc.ToLocalTime():g} · {record.Width}×{record.Height}";
             _ = LoadTrayThumbnailAsync(tile);
         }
 

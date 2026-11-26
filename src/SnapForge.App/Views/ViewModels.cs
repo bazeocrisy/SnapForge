@@ -50,6 +50,14 @@ internal sealed class TrayTileViewModel : ObservableObject
 
     public bool IsUnsaved { get => _isUnsaved; set => Set(ref _isUnsaved, value); }
 
+    private bool _isVideo;
+    private string _durationText = string.Empty;
+
+    /// <summary>True for screen recordings (play badge and duration on the tile).</summary>
+    public bool IsVideo { get => _isVideo; set => Set(ref _isVideo, value); }
+
+    public string DurationText { get => _durationText; set => Set(ref _durationText, value); }
+
     public bool Pinned { get => _pinned; set { if (Set(ref _pinned, value)) OnPropertyChanged(nameof(PinHeader)); } }
 
     public string PinHeader => Pinned ? "Un_pin" : "_Pin to tray";
@@ -62,7 +70,7 @@ internal sealed class TrayTileViewModel : ObservableObject
 
     public string Tooltip => NotInLibrary
         ? $"{Title} — not saved to the Library\nDrag to another app to copy it as an image"
-        : $"{Title}{(Detail.Length > 0 ? "\n" + Detail : string.Empty)}\nDrag to another app to copy it as an image";
+        : $"{Title}{(Detail.Length > 0 ? "\n" + Detail : string.Empty)}\nDrag to another app to copy it {(IsVideo ? "as an MP4 video" : "as an image")}";
 }
 
 /// <summary>One Quick Style tile.</summary>
