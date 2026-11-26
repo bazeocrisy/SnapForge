@@ -55,7 +55,9 @@ public class GateBUiTests
 
             Assert.True(panel.ImageMode.IsChecked);
             Assert.True(panel.ImageMode.IsEnabled);
-            foreach (FrameworkElement unavailable in new FrameworkElement[] { panel.VideoMode, panel.AllInOneMode, panel.EffectsButton, panel.ShareButton })
+            // Milestone V1: Video is available; All-in-One, Effects and Share are still marked unavailable.
+            Assert.True(panel.VideoMode.IsEnabled);
+            foreach (FrameworkElement unavailable in new FrameworkElement[] { panel.AllInOneMode, panel.EffectsButton, panel.ShareButton })
             {
                 Assert.False(unavailable.IsEnabled);
                 Assert.Contains("Not available yet", AutomationProperties.GetName(unavailable), StringComparison.Ordinal);
@@ -66,6 +68,24 @@ public class GateBUiTests
             Assert.Equal("Capture", AutomationProperties.GetName(panel.CaptureButton));
             Assert.Equal("Print Screen", panel.HotkeyText.Text); // default hotkey, shown under the button
             Assert.True(panel.SaveBox.IsChecked); // Save to Library preserved
+
+            // Video mode swaps the options card and the button; Image mode restores the screenshot panel unchanged.
+            panel.VideoMode.IsChecked = true;
+            await Task.Delay(100);
+            Assert.Equal(Visibility.Visible, panel.VideoOptions.Visibility);
+            Assert.Equal(Visibility.Collapsed, panel.ImageOptions.Visibility);
+            Assert.Equal("Record", AutomationProperties.GetName(panel.CaptureButton));
+            Assert.Equal("Shift+F9", panel.HotkeyText.Text);
+            Assert.True(panel.SystemAudioBox.IsChecked); // owner defaults: system audio on, microphone off, cursor on, countdown on
+            Assert.False(panel.MicBox.IsChecked);
+            Assert.True(panel.VideoCursorBox.IsChecked);
+            Assert.True(panel.CountdownBox.IsChecked);
+            Assert.Equal("30 FPS", panel.FrameRateText.Text);
+            panel.ImageMode.IsChecked = true;
+            await Task.Delay(100);
+            Assert.Equal(Visibility.Visible, panel.ImageOptions.Visibility);
+            Assert.Equal("Capture", AutomationProperties.GetName(panel.CaptureButton));
+            Assert.Equal("Print Screen", panel.HotkeyText.Text);
         }
         finally
         {

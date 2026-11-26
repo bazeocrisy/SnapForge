@@ -488,8 +488,8 @@ public partial class App : Application
             ("Capture", s.CaptureHotkey, () => _ = CaptureWithOptionsAsync(AppServices.Current!.Settings.Capture)),
         };
         list.Add(("Show capture panel", s.ShowPanelHotkey, ToggleCaptureWindow));
-        list.Add(("Start/stop recording", s.Video.StartStopHotkey, Video.RecordingController.ToggleFromHotkey));
-        list.Add(("Pause/resume recording", s.Video.PauseResumeHotkey, Video.RecordingController.TogglePause));
+        list.Add(("Record / pause / resume", s.Video.RecordHotkey, Video.RecordingController.RecordOrPause));
+        list.Add(("Stop recording", s.Video.StopHotkey, () => _ = Video.RecordingController.StopAsync()));
         list.Add(("Cancel recording", s.Video.CancelHotkey, Video.RecordingController.Cancel));
         foreach (CapturePreset preset in s.Presets)
         {

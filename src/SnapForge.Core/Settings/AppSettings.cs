@@ -210,8 +210,8 @@ public sealed record AppSettings
         Presets.Select(p => ($"Preset: {p.Name}", p.Hotkey))
             .Prepend(("Show capture panel", ShowPanelHotkey))
             .Prepend(("Capture", CaptureHotkey))
-            .Append(("Start/stop recording", Video.StartStopHotkey))
-            .Append(("Pause/resume recording", Video.PauseResumeHotkey))
+            .Append(("Record / pause / resume", Video.RecordHotkey))
+            .Append(("Stop recording", Video.StopHotkey))
             .Append(("Cancel recording", Video.CancelHotkey));
 
     public static AppSettings Load(string path)

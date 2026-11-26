@@ -40,7 +40,20 @@ internal static partial class RecordingController
 
     public static event EventHandler? ActiveChanged;
 
-    /// <summary>Recording hotkey: starts a recording, or stops and saves the running one.</summary>
+    /// <summary>Record hotkey (VID-06): starts a recording; while recording, pauses and resumes it.</summary>
+    public static void RecordOrPause()
+    {
+        if (_recorder is not null)
+        {
+            TogglePause();
+        }
+        else
+        {
+            _ = StartAsync();
+        }
+    }
+
+    /// <summary>Widget Record/Stop button: starts a recording, or stops and saves the running one.</summary>
     public static void ToggleFromHotkey()
     {
         if (_recorder is not null)
@@ -191,7 +204,7 @@ internal static partial class RecordingController
 
         string format = $"{_recorder.Width}×{_recorder.Height} · {v.FramesPerSecond} FPS";
         _toolbar = new RecordingToolbar(format, options.AudioTrack, v.RecordSystemAudio, v.RecordMicrophone,
-            v.StartStopHotkey is { } s ? s.ToString() : null, v.PauseResumeHotkey is { } p ? p.ToString() : null);
+            v.StopHotkey is { } s ? s.ToString() : null, v.RecordHotkey is { } p ? p.ToString() : null);
         _toolbar.PauseClicked += (_, _) => TogglePause();
         _toolbar.StopClicked += (_, _) => _ = StopAsync();
         _toolbar.CancelClicked += (_, _) => CancelWithConfirmation();
@@ -254,11 +267,41 @@ internal static partial class RecordingController
 
         Cleanup();
         RestoreOwnWindows();
+        if (saved is not null && !services.Settings.Video.SaveToLibrary)
+        {
+            saved = await SaveOutsideLibraryAsync(services, saved).ConfigureAwait(true);
+            message = saved is null ? "Recording saved (not kept in the Library)." : message + " It was kept in the Library because no location was chosen.";
+        }
+
         App.NotifyBalloon("SnapForge recording", message, warning: !result.Finalized || result.EndReason is not null);
         if (saved is not null && services.Settings.Video.OpenAfterRecording)
         {
             App.ShowVideo(saved.Id);
         }
+    }
+
+    /// <summary>
+    /// VID-08 "without history": asks where to save, copies the MP4 there and removes it from the Library.
+    /// Returns null when it was saved outside, or the record if the user cancelled (then it stays in the Library).
+    /// </summary>
+    private static async Task<CaptureRecord?> SaveOutsideLibraryAsync(AppServices services, CaptureRecord saved)
+    {
+        var dialog = new Microsoft.Win32.SaveFileDialog
+        {
+            Title = "Save recording",
+            Filter = "MP4 video (*.mp4)|*.mp4",
+            FileName = Core.Export.ExportFileNames.For(saved.Title, saved.CreatedUtc.ToLocalTime(), ".mp4", new HashSet<string>()),
+            InitialDirectory = Environment.GetFolderPath(Environment.SpecialFolder.MyVideos),
+        };
+        if (dialog.ShowDialog() != true)
+        {
+            return saved;
+        }
+
+        string target = dialog.FileName;
+        await Task.Run(() => File.Copy(services.Library.VideoPath(saved.Id), target, overwrite: true)).ConfigureAwait(true);
+        await services.Writer.RunAsync(() => services.Library.DeletePermanently([saved.Id])).ConfigureAwait(true);
+        return null;
     }
 
     private static void CancelWithConfirmation()

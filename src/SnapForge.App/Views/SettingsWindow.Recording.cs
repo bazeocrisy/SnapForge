@@ -50,8 +50,12 @@ public partial class SettingsWindow
         RecordingSection.Children.Add(new TextBlock { Text = "Microphone (used when Microphone is on):", FontSize = 12 });
         RecordingSection.Children.Add(mic);
 
-        AddHotkeyRow("Start/stop recording:", v.StartStopHotkey, g => _services.UpdateSettings(s => s with { Video = s.Video with { StartStopHotkey = g } }));
-        AddHotkeyRow("Pause/resume recording:", v.PauseResumeHotkey, g => _services.UpdateSettings(s => s with { Video = s.Video with { PauseResumeHotkey = g } }));
+        AddHotkeyRow("Record / pause / resume:", v.RecordHotkey, g => _services.UpdateSettings(s => s with { Video = s.Video with { RecordHotkey = g } }));
+        AddHotkeyRow("Stop recording:", v.StopHotkey, g => _services.UpdateSettings(s => s with { Video = s.Video with { StopHotkey = g } }));
+
+        var keep = new CheckBox { Content = "Save recordings to the Library", IsChecked = v.SaveToLibrary, Margin = new Thickness(0, 6, 0, 2), ToolTip = "Off = recordings are saved only where you choose when you stop (no history is kept)." };
+        keep.Click += (_, _) => _services.UpdateSettings(s => s with { Video = s.Video with { SaveToLibrary = keep.IsChecked == true } });
+        RecordingSection.Children.Add(keep);
         AddHotkeyRow("Cancel recording:", v.CancelHotkey, g => _services.UpdateSettings(s => s with { Video = s.Video with { CancelHotkey = g } }));
 
         var open = new CheckBox { Content = "Open the recording when it is saved", IsChecked = v.OpenAfterRecording, Margin = new Thickness(0, 6, 0, 2) };

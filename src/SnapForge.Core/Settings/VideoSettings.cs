@@ -56,9 +56,17 @@ public sealed record VideoSettings
     /// <summary>A warning is shown when the estimated remaining recording time falls below this.</summary>
     public int LowSpaceWarningMinutes { get; init; } = 10;
 
-    public HotkeyGesture? StartStopHotkey { get; init; } = new(HotkeyModifiers.Shift, "F9");
+    /// <summary>VID-06: starts a recording; while recording, pauses and resumes it (default Shift+F9).</summary>
+    public HotkeyGesture? RecordHotkey { get; init; } = new(HotkeyModifiers.Shift, "F9");
 
-    public HotkeyGesture? PauseResumeHotkey { get; init; } = new(HotkeyModifiers.Shift, "F10");
+    /// <summary>VID-06: stops and saves the recording (default Shift+F10).</summary>
+    public HotkeyGesture? StopHotkey { get; init; } = new(HotkeyModifiers.Shift, "F10");
+
+    /// <summary>
+    /// VID-08 "without history": when off, a finished recording is saved only where the user chooses and not kept
+    /// in the Library.
+    /// </summary>
+    public bool SaveToLibrary { get; init; } = true;
 
     public HotkeyGesture? CancelHotkey { get; init; }
 

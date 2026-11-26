@@ -77,9 +77,9 @@ public partial class CaptureWindow : Window
         DelayBox.Content = o.DelaySeconds > 0 ? $"Time Delay ({o.DelaySeconds} s)" : "Time Delay";
         LoadVideoOptions();
 
-        string action = IsVideoMode ? "Start/stop recording" : "Capture";
+        string action = IsVideoMode ? "Record / pause / resume" : "Capture";
         HotkeyRegistration? reg = App.HotkeyResults.FirstOrDefault(r => r.Action == action);
-        if ((IsVideoMode ? _services.Settings.Video.StartStopHotkey : _services.Settings.CaptureHotkey) is not { } hk)
+        if ((IsVideoMode ? _services.Settings.Video.RecordHotkey : _services.Settings.CaptureHotkey) is not { } hk)
         {
             HotkeyText.Text = "No hotkey";
             HotkeyText.ToolTip = "Set a global capture hotkey in Settings → Hotkeys.";

@@ -286,8 +286,9 @@ public class VideoSettingsTests
         Assert.True(v.Countdown);
         Assert.Equal(3, v.CountdownSeconds);
         Assert.Equal(SnapForge.Core.Settings.VideoQuality.Standard, v.Quality);
-        Assert.Equal("Shift+F9", v.StartStopHotkey!.ToString());
-        Assert.Equal("Shift+F10", v.PauseResumeHotkey!.ToString());
+        Assert.Equal("Shift+F9", v.RecordHotkey!.ToString()); // VID-06: start / pause / resume
+        Assert.Equal("Shift+F10", v.StopHotkey!.ToString()); // VID-06: stop
+        Assert.True(v.SaveToLibrary);
     }
 
     [Fact]
@@ -325,8 +326,8 @@ public class VideoSettingsTests
     public void Recording_hotkeys_take_part_in_conflict_detection()
     {
         var s = new SnapForge.Core.Settings.AppSettings();
-        s = s with { CaptureHotkey = s.Video.StartStopHotkey };
+        s = s with { CaptureHotkey = s.Video.RecordHotkey };
         var conflicts = SnapForge.Core.Settings.HotkeyGesture.FindConflicts(s.HotkeyAssignments());
-        Assert.Contains(conflicts, c => c.Contains("Capture") && c.Contains("Start/stop recording"));
+        Assert.Contains(conflicts, c => c.Contains("Capture") && c.Contains("Record / pause / resume"));
     }
 }
