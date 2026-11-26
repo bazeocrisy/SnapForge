@@ -24,6 +24,7 @@
                 <TextBlock Text="BEHAVIOUR" Style="{StaticResource SectionHeader}" />
                 <CheckBox x:Name="CloseToTrayBox" Content="Keep running in the notification area when the window is closed (hotkeys keep working)" Click="OnBehaviourChanged" />
                 <CheckBox x:Name="ShowCaptureWindowBox" Content="Show the capture panel when SnapForge starts" Click="OnBehaviourChanged" />
+                <CheckBox x:Name="PanelTopmostBox" Content="Keep the capture panel on top of other windows" Click="OnBehaviourChanged" />
 
                 <CheckBox x:Name="StartupBox" Content="Launch SnapForge when I sign in to Windows (starts in the notification area)" Click="OnStartupChanged"
                           AutomationProperties.Name="Launch with Windows" />
@@ -67,6 +68,12 @@
                     <TextBlock Text="Capture (current settings)" VerticalAlignment="Center" Width="190" />
                     <TextBox x:Name="CaptureHotkeyBox" IsReadOnly="True" PreviewKeyDown="OnHotkeyKeyDown" AutomationProperties.Name="Capture hotkey"
                              ToolTip="Click here and press the key combination (e.g. Print Screen or Ctrl+Shift+S)" />
+                </DockPanel>
+                <DockPanel Margin="0,6,0,0">
+                    <Button DockPanel.Dock="Right" Content="Clear" Click="OnClearHotkey" Tag="Panel" Margin="8,0,0,0" />
+                    <TextBlock Text="Show / hide capture panel" VerticalAlignment="Center" Width="190" />
+                    <TextBox x:Name="PanelHotkeyBox" IsReadOnly="True" PreviewKeyDown="OnHotkeyKeyDown" Tag="Panel" AutomationProperties.Name="Show or hide capture panel hotkey"
+                             ToolTip="Optional. Click here and press the key combination (e.g. Ctrl+Shift+Space)" />
                 </DockPanel>
                 <TextBlock x:Name="HotkeyStatus" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource MutedTextBrush}" />
                 <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,6,0,0"

@@ -71,6 +71,8 @@ public partial class CaptureWindow : Window
             _lastDelay = o.DelaySeconds;
         }
 
+        TopmostMenu.IsChecked = _services.Settings.CapturePanelTopmost;
+        Topmost = _services.Settings.CapturePanelTopmost;
         DelayBox.IsChecked = o.DelaySeconds > 0;
         DelayBox.Content = o.DelaySeconds > 0 ? $"Time Delay ({o.DelaySeconds} s)" : "Time Delay";
 
@@ -341,6 +343,9 @@ public partial class CaptureWindow : Window
     private void OnSettings(object sender, RoutedEventArgs e) => App.ShowSettings(this);
 
     private void OnToggleWidget(object sender, RoutedEventArgs e) => App.ShowWidget();
+
+    private void OnToggleTopmost(object sender, RoutedEventArgs e) =>
+        _services.UpdateSettings(s => s with { CapturePanelTopmost = TopmostMenu.IsChecked });
 
     private void OnShortcuts(object sender, RoutedEventArgs e) => App.MainShell?.ShowShortcuts(this);
 

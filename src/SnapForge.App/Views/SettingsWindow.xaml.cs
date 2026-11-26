@@ -34,6 +34,8 @@ public partial class SettingsWindow : Window
         ThemeDark.IsChecked = s.Theme == ThemePreference.Dark;
         CloseToTrayBox.IsChecked = s.CloseToNotificationArea;
         ShowCaptureWindowBox.IsChecked = s.ShowCaptureWindowOnStart;
+        PanelTopmostBox.IsChecked = s.CapturePanelTopmost;
+        PanelHotkeyBox.Text = s.ShowPanelHotkey?.ToString() ?? "(none)";
         CaptureHotkeyBox.Text = s.CaptureHotkey?.ToString() ?? "(none)";
         TrashDaysCheck.IsChecked = s.Retention.EmptyTrashAfterDays is not null;
         TrashDaysBox.Text = (s.Retention.EmptyTrashAfterDays ?? 30).ToString(CultureInfo.CurrentCulture);
@@ -183,7 +185,7 @@ public partial class SettingsWindow : Window
     {
         if (!_loading)
         {
-            _services.UpdateSettings(s => s with { CloseToNotificationArea = CloseToTrayBox.IsChecked == true, ShowCaptureWindowOnStart = ShowCaptureWindowBox.IsChecked == true });
+            _services.UpdateSettings(s => s with { CloseToNotificationArea = CloseToTrayBox.IsChecked == true, ShowCaptureWindowOnStart = ShowCaptureWindowBox.IsChecked == true, CapturePanelTopmost = PanelTopmostBox.IsChecked == true });
         }
     }
 
@@ -214,17 +216,37 @@ public partial class SettingsWindow : Window
             return;
         }
 
-        _services.UpdateSettings(s => s with { CaptureHotkey = gesture });
-        CaptureHotkeyBox.Text = gesture.ToString();
+        if (IsPanelHotkey(sender))
+        {
+            _services.UpdateSettings(s => s with { ShowPanelHotkey = gesture });
+            PanelHotkeyBox.Text = gesture.ToString();
+        }
+        else
+        {
+            _services.UpdateSettings(s => s with { CaptureHotkey = gesture });
+            CaptureHotkeyBox.Text = gesture.ToString();
+        }
+
         UpdateHotkeyStatus();
     }
 
     private void OnClearHotkey(object sender, RoutedEventArgs e)
     {
-        _services.UpdateSettings(s => s with { CaptureHotkey = null });
-        CaptureHotkeyBox.Text = "(none)";
+        if (IsPanelHotkey(sender))
+        {
+            _services.UpdateSettings(s => s with { ShowPanelHotkey = null });
+            PanelHotkeyBox.Text = "(none)";
+        }
+        else
+        {
+            _services.UpdateSettings(s => s with { CaptureHotkey = null });
+            CaptureHotkeyBox.Text = "(none)";
+        }
+
         UpdateHotkeyStatus();
     }
+
+    private static bool IsPanelHotkey(object sender) => sender is FrameworkElement { Tag: "Panel" };
 
     private void OnOpenFolder(object sender, RoutedEventArgs e)
     {

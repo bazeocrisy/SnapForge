@@ -158,7 +158,17 @@ public sealed record AppSettings
     /// <summary>Closing the main window keeps SnapForge running in the notification area (hotkeys keep working).</summary>
     public bool CloseToNotificationArea { get; init; } = true;
 
-    public bool ShowCaptureWindowOnStart { get; init; }
+    /// <summary>Show the capture panel at start (capture-first, like a separate capture app). Default on.</summary>
+    public bool ShowCaptureWindowOnStart { get; init; } = true;
+
+    /// <summary>Set once the "capture panel at start" default (milestone 3.1) was applied to an older settings file.</summary>
+    public bool CapturePanelDefaultApplied { get; init; }
+
+    /// <summary>Keep the capture panel above other windows.</summary>
+    public bool CapturePanelTopmost { get; init; }
+
+    /// <summary>Optional global hotkey that shows or hides the capture panel (unassigned by default).</summary>
+    public HotkeyGesture? ShowPanelHotkey { get; init; }
 
     /// <summary>Set once the user has seen the storage/privacy notice.</summary>
     public bool PrivacyNoticeShown { get; init; }
@@ -194,7 +204,7 @@ public sealed record AppSettings
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductInfo.Name, "settings.json");
 
     public IEnumerable<(string Action, HotkeyGesture? Gesture)> HotkeyAssignments() =>
-        Presets.Select(p => ($"Preset: {p.Name}", p.Hotkey)).Prepend(("Capture", CaptureHotkey));
+        Presets.Select(p => ($"Preset: {p.Name}", p.Hotkey)).Prepend(("Show capture panel", ShowPanelHotkey)).Prepend(("Capture", CaptureHotkey));
 
     public static AppSettings Load(string path)
     {
@@ -217,6 +227,11 @@ public sealed record AppSettings
                 Presets = s.Presets.Count == 0 ? CapturePreset.Defaults : MigratePresets(s.Presets),
                 Widget = s.Widget ?? new WidgetSettings(),
                 DragDrop = (s.DragDrop ?? new DragDropSettings()).Normalized(),
+
+                // Milestone 3.1: the capture panel opens at start by default. Older files stored "false" because it
+                // was the previous default, so the new default is applied once; the user can turn it off again.
+                ShowCaptureWindowOnStart = s.CapturePanelDefaultApplied ? s.ShowCaptureWindowOnStart : true,
+                CapturePanelDefaultApplied = true,
             };
         }
         catch (Exception ex) when (ex is JsonException or NotSupportedException or IOException or ArgumentException or FormatException)

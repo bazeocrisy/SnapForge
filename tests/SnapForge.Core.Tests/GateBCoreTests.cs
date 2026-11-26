@@ -273,3 +273,28 @@ public class ImageImportTests
         Assert.Equal("Imported image", ImageImport.TitleFor(".png"));
     }
 }
+
+public class CaptureFirstSettingsTests
+{
+    [Fact]
+    public void Capture_panel_at_start_is_applied_once_to_old_files_and_then_respected()
+    {
+        using var dir = new TestDirectory();
+        string path = dir.Sub("settings.json");
+        Assert.True(new AppSettings().ShowCaptureWindowOnStart); // new installs
+        File.WriteAllText(path, """{ "Version": 1, "ShowCaptureWindowOnStart": false }""");
+        AppSettings migrated = AppSettings.Load(path);
+        Assert.True(migrated.ShowCaptureWindowOnStart);
+        Assert.True(migrated.CapturePanelDefaultApplied);
+        Assert.False(migrated.CapturePanelTopmost);
+        Assert.Null(migrated.ShowPanelHotkey);
+
+        // The user turns it off again: that choice now sticks.
+        (migrated with { ShowCaptureWindowOnStart = false, CapturePanelTopmost = true, ShowPanelHotkey = new HotkeyGesture(HotkeyModifiers.Control | HotkeyModifiers.Shift, "Space") }).Save(path);
+        AppSettings again = AppSettings.Load(path);
+        Assert.False(again.ShowCaptureWindowOnStart);
+        Assert.True(again.CapturePanelTopmost);
+        Assert.Equal("Ctrl+Shift+Space", again.ShowPanelHotkey!.ToString());
+        Assert.Contains(again.HotkeyAssignments(), a => a.Action == "Show capture panel" && a.Gesture == again.ShowPanelHotkey);
+    }
+}

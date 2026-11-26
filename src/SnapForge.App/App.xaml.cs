@@ -101,7 +101,8 @@ public partial class App : Application
 
         _shell = new ShellIntegration();
         _shell.ShowIcon(ProductInfo.Name);
-        _shell.IconActivated += (_, _) => MainShell?.BringToFront();
+        // Capture-first: clicking the notification-area icon opens the capture panel (the Editor is in its menu).
+        _shell.IconActivated += (_, _) => ShowCaptureWindow();
         _shell.IconContextMenuRequested += (_, _) => ShowNotificationMenu();
         services.SettingsChanged += (_, _) => RegisterHotkeys(notifyOnFailure: false);
         RegisterHotkeys(notifyOnFailure: true);
@@ -331,8 +332,30 @@ public partial class App : Application
             _captureWindow = new CaptureWindow(services);
         }
 
+        _captureWindow.Topmost = services.Settings.CapturePanelTopmost;
+        if (_captureWindow.WindowState == WindowState.Minimized)
+        {
+            _captureWindow.WindowState = WindowState.Normal;
+        }
+
         _captureWindow.Show();
         _captureWindow.Activate();
+    }
+
+    /// <summary>The capture panel window, if it has been created (tests).</summary>
+    internal static CaptureWindow? CapturePanel => _captureWindow;
+
+    /// <summary>Show/hide capture panel hotkey: hides the panel if it is visible, otherwise shows it.</summary>
+    internal static void ToggleCaptureWindow()
+    {
+        if (_captureWindow is { IsVisible: true, WindowState: not WindowState.Minimized })
+        {
+            _captureWindow.Close(); // closing only hides it while SnapForge runs in the notification area
+        }
+        else
+        {
+            ShowCaptureWindow();
+        }
     }
 
     internal static void ShowSettings(Window? owner)
@@ -402,6 +425,7 @@ public partial class App : Application
         {
             ("Capture", s.CaptureHotkey, () => _ = CaptureWithOptionsAsync(AppServices.Current!.Settings.Capture)),
         };
+        list.Add(("Show capture panel", s.ShowPanelHotkey, ToggleCaptureWindow));
         foreach (CapturePreset preset in s.Presets)
         {
             CaptureOptions options = preset.Options;

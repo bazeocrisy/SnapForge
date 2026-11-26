@@ -596,6 +596,38 @@ public class GateBUiTests
     });
 
     [Fact]
+    public void Capture_panel_toggle_and_always_on_top_follow_settings() => UiThread.Run(async () =>
+    {
+        AppServices? previous = AppServices.Current;
+        AppServices services = TestServices.Create(s => s with { CapturePanelTopmost = true });
+        AppServices.Current = services;
+        try
+        {
+            App.ShowCaptureWindow();
+            await Task.Delay(200);
+            CaptureWindow panel = App.CapturePanel!;
+            Assert.True(panel.IsVisible);
+            Assert.True(panel.Topmost);
+            Assert.True(panel.TopmostMenu.IsChecked);
+
+            App.ToggleCaptureWindow(); // visible → hidden
+            await Task.Delay(200);
+            Assert.False(App.CapturePanel!.IsVisible);
+
+            services.UpdateSettings(s => s with { CapturePanelTopmost = false });
+            App.ToggleCaptureWindow(); // hidden → shown, without topmost now
+            await Task.Delay(200);
+            Assert.True(App.CapturePanel!.IsVisible);
+            Assert.False(App.CapturePanel!.Topmost);
+            App.CapturePanel!.Close();
+        }
+        finally
+        {
+            AppServices.Current = previous;
+        }
+    });
+
+    [Fact]
     public void Build_identity_round_trips_for_the_single_instance_check()
     {
         var info = new InstanceInfo("0.1.0-dev+67ae21879015de906d905320ff008e2a53d0ea1d", @"C:\Users\me\Desktop\SnapForge\SnapForge.exe");

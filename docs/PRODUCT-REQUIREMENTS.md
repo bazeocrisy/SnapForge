@@ -321,17 +321,17 @@ here authorises work beyond milestone 3).
 
 | ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
 |---|---|---|---|---|---|---|---|---|---|---|
-| VID-01 | Screen recording region/window/screen to MP4 | S-LIB-21 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-01 |
-| VID-02 | Microphone + system audio | S-LIB-21 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-02 |
-| VID-03 | Webcam picture-in-picture | S-LIB-21 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-02 |
-| VID-04 | Pause/resume, stop hotkeys | S-LIB-21; S-CAP-07 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-03 |
-| VID-05 | Countdown before recording | UNVERIFIED | UNVERIFIED | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-04 |
-| VID-06 | Quality presets up to 4K60 | S-LIB-27 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-05 |
-| VID-07 | Cursor highlight / click animation | S-LIB-02 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-06 |
-| VID-08 | Draw on screen while recording | S-LIB-24 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-07 |
-| VID-09 | Trim, save frame, combine clips | S-LIB-22/23 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-08 |
-| VID-10 | Video from images with narration | S-LIB-20 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-DOC-03 |
-| VID-11 | Animated GIF export | S-LIB-25 | DOC | Not started | — | M8 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-09 |
+| VID-01 | Screen recording region/window/screen to MP4 | S-LIB-21 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-01 |
+| VID-02 | Microphone + system audio | S-LIB-21 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-02 |
+| VID-03 | Webcam picture-in-picture | S-LIB-21 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-02 |
+| VID-04 | Pause/resume, stop hotkeys | S-LIB-21; S-CAP-07 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-03 |
+| VID-05 | Countdown before recording | UNVERIFIED | UNVERIFIED | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-04 |
+| VID-06 | Quality presets up to 4K60 | S-LIB-27 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-05 |
+| VID-07 | Cursor highlight / click animation | S-LIB-02 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-06 |
+| VID-08 | Draw on screen while recording | S-LIB-24 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-07 |
+| VID-09 | Trim, save frame, combine clips | S-LIB-22/23 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-08 |
+| VID-10 | Video from images with narration | S-LIB-20 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-DOC-03 |
+| VID-11 | Animated GIF export | S-LIB-25 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-09 |
 
 ## M9 Enterprise (7)
 
@@ -349,17 +349,17 @@ here authorises work beyond milestone 3).
 
 | ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
 |---|---|---|---|---|---|---|---|---|---|---|
-| CF-01 | Capture-first start-up: icon, widget and (if enabled) panel only; Editor not created at start | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
-| CF-02 | Editor/Library window created on demand from every entry point | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
-| CF-03 | Closing the Editor saves, releases documents and destroys it; capture keeps working | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
-| CF-04 | Captures with Preview off never create the Editor | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
-| CF-05 | Separate taskbar identities for capture panel and Editor | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
-| CF-06 | Editor errors are isolated; capture keeps working; Editor can be reopened | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
-| CF-07 | Notification-icon left-click opens the capture panel | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
-| CP-01 | Capture panel shown at start by default (setting) | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
-| CP-02 | Menus in the capture panel's title bar (accessible custom title bar) | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
-| CP-03 | Capture panel always-on-top option | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
-| CP-04 | Show/hide capture panel hotkey (unassigned by default) | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Not started | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Proposed — M3.1, awaiting approval | — |
+| CF-01 | Capture-first start-up: icon, widget and (if enabled) panel only; Editor not created at start | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | On hold | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Deferred — owner (2026-11-26) | — |
+| CF-02 | Editor/Library window created on demand from every entry point | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | On hold | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Deferred — owner (2026-11-26) | — |
+| CF-03 | Closing the Editor saves, releases documents and destroys it; capture keeps working | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | On hold | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Deferred — owner (2026-11-26) | — |
+| CF-04 | Captures with Preview off never create the Editor | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | On hold | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Deferred — owner (2026-11-26) | — |
+| CF-05 | Separate taskbar identities for capture panel and Editor | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | On hold | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Deferred — owner (2026-11-26) | — |
+| CF-06 | Editor errors are isolated; capture keeps working; Editor can be reopened | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | On hold | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Deferred — owner (2026-11-26) | — |
+| CF-07 | Notification-icon left-click opens the capture panel | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Implemented | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Capture-first notification icon (App.IconActivated → ShowCaptureWindow); manual M3-C1 | Approved — owner (small items, 2026-11-26) | — |
+| CP-01 | Capture panel shown at start by default (setting) | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Implemented | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Capture_panel_at_start_is_applied_once_to_old_files_and_then_respected | Approved — owner (small items, 2026-11-26) | — |
+| CP-02 | Menus in the capture panel's title bar (accessible custom title bar) | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | On hold | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Planned tests | Deferred — owner (2026-11-26) | — |
+| CP-03 | Capture panel always-on-top option | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Implemented | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Capture_panel_toggle_and_always_on_top_follow_settings | Approved — owner (small items, 2026-11-26) | — |
+| CP-04 | Show/hide capture panel hotkey (unassigned by default) | OWNER (option A, 2026-11-26); S-CAP-22/23 | OWNER | Implemented | P1 | M3.1 | See docs/CAPTURE-FIRST-PLAN.md | Capture_panel_toggle_and_always_on_top_follow_settings; Capture_panel_at_start… (hotkey assignment) | Approved — owner (small items, 2026-11-26) | — |
 
 ## Totals
 
@@ -370,5 +370,6 @@ here authorises work beyond milestone 3).
 | Approved — Gate B (owner, 2026-11-25) | 62 |
 | Delivered M1/M2 — under independent review | 37 |
 | Proposed — not authorised | 110 |
-| Proposed — M3.1, awaiting approval | 11 |
+| Deferred — owner (2026-11-26) | 7 |
+| Approved — owner (small items, 2026-11-26) | 4 |
 | **Total** | **234** |

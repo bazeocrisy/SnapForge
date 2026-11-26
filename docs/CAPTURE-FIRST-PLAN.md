@@ -1,7 +1,9 @@
 # Milestone 3.1 — "Capture-first": one program that behaves like two (proposed)
 
-Status: **Proposed — awaiting owner approval.** Owner decision 2026-11-26: option A (one program that behaves like
-two), instead of two separate programs (B) or no change (C). Nothing here is built yet.
+Status (2026-11-26): after discussion the owner agreed to build only the **small items** now — CF-07 (icon click opens
+the capture panel), CP-01 (panel at start, default on), CP-03 (panel always-on-top option), CP-04 (show/hide panel
+hotkey, unassigned by default). **Implemented.** The larger items (CF-01…CF-06, CP-02) are **on hold** in the
+roadmap until there is a concrete need (e.g. a heavy video editor).
 
 ## Background
 

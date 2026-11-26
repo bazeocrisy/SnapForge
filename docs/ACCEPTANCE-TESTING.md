@@ -267,6 +267,10 @@ Use a capture that has some text on it. Tools are on the left; colour and size a
 | M3-S3 | Windows high contrast (Settings → Accessibility → Contrast themes → e.g. Night sky). Look at the panel, widget, Editor, Library, Settings. | All text readable in the contrast colours; turning contrast off returns to SnapForge's theme. | NFR-A11Y-03 |
 | M3-S4 | Library with many captures (if you have them): start SnapForge. | The window appears immediately; the Library shows "Loading the library…" briefly and then all captures; the app stays responsive. | PERF-03 |
 | M3-S5 | Library sidebar → STORAGE. | The path is shortened with "…" if long; hovering shows the full path. | LIB-UI-01 |
+| M3-C1 | Click the orange SnapForge icon next to the clock (left click). | The capture panel opens (the Editor is in the right-click menu). | CF-07 |
+| M3-C2 | Exit SnapForge and start it again. | The capture panel appears at start. Settings → "Show the capture panel when SnapForge starts" turns this off. | CP-01 |
+| M3-C3 | Capture panel → View → Keep capture panel on top. Click another window. | The panel stays above other windows; turning it off restores normal behaviour. | CP-03 |
+| M3-C4 | Settings → Hotkeys → Show / hide capture panel: press e.g. Ctrl+Shift+Space. Press it twice in another app. | First press shows the panel, second hides it. A key already used by another program is reported. | CP-04 |
 
 ---
 
