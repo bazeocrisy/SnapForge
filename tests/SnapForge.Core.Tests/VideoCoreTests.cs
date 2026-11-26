@@ -331,3 +331,62 @@ public class VideoSettingsTests
         Assert.Contains(conflicts, c => c.Contains("Capture") && c.Contains("Record / pause / resume"));
     }
 }
+
+/// <summary>Mp4Timing parses fragment timing boxes exactly (hand-built fMP4).</summary>
+public class Mp4TimingTests
+{
+    private static byte[] Box(string type, params byte[][] parts)
+    {
+        int len = 8 + parts.Sum(p => p.Length);
+        var b = new byte[len];
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(b, (uint)len);
+        System.Text.Encoding.ASCII.GetBytes(type).CopyTo(b, 4);
+        int o = 8;
+        foreach (byte[] p in parts)
+        {
+            p.CopyTo(b, o);
+            o += p.Length;
+        }
+
+        return b;
+    }
+
+    private static byte[] U32(params uint[] v)
+    {
+        var b = new byte[v.Length * 4];
+        for (int i = 0; i < v.Length; i++)
+        {
+            System.Buffers.Binary.BinaryPrimitives.WriteUInt32BigEndian(b.AsSpan(i * 4), v[i]);
+        }
+
+        return b;
+    }
+
+    private static byte[] Fragment(uint track, ulong baseTime, uint[] durations)
+    {
+        byte[] tfhd = Box("tfhd", U32(0x020000, track));
+        var tfdtPayload = new byte[12];
+        tfdtPayload[0] = 1;
+        System.Buffers.Binary.BinaryPrimitives.WriteUInt64BigEndian(tfdtPayload.AsSpan(4), baseTime);
+        byte[] tfdt = Box("tfdt", tfdtPayload);
+        byte[] trun = Box("trun", U32(0x000100, (uint)durations.Length), U32(durations));
+        return [.. Box("moof", Box("traf", tfhd, tfdt, trun)), .. Box("mdat", new byte[16])];
+    }
+
+    [Fact]
+    public void Reads_tracks_and_fragment_times_and_finds_discontinuities()
+    {
+        byte[] tkhd = Box("tkhd", U32(0, 0, 0, 1)); // version 0: track id at payload offset 12
+        byte[] mdhd = Box("mdhd", U32(0, 0, 0, 90000));
+        byte[] hdlr = Box("hdlr", U32(0, 0), System.Text.Encoding.ASCII.GetBytes("vide"), new byte[12]);
+        byte[] moov = Box("moov", Box("trak", tkhd, Box("mdia", mdhd, hdlr)));
+        byte[] file = [.. Box("ftyp", new byte[8]), .. moov, .. Fragment(1, 0, [3000, 3000, 3000]), .. Fragment(1, 9000, [3000, 3000]), .. Fragment(1, 18000, [3000])];
+        using var ms = new MemoryStream(file);
+        Mp4TimingReport r = Mp4Timing.Read(ms);
+        Assert.Equal(("vide", 90000u), r.Tracks[1]);
+        Assert.Equal(3, r.Fragments.Count);
+        Assert.Equal((0L, 3, 9000L), (r.Fragments[0].BaseDecodeTime, r.Fragments[0].Samples, r.Fragments[0].TotalDuration));
+        var gap = Assert.Single(r.Discontinuities(1));
+        Assert.Equal((2, 15000L, 18000L), gap); // fragment 2 should start at 9000+6000
+    }
+}

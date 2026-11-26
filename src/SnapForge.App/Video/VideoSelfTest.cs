@@ -111,6 +111,7 @@ internal static partial class VideoSelfTest
         {
             string path = Path.Combine(dir, "sample-sync-640x360-30fps.mp4");
             (RecordingResult r, SyncReport sync) = RecordSynthetic(path, 640, 360, 30, TimeSpan.FromSeconds(12), pauseAt: null);
+            report["storedTiming"] = StoredTiming(path);
             report["sync"] = new { result = Summary(r), sync = SyncSummary(sync), diagnostics = LastDiagnostics, decodedFlashesMs = sync.FlashesMs.Select(f => Math.Round(f, 1)), decodedBeepsMs = sync.BeepsMs.Select(b => Math.Round(b, 1)), frames = VideoAnalysis.FrameTimeline(path, 0, 75) };
             Check("av-sync", sync.OffsetsMs.Count >= 10 && sync.MaxAbsOffsetMs <= 45, $"{sync.OffsetsMs.Count} flash/beep pairs, mean {sync.MeanOffsetMs} ms, max |offset| {sync.MaxAbsOffsetMs} ms, drift {sync.DriftMsPerMinute} ms/min");
             Check("constant-frame-rate", Math.Abs(sync.VideoFrames - (r.DurationMs * 30 / 1000.0)) <= 2, $"{sync.VideoFrames} frames for {r.DurationMs} ms");
@@ -418,6 +419,18 @@ internal static partial class VideoSelfTest
         thread.IsBackground = true;
         thread.Start();
         done.Wait();
+    }
+
+    /// <summary>The timestamps as stored in the file's fragments (independent of the Windows decoder).</summary>
+    private static object StoredTiming(string path)
+    {
+        Mp4TimingReport t = Mp4Timing.Read(path);
+        return new
+        {
+            tracks = t.Tracks.Select(kv => new { id = kv.Key, handler = kv.Value.Handler, timescale = kv.Value.Timescale }),
+            discontinuities = t.Tracks.Keys.ToDictionary(k => k.ToString(System.Globalization.CultureInfo.InvariantCulture), k => t.Discontinuities(k).Select(d => $"frag {d.Fragment}: expected {d.Expected}, stored {d.Actual}")),
+            firstFragments = t.Fragments.Take(24).Select(f => $"#{f.Fragment} trk{f.TrackId} base={f.BaseDecodeTime} n={f.Samples} dur={f.TotalDuration} cto={f.MinCompositionOffset}..{f.MaxCompositionOffset}"),
+        };
     }
 
     private static object Summary(RecordingResult r) => new
