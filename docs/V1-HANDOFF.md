@@ -83,7 +83,19 @@ See §7 (filled from the final CI run). Then follow VIDEO-ACCEPTANCE.md on a Win
 
 ## 7. Final build
 
-_(added after the final CI run)_
+* **Code commit `ed4815da1775eaf058258753c03d0de51de31ceb`** — CI run
+  [45911438628](https://github.com/bazeocrisy/SnapForge/actions/runs/45911438628): build 0 warnings / 0 errors;
+  **Core tests 191/191**, **Windows app tests 55/55**; portable build without .NET: checksums verified, self-test PASS,
+  video probe, **video self-test PASS (13/13)**, **crash-recovery PASS**, screenshot tour PASS; Library benchmarks PASS.
+  Later commits on the branch change documentation only.
+* **Portable build (zip):** [SnapForge-portable-win-x64-dev-ed4815d…](https://github.com/bazeocrisy/SnapForge/actions/runs/45911438628/artifacts/15160347121)
+  (GitHub sign-in needed to download; kept 30 days). Help → About shows commit `ed4815da…` and branch `claude/video-v1`.
+* **`SnapForge.exe` SHA-256:** `b96a4b96713cf3067346a5559a98ff12f89edf21bdd3c864d6cea5956c98d9d0`
+  (all files: `SHA256SUMS.txt` in the zip; verify with `Get-FileHash .\SnapForge.exe`).
+* **Sample MP4s:** artifact `video-samples-<commit>` of the same run (VIDEO-TEST-RESULTS.md §5 lists hashes from run 45910436639).
+* Unsigned development build: Windows SmartScreen will warn (More info → Run anyway), as with Milestone 3.
+* Only one SnapForge runs at a time: exit the Milestone 3 copy from the notification area first, or accept the
+  take-over prompt. Both builds share the same Library; the Milestone 3 build will not show videos (by design).
 
 ## 8. Stop point
 
