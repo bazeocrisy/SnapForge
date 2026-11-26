@@ -121,6 +121,26 @@ public class VideoCoreTests
     }
 
     [Fact]
+    public void After_resume_a_small_gap_is_placed_exactly_instead_of_shifting_audio()
+    {
+        var m = new AudioMixer("system");
+        m.Push(0, 0, Tone(4800, 0.5f)); // 0–100 ms
+        // Resume: the packet straddling the resume instant was dropped, so the next one starts 10 ms later than the
+        // previous end — below the 40 ms re-anchor threshold, which would normally leave the audio 10 ms early.
+        m.ReanchorAll();
+        m.Push(0, AudioMixer.ToTime(4800 + 480), Tone(480, 0.5f));
+        var pcm = new short[(4800 + 960) * 2];
+        Assert.Equal(4800 + 960, m.Mix(m.ReadyFrame(), pcm));
+        Assert.Equal(0, pcm[(4800 + 100) * 2]); // the 10 ms gap is silence
+        Assert.NotEqual(0, pcm[(4800 + 480 + 10) * 2]); // the packet sits exactly at its timestamp
+        Assert.Equal(1, m.Stats()[0].Reanchors);
+
+        // Without a resume, small jitter is not corrected (covered elsewhere); the flag applies to one packet only.
+        m.Push(0, AudioMixer.ToTime(4800 + 960 + 100), Tone(480, 0.5f));
+        Assert.Equal(1, m.Stats()[0].Reanchors);
+    }
+
+    [Fact]
     public void Mixer_memory_is_bounded_when_the_encoder_falls_behind()
     {
         var m = new AudioMixer("system");

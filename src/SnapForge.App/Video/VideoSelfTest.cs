@@ -115,7 +115,9 @@ internal static partial class VideoSelfTest
             report["storedTiming"] = StoredTiming(LastFragmentedPath!);
             report["fragmentedFileSync"] = LastFragmentedSync is { } fs ? SyncSummary(fs) : null;
             report["sync"] = new { result = Summary(r), sync = SyncSummary(sync), diagnostics = LastDiagnostics, decodedFlashesMs = sync.FlashesMs.Select(f => Math.Round(f, 1)), decodedBeepsMs = sync.BeepsMs.Select(b => Math.Round(b, 1)), frames = VideoAnalysis.FrameTimeline(path, 0, 75) };
-            Check("av-sync", sync.OffsetsMs.Count >= 10 && sync.MaxAbsOffsetMs <= 45, $"{sync.OffsetsMs.Count} flash/beep pairs, mean {sync.MeanOffsetMs} ms, max |offset| {sync.MaxAbsOffsetMs} ms, drift {sync.DriftMsPerMinute} ms/min");
+            SyncError e = LastSyncError!;
+            report["syncError"] = e;
+            Check("av-sync", e.ErrorsMs.Count >= 10 && e.MaxAbsMs <= 20, $"{e.ErrorsMs.Count} flash/beep pairs: A/V error mean {e.MeanMs} ms, max |error| {e.MaxAbsMs} ms, drift {e.DriftMsPerMinute} ms/min (video timestamp error max {e.VideoErrorsMs.Max(Math.Abs)} ms, audio {e.AudioErrorsMs.Max(Math.Abs)} ms)");
             Check("constant-frame-rate", Math.Abs(sync.VideoFrames - (r.DurationMs * 30 / 1000.0)) <= 2, $"{sync.VideoFrames} frames for {r.DurationMs} ms");
             Check("timestamps-exact", sync.NonMonotonicTimestamps == 0 && Math.Abs(sync.FirstVideoMs) < 1, $"first decoded frame at {sync.FirstVideoMs} ms, {sync.NonMonotonicTimestamps} out-of-order timestamps");
             Check("fragmented-recording", Mp4Inspector.Inspect(LastFragmentedPath!) is { IsComplete: true, IsFragmented: true } s1 && s1.CompleteFragments >= 5, Mp4Inspector.Inspect(LastFragmentedPath!).CompleteFragments + " fragments while recording");
@@ -137,7 +139,9 @@ internal static partial class VideoSelfTest
             (RecordingResult r, SyncReport sync) = RecordSynthetic(path, 640, 360, 30, TimeSpan.FromSeconds(11), pauseAt: (TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(3)));
             report["pauseResume"] = new { result = Summary(r), sync = SyncSummary(sync) };
             Check("pause-resume-duration", Math.Abs(r.DurationMs - 8000) <= 200, $"{r.DurationMs} ms recorded of 11 s with a 3 s pause");
-            Check("pause-resume-sync", sync.OffsetsMs.Count >= 6 && sync.MaxAbsOffsetMs <= 45, $"max |offset| {sync.MaxAbsOffsetMs} ms over {sync.OffsetsMs.Count} pairs");
+            SyncError pe = LastSyncError!;
+            report["pauseResumeSyncError"] = pe;
+            Check("pause-resume-sync", pe.ErrorsMs.Count >= 6 && pe.MaxAbsMs <= 20, $"A/V error max {pe.MaxAbsMs} ms, mean {pe.MeanMs} ms over {pe.ErrorsMs.Count} pairs (errors: {string.Join(", ", pe.ErrorsMs)})");
             File.Delete(path);
             File.Delete(LastFragmentedPath!);
         }
@@ -156,7 +160,9 @@ internal static partial class VideoSelfTest
             (RecordingResult r, SyncReport sync) = RecordSynthetic(path, 1280, 720, 60, TimeSpan.FromSeconds(5), pauseAt: null);
             report["fps60"] = new { result = Summary(r), sync = SyncSummary(sync) };
             Check("60fps", sync.VideoFrames >= 280 && r.FramesDropped < 30, $"{sync.VideoFrames} frames, {r.FramesDropped} dropped, encoder {r.Encoder}");
-            Check("60fps-sync", sync.MaxAbsOffsetMs <= 45, $"max |offset| {sync.MaxAbsOffsetMs} ms over {sync.OffsetsMs.Count} pairs");
+            SyncError fe = LastSyncError!;
+            report["fps60SyncError"] = fe;
+            Check("60fps-sync", fe.ErrorsMs.Count >= 3 && fe.MaxAbsMs <= 20, $"A/V error max {fe.MaxAbsMs} ms over {fe.ErrorsMs.Count} pairs");
             File.Delete(path);
             File.Delete(LastFragmentedPath!);
         }
@@ -349,12 +355,60 @@ internal static partial class VideoSelfTest
     /// <summary>Diagnostics of the last synthetic recording: where flash frames were produced and placed.</summary>
     internal static object? LastDiagnostics { get; private set; }
 
+    /// <summary>
+    /// True synchronisation error per flash/beep pair: (decoded beep − decoded flash) − (produced beep − produced flash),
+    /// both produced times mapped through the recording clock. 0 = audio and video exactly as captured.
+    /// </summary>
+    internal sealed record SyncError(IReadOnlyList<double> ErrorsMs, double MeanMs, double MaxAbsMs, double DriftMsPerMinute, IReadOnlyList<double> VideoErrorsMs, IReadOnlyList<double> AudioErrorsMs);
+
+    internal static SyncError? LastSyncError { get; private set; }
+
+    private static SyncError ComputeSyncError(SyncReport decoded, IReadOnlyList<double> producedFlashesMs, IReadOnlyList<double> producedBeepsMs)
+    {
+        static double Nearest(IReadOnlyList<double> xs, double v) => xs.Count == 0 ? double.NaN : xs.MinBy(x => Math.Abs(x - v));
+        var errors = new List<double>();
+        var times = new List<double>();
+        var videoErrors = new List<double>();
+        var audioErrors = new List<double>();
+        foreach (double f in decoded.FlashesMs)
+        {
+            double b = decoded.BeepsMs.Count == 0 ? double.NaN : decoded.BeepsMs.MinBy(x => Math.Abs(x - f));
+            if (double.IsNaN(b) || Math.Abs(b - f) > 500)
+            {
+                continue;
+            }
+
+            double pf = Nearest(producedFlashesMs, f), pb = Nearest(producedBeepsMs, b);
+            if (double.IsNaN(pf) || double.IsNaN(pb))
+            {
+                continue;
+            }
+
+            videoErrors.Add(Math.Round(f - pf, 2));
+            audioErrors.Add(Math.Round(b - pb, 2));
+            errors.Add(Math.Round((b - f) - (pb - pf), 2));
+            times.Add(f);
+        }
+
+        double slope = 0;
+        if (times.Count > 1)
+        {
+            double mx = times.Average(), my = errors.Average();
+            double num = times.Zip(errors).Sum(p => (p.First - mx) * (p.Second - my));
+            double den = times.Sum(t => (t - mx) * (t - mx));
+            slope = den == 0 ? 0 : num / den;
+        }
+
+        return new SyncError(errors, errors.Count == 0 ? double.NaN : Math.Round(errors.Average(), 2), errors.Count == 0 ? double.NaN : errors.Max(Math.Abs), Math.Round(slope * 60_000, 3), videoErrors, audioErrors);
+    }
+
     /// <summary>Sync measured on the fragmented recording file, before conversion (diagnostics).</summary>
     internal static SyncReport? LastFragmentedSync { get; private set; }
 
     internal static (RecordingResult Result, SyncReport Sync) RecordSynthetic(string path, int w, int h, int fps, TimeSpan length, (TimeSpan At, TimeSpan For)? pauseAt)
     {
         var placed = new List<(long Source, long Media)>();
+        List<double> producedFlashes = [], producedBeeps = [];
         string fragmented = Path.ChangeExtension(path, ".fragmented.mp4");
         const long flashEvery = 10_000_000; // 1 s
         var video = new SyntheticFrameSource(w, h, fps, flashEvery);
@@ -383,6 +437,8 @@ internal static partial class VideoSelfTest
 
             Thread.Sleep(length - sw.Elapsed);
             result = rec.Stop();
+            producedFlashes = [.. video.FlashTimes.Select(rec.MapSourceTime).OfType<long>().Select(m => m / 10_000.0)];
+            producedBeeps = [.. audio.BeepTimes.Select(rec.MapSourceTime).OfType<long>().Select(m => m / 10_000.0)];
             long clockStart = rec.ClockStart;
             long videoStart = video.StartTime;
             var flashSet = video.FlashTimes.ToHashSet();
@@ -401,7 +457,9 @@ internal static partial class VideoSelfTest
         File.Delete(path);
         Mp4Defragmenter.Convert(fragmented, path);
         LastFragmentedPath = fragmented;
-        return (result, VideoAnalysis.MeasureSync(path, 1000));
+        SyncReport final = VideoAnalysis.MeasureSync(path, 1000);
+        LastSyncError = ComputeSyncError(final, producedFlashes, producedBeeps);
+        return (result, final);
     }
 
     internal static string? LastFragmentedPath { get; private set; }

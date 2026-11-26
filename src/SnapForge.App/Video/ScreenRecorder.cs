@@ -175,6 +175,15 @@ internal sealed unsafe class ScreenRecorder : IDisposable
 
     public string? EncoderName => _writer?.Encoder?.Name;
 
+    /// <summary>Media time (100 ns) of a source timestamp on this recording's clock, or null if it was paused / before start.</summary>
+    internal long? MapSourceTime(long source)
+    {
+        lock (_gate)
+        {
+            return _clock.TryMap(source, out long media) ? media : null;
+        }
+    }
+
     /// <summary>QPC time (100 ns) at which the recording clock started (diagnostics).</summary>
     public long ClockStart => _wallStart;
 
@@ -272,6 +281,7 @@ internal sealed unsafe class ScreenRecorder : IDisposable
             if (State == RecorderState.Paused)
             {
                 _clock.Resume(Qpc.Now100ns());
+                _mixer.ReanchorAll();
                 State = RecorderState.Recording;
             }
         }

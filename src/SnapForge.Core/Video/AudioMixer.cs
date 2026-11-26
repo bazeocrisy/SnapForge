@@ -81,7 +81,9 @@ public sealed class AudioMixer
         long drift = expected - s.WriteFrame;
         s.LastDriftMs = drift * 1000.0 / SampleRate;
         s.MaxDriftMs = Math.Max(s.MaxDriftMs, Math.Abs(s.LastDriftMs));
-        if (Math.Abs(drift) > ReanchorThreshold)
+        bool forced = s.ForceAnchor && drift != 0;
+        s.ForceAnchor = false;
+        if (Math.Abs(drift) > ReanchorThreshold || forced)
         {
             s.Reanchors++;
             if (drift > 0)
@@ -135,6 +137,18 @@ public sealed class AudioMixer
 
         s.WriteFrame = s.BufferStart + s.Buffered;
         s.EnforceCap();
+    }
+
+    /// <summary>
+    /// After a pause: the next packet of every source is placed exactly at its timestamp (a packet that straddled the
+    /// resume instant was dropped, leaving a gap smaller than the normal re-anchor threshold — VID-R12).
+    /// </summary>
+    public void ReanchorAll()
+    {
+        foreach (Source s in _sources)
+        {
+            s.ForceAnchor = true;
+        }
     }
 
     /// <summary>Marks a source as gone (device removed) — it contributes silence until it pushes again.</summary>
@@ -213,6 +227,8 @@ public sealed class AudioMixer
         public int Buffered => _count / Channels;
 
         public bool Muted { get; set; }
+
+        public bool ForceAnchor { get; set; }
 
         public bool Active { get; set; }
 

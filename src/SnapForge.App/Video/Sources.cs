@@ -276,7 +276,7 @@ internal sealed unsafe class SyntheticFrameSource(int width, int height, int fps
 
         _lastFrame = index;
         long t = sourceTime100ns - _start;
-        bool flash = flashEvery100ns > 0 && t % flashEvery100ns < period;
+        bool flash = flashEvery100ns > 0 && t >= flashEvery100ns && t % flashEvery100ns < period;
         if (flash)
         {
             FlashTimes.Add(sourceTime100ns);
@@ -494,6 +494,9 @@ internal sealed class SyntheticAudioSource(Func<long> startTime, long flashEvery
 
     public string Name => "Synthetic tone";
 
+    /// <summary>Source times of the beep onsets produced (diagnostics).</summary>
+    public List<long> BeepTimes { get; } = [];
+
     public string? DeviceName => "synthetic";
 
     public bool Enabled { get; set; } = true;
@@ -518,7 +521,12 @@ internal sealed class SyntheticAudioSource(Func<long> startTime, long flashEvery
             for (int i = 0; i < 480; i++)
             {
                 long t = _next - start + (i * 10_000_000L / 48000);
-                bool beep = t % flashEvery100ns < 500_000;
+                bool beep = t >= flashEvery100ns && t % flashEvery100ns < 500_000;
+                if (beep && t % flashEvery100ns < 10_000_000L / 48000)
+                {
+                    BeepTimes.Add(start + t);
+                }
+
                 float v = beep ? (float)(0.5 * Math.Sin(2 * Math.PI * 1000 * t / 10_000_000.0)) : 0f;
                 _block[i * 2] = v;
                 _block[(i * 2) + 1] = v;
