@@ -483,10 +483,12 @@ internal sealed unsafe class ScreenRecorder : IDisposable
                         ReturnBuffer(buffer);
                     }
 
-                    // Screen unchanged: repeat the previous frame in each elapsed slot (constant frame rate).
+                    // Screen unchanged: repeat the previous frame in each slot that has already ended (constant
+                    // frame rate). The slot in progress is left open: a new frame may still arrive for it, and
+                    // filling it early would push that frame one slot late (measured 35 ms after resume on CI).
                     if (!paused && last is not null)
                     {
-                        while (lastSlot < slotNow && !_stopCapture)
+                        while (lastSlot < slotNow - 1 && !_stopCapture)
                         {
                             lastSlot++;
                             last.AddRef();
