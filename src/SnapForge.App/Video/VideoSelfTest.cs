@@ -27,6 +27,53 @@ internal static partial class VideoSelfTest
     [LibraryImport("user32.dll")]
     private static partial nint MonitorFromPoint(long point, uint flags);
 
+#pragma warning disable SYSLIB1054 // DEVMODEW has inline strings; the classic marshaller handles them.
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    [return: MarshalAs(UnmanagedType.Bool)]
+    private static extern bool EnumDisplaySettingsW(string? device, int mode, ref DevMode devMode);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int ChangeDisplaySettingsW(ref DevMode devMode, uint flags);
+
+    [DllImport("user32.dll", CharSet = CharSet.Unicode)]
+    private static extern int ChangeDisplaySettingsW(nint devMode, uint flags);
+#pragma warning restore SYSLIB1054
+
+    [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
+    private struct DevMode
+    {
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string DeviceName;
+        public ushort SpecVersion, DriverVersion, Size, DriverExtra;
+        public uint Fields;
+        public int PositionX, PositionY;
+        public uint DisplayOrientation, DisplayFixedOutput;
+        public short Color, Duplex, YResolution, TTOption, Collate;
+        [MarshalAs(UnmanagedType.ByValTStr, SizeConst = 32)]
+        public string FormName;
+        public ushort LogPixels;
+        public uint BitsPerPel, PelsWidth, PelsHeight, DisplayFlags, DisplayFrequency, IcmMethod, IcmIntent, MediaType, DitherType, Reserved1, Reserved2, PanningWidth, PanningHeight;
+    }
+
+    /// <summary>
+    /// Benchmarks only: temporarily switches the primary display to w×h if the display offers that mode
+    /// (CDS_FULLSCREEN = not saved, restored by Windows when the process ends). Returns false if unsupported.
+    /// </summary>
+    private static bool TrySetDisplayMode(int w, int h)
+    {
+        var dm = new DevMode { Size = (ushort)Marshal.SizeOf<DevMode>() };
+        for (int i = 0; EnumDisplaySettingsW(null, i, ref dm); i++)
+        {
+            if (dm.PelsWidth == w && dm.PelsHeight == h)
+            {
+                dm.Fields = 0x00080000 | 0x00100000; // DM_PELSWIDTH | DM_PELSHEIGHT
+                return ChangeDisplaySettingsW(ref dm, 0x4 /* CDS_FULLSCREEN */) == 0;
+            }
+        }
+
+        return false;
+    }
+
     private static RecorderOptions Options(int fps, bool audio = true) =>
         new(fps, VideoQuality.Standard, RecordSystemAudio: audio, RecordMicrophone: false, null, 100L * 1024 * 1024, 1);
 
@@ -265,8 +312,15 @@ internal static partial class VideoSelfTest
         string name = $"{w}x{h}-{fps}fps-{seconds}s-{source}";
         string path = Path.Combine(dir, name + ".mp4");
         object row;
+        bool modeChanged = false;
         try
         {
+            if (source == "screen")
+            {
+                modeChanged = TrySetDisplayMode(w, h);
+                Thread.Sleep(modeChanged ? 2000 : 0);
+            }
+
             IFrameSource video = source == "screen"
                 ? new ScreenFrameSource(MonitorFromPoint(0, 1), isWindow: false, crop: (0, 0, w, h), captureCursor: true)
                 : new SyntheticFrameSource(w, h, fps, 10_000_000);
@@ -304,6 +358,13 @@ internal static partial class VideoSelfTest
 #pragma warning restore CA1031
         {
             row = new { name, status = "failed", reason = ex.Message };
+        }
+        finally
+        {
+            if (modeChanged)
+            {
+                _ = ChangeDisplaySettingsW(0, 0); // back to the registry mode
+            }
         }
 
         string json = JsonSerializer.Serialize(row, Json);
