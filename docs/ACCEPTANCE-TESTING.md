@@ -278,3 +278,11 @@ Use a capture that has some text on it. Tools are on the left; colour and size a
 
 Fill in the summary at the top of ACCEPTANCE-RESULTS-TEMPLATE.md and send it (with any screenshots of failures)
 to the reviewer. Thank you!
+
+## Part 14 — Screen recording (Milestone V1, branch `claude/video-v1`)
+
+The recording checklist, with one ID per check (V1-UI-*, V1-AUD-*, V1-REL-*, V1-LIB-*, V1-SEC-*, V1-COMPAT-*) and the
+known limitations, is in [VIDEO-ACCEPTANCE.md](VIDEO-ACCEPTANCE.md) (also included in the portable zip). Record results
+in ACCEPTANCE-RESULTS-TEMPLATE.md with those IDs. Checks marked **CI** already run automatically on every build; checks
+marked **PC** need a real Windows 11 PC with speakers or headphones and, for the microphone rows, a microphone.
+

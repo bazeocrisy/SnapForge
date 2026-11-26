@@ -96,6 +96,7 @@ jobs:
           $dir = "artifacts/portable/SnapForge"
           Copy-Item LICENSE "$dir/LICENSE.txt"
           Copy-Item README.md, THIRD-PARTY-NOTICES.md, docs/ACCEPTANCE-TESTING.md, docs/ACCEPTANCE-RESULTS-TEMPLATE.md $dir
+          if (Test-Path docs/VIDEO-ACCEPTANCE.md) { Copy-Item docs/VIDEO-ACCEPTANCE.md $dir }
           $lines = Get-ChildItem $dir -File | Where-Object Name -ne 'SHA256SUMS.txt' | Sort-Object Name | ForEach-Object {
             "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name
           }
