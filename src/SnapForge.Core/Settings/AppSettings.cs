@@ -198,13 +198,21 @@ public sealed record AppSettings
     /// <summary>Last position of the capture panel; null = centred on the primary monitor.</summary>
     public WindowPosition? CapturePanelPosition { get; init; }
 
+    /// <summary>Screen recording preferences (Milestone V1). Older settings files have none: defaults apply.</summary>
+    public VideoSettings Video { get; init; } = new();
+
     public string EffectiveLibraryPath => string.IsNullOrWhiteSpace(LibraryPath) ? CaptureLibrary.DefaultRoot() : LibraryPath;
 
     public static string DefaultPath() =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductInfo.Name, "settings.json");
 
     public IEnumerable<(string Action, HotkeyGesture? Gesture)> HotkeyAssignments() =>
-        Presets.Select(p => ($"Preset: {p.Name}", p.Hotkey)).Prepend(("Show capture panel", ShowPanelHotkey)).Prepend(("Capture", CaptureHotkey));
+        Presets.Select(p => ($"Preset: {p.Name}", p.Hotkey))
+            .Prepend(("Show capture panel", ShowPanelHotkey))
+            .Prepend(("Capture", CaptureHotkey))
+            .Append(("Start/stop recording", Video.StartStopHotkey))
+            .Append(("Pause/resume recording", Video.PauseResumeHotkey))
+            .Append(("Cancel recording", Video.CancelHotkey));
 
     public static AppSettings Load(string path)
     {
@@ -227,6 +235,7 @@ public sealed record AppSettings
                 Presets = s.Presets.Count == 0 ? CapturePreset.Defaults : MigratePresets(s.Presets),
                 Widget = s.Widget ?? new WidgetSettings(),
                 DragDrop = (s.DragDrop ?? new DragDropSettings()).Normalized(),
+                Video = (s.Video ?? new VideoSettings()).Normalized(),
 
                 // Milestone 3.1: the capture panel opens at start by default. Older files stored "false" because it
                 // was the previous default, so the new default is applied once; the user can turn it off again.

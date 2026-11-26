@@ -271,3 +271,62 @@ public class VideoCoreTests
         Assert.Null(s.Problem);
     }
 }
+
+/// <summary>Milestone V1 recording settings: owner defaults, validation, bit rates, hotkey conflicts, migration.</summary>
+public class VideoSettingsTests
+{
+    [Fact]
+    public void Defaults_follow_the_owner_decisions()
+    {
+        var v = new SnapForge.Core.Settings.VideoSettings();
+        Assert.True(v.RecordSystemAudio);
+        Assert.False(v.RecordMicrophone);
+        Assert.True(v.CaptureCursor);
+        Assert.Equal(30, v.FramesPerSecond);
+        Assert.True(v.Countdown);
+        Assert.Equal(3, v.CountdownSeconds);
+        Assert.Equal(SnapForge.Core.Settings.VideoQuality.Standard, v.Quality);
+        Assert.Equal("Shift+F9", v.StartStopHotkey!.ToString());
+        Assert.Equal("Shift+F10", v.PauseResumeHotkey!.ToString());
+    }
+
+    [Fact]
+    public void Old_settings_file_without_video_gets_defaults_and_bad_values_are_repaired()
+    {
+        using var dir = new TestDirectory();
+        string path = dir.Sub("settings.json");
+        File.WriteAllText(path, """{ "Version": 1, "ShowRecentTray": false }""");
+        SnapForge.Core.Settings.AppSettings s = SnapForge.Core.Settings.AppSettings.Load(path);
+        Assert.False(s.ShowRecentTray);
+        Assert.Equal(new SnapForge.Core.Settings.VideoSettings(), s.Video);
+
+        File.WriteAllText(path, """{ "Version": 1, "Video": { "FramesPerSecond": 144, "CountdownSeconds": 7, "MinimumFreeSpaceMegabytes": 1 } }""");
+        s = SnapForge.Core.Settings.AppSettings.Load(path);
+        Assert.Equal(30, s.Video.FramesPerSecond);
+        Assert.Equal(3, s.Video.CountdownSeconds);
+        Assert.Equal(100, s.Video.MinimumFreeSpaceMegabytes);
+
+        s = s with { Video = s.Video with { FramesPerSecond = 60, RecordMicrophone = true } };
+        s.Save(path);
+        Assert.Equal(60, SnapForge.Core.Settings.AppSettings.Load(path).Video.FramesPerSecond);
+        Assert.True(SnapForge.Core.Settings.AppSettings.Load(path).Video.RecordMicrophone);
+    }
+
+    [Theory]
+    [InlineData(1920, 1080, 30, SnapForge.Core.Settings.VideoQuality.Standard, 5_000_000)]
+    [InlineData(1920, 1080, 30, SnapForge.Core.Settings.VideoQuality.High, 10_000_000)]
+    [InlineData(2560, 1440, 60, SnapForge.Core.Settings.VideoQuality.Standard, 17_700_000)]
+    [InlineData(3840, 2160, 60, SnapForge.Core.Settings.VideoQuality.High, 79_600_000)]
+    [InlineData(320, 240, 30, SnapForge.Core.Settings.VideoQuality.Standard, 1_000_000)]
+    public void Bit_rate_scales_with_pixels_frame_rate_and_quality(int w, int h, int fps, SnapForge.Core.Settings.VideoQuality q, int expected) =>
+        Assert.Equal(expected, SnapForge.Core.Settings.VideoSettings.BitRate(w, h, fps, q));
+
+    [Fact]
+    public void Recording_hotkeys_take_part_in_conflict_detection()
+    {
+        var s = new SnapForge.Core.Settings.AppSettings();
+        s = s with { CaptureHotkey = s.Video.StartStopHotkey };
+        var conflicts = SnapForge.Core.Settings.HotkeyGesture.FindConflicts(s.HotkeyAssignments());
+        Assert.Contains(conflicts, c => c.Contains("Capture") && c.Contains("Start/stop recording"));
+    }
+}

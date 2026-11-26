@@ -68,6 +68,7 @@ internal static unsafe partial class VideoProbe
 
     public static int Run(string outPath)
     {
+        _outPath = outPath;
         var report = new Dictionary<string, object?>
         {
             ["os"] = Environment.OSVersion.VersionString,
@@ -88,12 +89,18 @@ internal static unsafe partial class VideoProbe
         Step(report, "aacEncoders", () => Mf.EnumerateEncoders(Mf.MFT_CATEGORY_AUDIO_ENCODER, Mf.MediaType_Audio, Mf.AudioFormat_AAC, hardware: false));
         Step(report, "renderEndpoints", () => CoreAudio.ListEndpoints(CoreAudio.eRender).Select(e => e.Name).ToList());
         Step(report, "captureEndpoints", () => CoreAudio.ListEndpoints(CoreAudio.eCapture).Select(e => e.Name).ToList());
-        Step(report, "excludeFromCapture", () =>
+        try
         {
             var p = new System.Windows.Interop.HwndSourceParameters("probe") { Width = 10, Height = 10 };
             using var src = new System.Windows.Interop.HwndSource(p);
-            return SetWindowDisplayAffinity(src.Handle, 0x11 /* WDA_EXCLUDEFROMCAPTURE */);
-        });
+            report["excludeFromCapture"] = SetWindowDisplayAffinity(src.Handle, 0x11 /* WDA_EXCLUDEFROMCAPTURE */);
+        }
+#pragma warning disable CA1031
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            report["excludeFromCapture"] = new { error = ex.Message };
+        }
         Step(report, "displayModes", () =>
         {
             var modes = new SortedSet<string>();
@@ -125,17 +132,34 @@ internal static unsafe partial class VideoProbe
         return 0;
     }
 
+    private static string? _outPath;
+
+    /// <summary>Runs one check on its own thread with a time limit, so a native call that hangs cannot stall CI.</summary>
     private static void Step(Dictionary<string, object?> report, string name, Func<object?> action)
     {
-        try
+        object? result = null;
+        var sw = Stopwatch.StartNew();
+        var thread = new Thread(() =>
         {
-            report[name] = action();
-        }
+            try
+            {
+                result = action();
+            }
 #pragma warning disable CA1031 // A probe records every failure instead of stopping.
-        catch (Exception ex)
+            catch (Exception ex)
 #pragma warning restore CA1031
+            {
+                result = new { error = $"{ex.GetType().Name}: {ex.Message}" };
+            }
+        })
+        { IsBackground = true, Name = "probe " + name };
+        thread.SetApartmentState(ApartmentState.MTA);
+        thread.Start();
+        report[name] = thread.Join(TimeSpan.FromSeconds(60)) ? result : new { error = "Timed out after 60 s." };
+        report[name + "Ms"] = sw.ElapsedMilliseconds;
+        if (_outPath is not null)
         {
-            report[name] = new { error = $"{ex.GetType().Name}: {ex.Message}" };
+            File.WriteAllText(_outPath, JsonSerializer.Serialize(report, Json)); // partial report survives a crash
         }
     }
 
@@ -183,7 +207,16 @@ internal static unsafe partial class VideoProbe
         }
 
         long encodeMs = sw.ElapsedMilliseconds;
-        return new { encodeMs, bytes = new FileInfo(path).Length, readBack = ReadBack(path) };
+        SnapForge.Core.Video.Mp4Structure structure = SnapForge.Core.Video.Mp4Inspector.Inspect(path);
+        return new
+        {
+            encodeMs,
+            bytes = new FileInfo(path).Length,
+            readBack = ReadBack(path),
+            boxes = string.Join(' ', structure.Boxes.Select(b => $"{b.Type}:{b.Size}")),
+            fragments = structure.CompleteFragments,
+            complete = structure.IsComplete,
+        };
     }
 
     /// <summary>Reads an MP4 back: duration and the number of decodable video and audio samples.</summary>

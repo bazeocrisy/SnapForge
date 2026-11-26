@@ -18,6 +18,13 @@ public sealed record CaptureMetadata
     public DateTime? LastOpenedUtc { get; init; }
 }
 
+/// <summary>What a library item is.</summary>
+public enum CaptureKind
+{
+    Image,
+    Video,
+}
+
 /// <summary>Index entry for one capture: metadata plus facts from its manifest.</summary>
 public sealed record CaptureRecord
 {
@@ -44,6 +51,22 @@ public sealed record CaptureRecord
 
     /// <summary>Non-null when the capture failed integrity checks (it is listed but cannot be opened).</summary>
     public string? Damage { get; init; }
+
+    public CaptureKind Kind { get; init; } = CaptureKind.Image;
+
+    /// <summary>Video length in milliseconds (videos only).</summary>
+    public long DurationMs { get; init; }
+
+    /// <summary>Video frame rate (videos only).</summary>
+    public int FramesPerSecond { get; init; }
+
+    /// <summary>True if the video has an audio track (videos only).</summary>
+    public bool HasAudio { get; init; }
+
+    /// <summary>True if the video was salvaged after the recording was interrupted (videos only).</summary>
+    public bool Recovered { get; init; }
+
+    public bool IsVideo => Kind == CaptureKind.Video;
 
     public string Title => Meta.Title;
 

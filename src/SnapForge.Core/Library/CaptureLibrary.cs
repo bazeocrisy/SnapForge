@@ -29,7 +29,7 @@ public sealed class LibraryChangedEventArgs(IReadOnlyCollection<Guid> ids) : Eve
 /// every write is atomic, so a crash or full disk never corrupts an existing capture. Nothing here uses the network.
 /// Thread-safe: saves may run on background threads.
 /// </summary>
-public sealed class CaptureLibrary
+public sealed partial class CaptureLibrary
 {
     public const int ThumbnailSize = 320;
     private const string SanitizedBaseFile = "base.sanitized.sfpx";
@@ -40,6 +40,7 @@ public sealed class CaptureLibrary
     {
         Root = Path.GetFullPath(root);
         CapturesDirectory = Path.Combine(Root, "captures");
+        VideosDirectory = Path.Combine(Root, VideosFolderName);
     }
 
     public event EventHandler<LibraryChangedEventArgs>? Changed;
@@ -77,6 +78,7 @@ public sealed class CaptureLibrary
         ArgumentException.ThrowIfNullOrWhiteSpace(root);
         var library = new CaptureLibrary(root);
         Directory.CreateDirectory(library.CapturesDirectory);
+        Directory.CreateDirectory(library.VideosDirectory);
         return library;
     }
 
@@ -96,7 +98,8 @@ public sealed class CaptureLibrary
     }
 
     /// <summary>True if a capture folder with a manifest exists on disk (usable before indexing finishes).</summary>
-    public bool ExistsOnDisk(Guid id) => File.Exists(Path.Combine(FolderOf(id), CaptureFormat.ManifestFile));
+    public bool ExistsOnDisk(Guid id) =>
+        File.Exists(Path.Combine(CaptureFolder(id), CaptureFormat.ManifestFile)) || File.Exists(Path.Combine(VideoFolder(id), VideoManifestFile));
 
     public static string DefaultRoot() =>
         Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductInfo.Name, "Library");
@@ -124,6 +127,8 @@ public sealed class CaptureLibrary
                 }
             }
         }
+
+        IndexVideos(found);
 
         lock (_gate)
         {
@@ -169,6 +174,7 @@ public sealed class CaptureLibrary
     /// (<see cref="Editing.EditorDocument.HasReversibleRedactions"/>).</param>
     public CaptureRecord SaveContent(Guid id, PixelBuffer? newBase, IReadOnlyList<Annotation> annotations, PixelBuffer flattened, bool hasReversibleRedactions)
     {
+        RequireImage(id);
         string dir = ExistingFolder(id);
         JsonObject manifest = ReadManifest(dir);
         DateTime created = CaptureFormat.ParseIso(manifest["createdUtc"]?.GetValue<string>());
@@ -184,6 +190,7 @@ public sealed class CaptureLibrary
     /// </summary>
     public CaptureRecord Sanitize(Guid id, PixelBuffer sanitizedBase, IReadOnlyList<Annotation> annotations, PixelBuffer flattened)
     {
+        RequireImage(id);
         ArgumentNullException.ThrowIfNull(sanitizedBase);
         string dir = ExistingFolder(id);
         JsonObject manifest = ReadManifest(dir);
@@ -201,6 +208,7 @@ public sealed class CaptureLibrary
 
     public CaptureContent Load(Guid id)
     {
+        RequireImage(id);
         string dir = ExistingFolder(id);
         JsonObject manifest = ReadManifest(dir);
         byte[] baseBytes = File.ReadAllBytes(Path.Combine(dir, CaptureFormat.BaseFile));
@@ -278,7 +286,7 @@ public sealed class CaptureLibrary
             {
                 foreach (string file in Directory.EnumerateFiles(dir))
                 {
-                    AtomicFile.OverwriteAndDelete(file);
+                    DeleteLibraryFile(file);
                 }
 
                 Directory.Delete(dir, recursive: true);
@@ -303,6 +311,7 @@ public sealed class CaptureLibrary
     public CaptureRecord Duplicate(Guid id, DateTime utc)
     {
         CaptureRecord source = Find(id) ?? throw new KeyNotFoundException($"Capture {id} not found.");
+        RequireImage(id);
         CaptureContent content = Load(id);
         PixelBuffer thumb = LoadThumbnail(id) ?? Thumbnailer.Create(content.BaseImage, ThumbnailSize);
         var copies = content.Annotations.Select(a => a with { Id = Guid.NewGuid() }).ToList();
@@ -352,7 +361,11 @@ public sealed class CaptureLibrary
         return (trashed, deleted);
     }
 
-    public void ExportPackage(Guid id, string packagePath) => CaptureFormat.WritePackage(ExistingFolder(id), packagePath);
+    public void ExportPackage(Guid id, string packagePath)
+    {
+        RequireImage(id);
+        CaptureFormat.WritePackage(ExistingFolder(id), packagePath);
+    }
 
     /// <summary>Imports a .sfcap package as a new capture (always a new id), after verifying it loads.</summary>
     public CaptureRecord ImportPackage(string packagePath)
@@ -385,7 +398,8 @@ public sealed class CaptureLibrary
                 ["version"] = 1,
                 ["createdUtc"] = CaptureFormat.Iso(DateTime.UtcNow),
             }));
-            foreach (CaptureRecord r in Records.Where(r => r.Damage is null))
+            // Images only: the backup format predates video, and older versions must be able to restore it.
+            foreach (CaptureRecord r in Records.Where(r => r.Damage is null && !r.IsVideo))
             {
                 string dir = FolderOf(r.Id);
                 foreach (string name in CaptureFormat.ContentFiles)
@@ -483,7 +497,9 @@ public sealed class CaptureLibrary
         }
 
         string targetCaptures = Path.Combine(target, "captures");
-        if (Directory.Exists(targetCaptures) && Directory.EnumerateFileSystemEntries(targetCaptures).Any())
+        string targetVideos = Path.Combine(target, VideosFolderName);
+        if ((Directory.Exists(targetCaptures) && Directory.EnumerateFileSystemEntries(targetCaptures).Any())
+            || (Directory.Exists(targetVideos) && Directory.EnumerateFileSystemEntries(targetVideos).Any()))
         {
             throw new IOException("The chosen folder already contains a SnapForge library. Choose an empty folder.");
         }
@@ -503,6 +519,7 @@ public sealed class CaptureLibrary
             }
         }
 
+        CopyVideosTo(target);
         CaptureLibrary moved = Open(target);
         foreach (CaptureRecord r in Records.Where(r => r.Damage is null))
         {
@@ -511,11 +528,14 @@ public sealed class CaptureLibrary
                 throw new IOException($"Capture {r.Id} did not copy correctly; the original library was left unchanged.");
             }
 
-            moved.Load(r.Id); // verifies hashes
+            if (!r.IsVideo)
+            {
+                moved.Load(r.Id); // verifies hashes
+            }
         }
 
         DeletePermanently([.. Records.Select(r => r.Id)]);
-        foreach (string leftover in Directory.EnumerateDirectories(CapturesDirectory))
+        foreach (string leftover in Directory.EnumerateDirectories(CapturesDirectory).Concat(Directory.EnumerateDirectories(VideosDirectory)))
         {
             Directory.Delete(leftover, recursive: true);
         }
@@ -589,7 +609,8 @@ public sealed class CaptureLibrary
 
     private CaptureRecord Refresh(Guid id)
     {
-        CaptureRecord record = ReadRecord(id, FolderOf(id));
+        string folder = FolderOf(id);
+        CaptureRecord record = IsVideoFolder(folder) ? ReadVideoRecord(id, folder) : ReadRecord(id, folder);
         lock (_gate)
         {
             _records[id] = record;
@@ -703,7 +724,14 @@ public sealed class CaptureLibrary
     private static string[] NormalizeTags(IEnumerable<string> tags) =>
         [.. tags.Select(t => t.Trim()).Where(t => t.Length > 0).Distinct(StringComparer.OrdinalIgnoreCase)];
 
-    private string FolderOf(Guid id) => Path.Combine(CapturesDirectory, id.ToString("D"));
+    /// <summary>The folder of an item: its video folder if it is a video, otherwise its capture folder.</summary>
+    private string FolderOf(Guid id)
+    {
+        string video = VideoFolder(id);
+        return Directory.Exists(video) ? video : CaptureFolder(id);
+    }
+
+    private string CaptureFolder(Guid id) => Path.Combine(CapturesDirectory, id.ToString("D"));
 
     private string ExistingFolder(Guid id)
     {

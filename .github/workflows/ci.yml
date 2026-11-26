@@ -164,6 +164,7 @@ jobs:
 
       - name: Video capability probe (screen capture API, encoders, audio devices)
         if: always()
+        timeout-minutes: 5
         shell: pwsh
         working-directory: portable
         run: |

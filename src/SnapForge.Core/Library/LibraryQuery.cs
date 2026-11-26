@@ -10,6 +10,9 @@ public enum LibraryView
     Tag,
     Folder,
     Trash,
+
+    /// <summary>Screen recordings only.</summary>
+    Videos,
 }
 
 public enum LibrarySort
@@ -45,6 +48,7 @@ public sealed record LibraryQuery
             LibraryView.Recent => records.Where(r => !r.IsDeleted && nowUtc - r.RecentActivityUtc <= RecentWindow),
             LibraryView.Tag => records.Where(r => !r.IsDeleted && r.Meta.Tags.Contains(Key ?? string.Empty, StringComparer.OrdinalIgnoreCase)),
             LibraryView.Folder => records.Where(r => !r.IsDeleted && string.Equals(r.Meta.Folder, Key ?? string.Empty, StringComparison.OrdinalIgnoreCase)),
+            LibraryView.Videos => records.Where(r => !r.IsDeleted && r.IsVideo),
             _ => records.Where(r => !r.IsDeleted),
         };
 
@@ -72,7 +76,8 @@ public sealed record LibraryQuery
             || r.Meta.Tags.Any(t => t.Contains(term, ci))
             || r.Meta.Folder.Contains(term, ci)
             || r.CreatedUtc.ToLocalTime().ToString("yyyy-MM-dd", CultureInfo.InvariantCulture).Contains(term, StringComparison.Ordinal)
-            || $"{r.Width}x{r.Height}".Contains(term, StringComparison.OrdinalIgnoreCase);
+            || $"{r.Width}x{r.Height}".Contains(term, StringComparison.OrdinalIgnoreCase)
+            || (r.IsVideo && (term.Equals("video", ci) || term.Equals("recording", ci)));
     }
 }
 
