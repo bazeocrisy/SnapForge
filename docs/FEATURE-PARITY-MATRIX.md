@@ -188,22 +188,22 @@ Legend
 |---|---|---|---|---|---|---|---|
 | FP-DOC-01 | Combine in Template / Apply Template / Image from Template | 2025 templates | S-LIB-16 DOC | ✗ | P3 | M7 | DOC-01 |
 | FP-DOC-02 | Step Capture (auto screenshot per click → guide) | 2025.0.0; Word/PowerPoint export | S-LIB-18/19 DOC | ✗ | P3 | M7 | DOC-02 |
-| FP-DOC-03 | Video from Images | Narration per image | S-LIB-20 DOC | ✗ | — | M8 | VID-10 |
+| FP-DOC-03 | Video from Images | Narration per image | S-LIB-20 DOC | ✗ | — | V3 | VID-V3-05 |
 | FP-DOC-04 | PDF export | Export only | S-LIB-28 DOC | ✗ | P2 | M7 | EXP-03 |
 
 ## 9. Video
 
 | ID | Capability | Snagit (Windows) | Src · Ev | SnapForge today | Pri | MS | Req |
 |---|---|---|---|---|---|---|---|
-| FP-VID-01 | Record region/window/screen to MP4 | Video tab | S-LIB-21 DOC | ✗ (out of scope until M8; owner forbade video earlier) | — | M8 | VID-01 |
-| FP-VID-02 | Mic + system audio, webcam PiP | Yes | S-LIB-21 DOC | ✗ | — | M8 | VID-02/03 |
-| FP-VID-03 | Pause/resume (Shift+F9), stop (Shift+F10) | Yes | S-LIB-21, S-CAP-07 DOC | ✗ | — | M8 | VID-04 |
-| FP-VID-04 | Countdown before recording | UNVERIFIED | — | ✗ | — | M8 | VID-05 |
-| FP-VID-05 | Quality up to 4K60 (VFR) | 2024.2.0 | S-LIB-27 DOC | ✗ | — | M8 | VID-06 |
-| FP-VID-06 | Cursor highlight / click animation | Yes | S-LIB-02 DOC | ✗ | — | M8 | VID-07 |
-| FP-VID-07 | Screen Draw while recording | Ctrl+Shift+D | S-LIB-24 DOC | ✗ | — | M8 | VID-08 |
-| FP-VID-08 | Trim/cut, save frame, combine clips | Yes | S-LIB-22/23 DOC | ✗ | — | M8 | VID-09 |
-| FP-VID-09 | Animated GIF (fps, size, dithering, loop) | Yes | S-LIB-25 DOC | ✗ | — | M8 | VID-11 |
+| FP-VID-01 | Record region/window/screen to MP4 | Video tab | S-LIB-21 DOC | ◐ V1 branch — under review | CI self-test | V1 | VID-01/02 |
+| FP-VID-02 | Mic + system audio, webcam PiP | Yes | S-LIB-21 DOC | ◐ mic + system audio on V1 branch (devices Pending-PC); webcam ✗ | Mixer tests | V1/V3 | VID-03, VID-V3-01 |
+| FP-VID-03 | Pause/resume (Shift+F9), stop (Shift+F10) | Yes | S-LIB-21, S-CAP-07 DOC | ◐ V1 branch — under review | CI pause-resume | V1 | VID-04, VID-06 |
+| FP-VID-04 | Countdown before recording | UNVERIFIED | — | ◐ V1 branch — under review | settings test | V1 | VID-05 |
+| FP-VID-05 | Quality up to 4K60 (VFR) | 2024.2.0 | S-LIB-27 DOC | ◐ 30/60 FPS CFR, Standard/High on V1 branch; 4K Pending-PC; VFR ✗ | CI 60fps | V1/V3 | VID-10, VID-V3-06 |
+| FP-VID-06 | Cursor highlight / click animation | Yes | S-LIB-02 DOC | ✗ (cursor on/off only: VID-07) | — | V3 | VID-V3-03 |
+| FP-VID-07 | Screen Draw while recording | Ctrl+Shift+D | S-LIB-24 DOC | ✗ | — | V3 | VID-V3-02 |
+| FP-VID-08 | Trim/cut, save frame, combine clips | Yes | S-LIB-22/23 DOC | ✗ | — | V2/V3 | VID-V2-01/02, VID-V3-04 |
+| FP-VID-09 | Animated GIF (fps, size, dithering, loop) | Yes | S-LIB-25 DOC | ✗ | — | V2 | VID-V2-03 |
 
 ## 10. Export / share
 

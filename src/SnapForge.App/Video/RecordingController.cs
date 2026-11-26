@@ -93,7 +93,14 @@ internal static partial class RecordingController
             return;
         }
 
-        _ = Mf.MFStartup(Mf.MF_VERSION, 0);
+        if (!MediaFoundationAvailable())
+        {
+            MessageBox.Show("Screen recording needs the Windows media components (Media Foundation), which are not installed on this PC. " +
+                "On Windows \"N\" editions install the Media Feature Pack (Settings → Apps → Optional features); on Windows Server add the Media Foundation feature.",
+                "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+            return;
+        }
+
         if (!GraphicsCapture.IsSupported())
         {
             MessageBox.Show("Screen recording needs Windows 10 version 2004 or later (Windows 11 recommended). This PC does not offer the Windows screen-capture service.", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
@@ -433,6 +440,23 @@ internal static partial class RecordingController
         }
 
         Hidden.Clear();
+    }
+
+    /// <summary>True if Media Foundation is present and starts (absent on Windows N editions without the Media Feature Pack).</summary>
+    internal static bool MediaFoundationAvailable()
+    {
+        try
+        {
+            return Mf.MFStartup(Mf.MF_VERSION, 0) >= 0;
+        }
+        catch (DllNotFoundException)
+        {
+            return false;
+        }
+        catch (EntryPointNotFoundException)
+        {
+            return false;
+        }
     }
 
     private static long PackPoint(int x, int y) => ((long)y << 32) | (uint)x;

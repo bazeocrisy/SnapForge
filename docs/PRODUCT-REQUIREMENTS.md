@@ -1,7 +1,7 @@
 # SnapForge master product requirements
 
 Status: **master list** (Gate A corrected 2026-11-25; Gate B approved with owner decisions). Generated from one
-structured list, so every row has a **unique ID** (checked mechanically: 234 requirements, 0 duplicates) and every
+structured list, so every row has a **unique ID** (checked mechanically: 258 requirements, 0 duplicates) and every
 parity-matrix row maps to at least one requirement (checked: 183 matrix rows, 0 dangling references).
 [REQUIREMENTS.md](REQUIREMENTS.md) stays as the record of milestones 1–2; its IDs map to the BL-* rows.
 
@@ -317,21 +317,55 @@ here authorises work beyond milestone 3).
 | CAP-LEG-01 | Printer capture (virtual printer driver) | S-CAP-06 | UNVERIFIED | Not started | — | Backlog (not planned: driver/admin) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-16 |
 | CAP-LEG-02 | Object capture | S-CAP-32 | DOC (historical) | Not started | — | Backlog (not planned) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-CAP-17 |
 
-## M8 Video (11)
+## V1 Screen recording (12)
 
 | ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
 |---|---|---|---|---|---|---|---|---|---|---|
-| VID-01 | Screen recording region/window/screen to MP4 | S-LIB-21 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-01 |
-| VID-02 | Microphone + system audio | S-LIB-21 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-02 |
-| VID-03 | Webcam picture-in-picture | S-LIB-21 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-02 |
-| VID-04 | Pause/resume, stop hotkeys | S-LIB-21; S-CAP-07 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-03 |
-| VID-05 | Countdown before recording | UNVERIFIED | UNVERIFIED | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-04 |
-| VID-06 | Quality presets up to 4K60 | S-LIB-27 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-05 |
-| VID-07 | Cursor highlight / click animation | S-LIB-02 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-06 |
-| VID-08 | Draw on screen while recording | S-LIB-24 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-07 |
-| VID-09 | Trim, save frame, combine clips | S-LIB-22/23 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-08 |
-| VID-10 | Video from images with narration | S-LIB-20 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-DOC-03 |
-| VID-11 | Animated GIF export | S-LIB-25 | DOC | Not started | — | V1/V2/V3 (see VIDEO-PLAN.md) | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-09 |
+| VID-01 | Video mode in the capture panel and the widget; Record: Region, Window, Display | VIDEO-PLAN; S-LIB-21 | OWNER | Implemented — under review | P1 | V1 | Video selected → Record starts a recording of that area | Capture_panel_is_compact_horizontal_and_marks_unavailable_modes (Video mode); manual V1-UI-01/02 | Approved — Milestone V1 (owner, 2026-11-26) | FP-VID-01 |
+| VID-02 | Record to MP4 (H.264 + AAC) with Windows.Graphics.Capture and the Windows encoders; no bundled codecs or paid components | VIDEO-PLAN; owner | OWNER | Implemented — under review | P1 | V1 | File plays in Windows players and browsers | CI video self-test (sample MP4s, decode read-back); manual V1-PLAY-01 | Approved — Milestone V1 (owner, 2026-11-26) | FP-VID-01 |
+| VID-03 | Audio: system sound (default on) and microphone (default off) as separate switches; microphone chooser in Settings | owner decisions | OWNER | Implemented — under review | P1 | V1 | Recording contains the selected sources; level meters move | CI: silent track when no devices; Mixer unit tests; manual V1-AUD-01…04 (Pending-PC) | Approved — Milestone V1 (owner, 2026-11-26) | FP-VID-02 |
+| VID-04 | Floating recording toolbar: indicator, elapsed time, Pause/Resume, Stop and save, Cancel and discard, mic/system toggles with level meters, resolution and FPS; never takes focus; excluded from the recording | owner | OWNER | Implemented — under review | P1 | V1 | Toolbar works by mouse and hotkeys; not in the video | CI probe excludeFromCapture=true; manual V1-UI-03…05 (pixel check Pending-PC) | Approved — Milestone V1 (owner, 2026-11-26) | FP-VID-03 |
+| VID-05 | Countdown before recording (on by default, 0/3/5/10 s) and a dashed outline around the recorded area (not recorded) | owner | OWNER | Implemented — under review | P1 | V1 | Visible countdown and outline; neither in the video | Defaults_follow_the_owner_decisions; manual V1-UI-06 | Approved — Milestone V1 (owner, 2026-11-26) | FP-VID-04 |
+| VID-06 | Hotkeys: Shift+F9 start/pause/resume, Shift+F10 stop, optional cancel; configurable; conflicts reported | VIDEO-PLAN | OWNER | Implemented — under review | P1 | V1 | Hotkeys work while another app has focus | Recording_hotkeys_take_part_in_conflict_detection; manual V1-HK-01 | Approved — Milestone V1 (owner, 2026-11-26) | FP-VID-03 |
+| VID-07 | Cursor in the recording on/off (default on) | owner | OWNER | Implemented — under review | P1 | V1 | Option honoured | CI probe cursorCapture=true; manual V1-UI-07 | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-08 | Videos in the Library and tray: thumbnail, play badge, duration, resolution, size; Videos view; player (play/pause/seek/volume, streamed); rename, tags, favourites, folders, search, trash, restore; record without history | owner | OWNER | Implemented — under review | P1 | V1 | Video tiles appear, play, survive restart | VideoLibraryTests (9 tests); manual V1-LIB-01…04 | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-09 | Native drag-out of videos as MP4 (copy in the temporary drag folder) and Export MP4 | owner | OWNER | Implemented — under review | P1 | V1 | MP4 arrives in Explorer/Teams/Outlook | Code path shared with image drag tests; separate-process drop target V1-LIB-05 (Pending); Explorer/browser/Office/Teams Pending-PC | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-10 | Quality: 30 FPS default, 60 FPS option; resolution = recorded area; Standard and High presets | owner | OWNER | Implemented — under review | P1 | V1 | Settings honoured; file size reported | Bit_rate_scales_with_pixels_frame_rate_and_quality; CI 60fps check; benchmark report | Approved — Milestone V1 (owner, 2026-11-26) | FP-VID-05 |
+| VID-11 | Safety and privacy: Windows capture border and mic indicator preserved; local only; disclosure that videos cannot be redacted or sanitized | owner | OWNER | Implemented — under review | P1 | V1 | Indicators visible; disclosure in Settings | VIDEO-THREAT-MODEL.md; manual V1-SEC-01…03 | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-12 | Performance: recording does not freeze SnapForge or the recorded app; CPU, GPU (where measurable), memory, dropped frames, A/V sync, encode latency, file size measured | owner | OWNER | Implemented — under review | P1 | V1 | Benchmark report with unsupported/unverified configurations listed | VIDEO-BENCHMARKS.md (CI + Pending-PC rows) | Approved — Milestone V1 (owner, 2026-11-26) | — |
+
+## V1 Recording reliability (14)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| VID-R01 | A/V synchronisation and drift measured on every CI run | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Mean \|offset\| ≤ 45 ms, drift reported | CI av-sync (synthetic flash/beep, decoded from the MP4) | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R02 | Hardware encoding with automatic software fallback; encoder actually used is reported | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Software fallback on failure; encoder name in result | Code + CI (software path); hardware path Pending-PC | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R03 | Graceful handling of unavailable encoders / missing Media Foundation | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Clear message, no crash | MediaFoundationAvailable check; manual on an N edition (Pending) | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R04 | Crash recovery where technically possible (fragmented MP4; recovery only claimed when demonstrated) | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Killed recording recovered and decodable | CI kill-and-recover test | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R05 | Safe MP4 finalization and validation (manifest after Finalize; read-back) | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Normal stop yields a complete, decodable MP4 | CI fragmented-mp4 + read-back; Mp4Inspector unit tests | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R06 | Disk-space monitoring, low-space warning, stop-and-save below a threshold | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Warning at <10 min, stop below minimum | Code; manual disk-full V1-REL-06 (Pending-PC) | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R07 | Microphone/audio device disconnection: silence, retry, notice | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Recording continues; notice shown | Mixer gap tests; CI no-device path; manual unplug (Pending-PC) | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R08 | Bluetooth / default output changes followed by system-audio capture | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Capture moves to the new device | Code; manual Bluetooth switch (Pending-PC) | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R09 | Display disconnection and resolution changes | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Stop and save on disconnect; resize handled | Code; manual V1-REL-09 (Pending-PC) | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R10 | Sleep, lock and unexpected shutdown: lock pauses, sleep/sign-out stop and save, crash → recovery | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Behaviour as stated | Code; CI kill test; manual lock/sleep (Pending-PC) | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R11 | Long recordings (5/30/60/120 min where feasible) | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | No growth in memory; valid file | Benchmark workflow (CI where feasible; Pending-PC) | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R12 | Accurate pause/resume timestamps on one clock for audio and video | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Paused time removed exactly; sync kept | RecordingClock unit tests; CI pause-resume | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R13 | Bounded memory (frame queue and audio buffers capped; drops counted) | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Peak memory bounded | Mixer_memory_is_bounded…; queue capacity from 256 MB budget; benchmark memory column | Approved — Milestone V1 (owner, 2026-11-26) | — |
+| VID-R14 | Prevent simultaneous recording sessions | owner (V1 approval) | OWNER | Implemented — under review | P1 | V1 | Second start refused | CI single-session | Approved — Milestone V1 (owner, 2026-11-26) | — |
+
+## V2/V3 Video (later, separate approval) (9)
+
+| ID | Requirement | Source | Ev | Status | Pri | MS | Acceptance | Verification | Approval | FP |
+|---|---|---|---|---|---|---|---|---|---|---|
+| VID-V2-01 | Trim / cut | S-LIB-22/23 | DOC | Not started | — | V2 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-08 |
+| VID-V2-02 | Save a frame as an image | S-LIB-22 | DOC | Not started | — | V2 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-08 |
+| VID-V2-03 | Animated GIF export (fps, size, dithering, loop) | S-LIB-25 | DOC | Not started | — | V2 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-09 |
+| VID-V3-01 | Webcam picture-in-picture | S-LIB-21 | DOC | Not started | — | V3 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-02 |
+| VID-V3-02 | Draw on screen while recording | S-LIB-24 | DOC | Not started | — | V3 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-07 |
+| VID-V3-03 | Cursor highlight / click animation | S-LIB-02 | DOC | Not started | — | V3 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-06 |
+| VID-V3-04 | Combine clips | S-LIB-23 | DOC | Not started | — | V3 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-08 |
+| VID-V3-05 | Video from images with narration | S-LIB-20 | DOC | Not started | — | V3 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-DOC-03 |
+| VID-V3-06 | Variable frame rate / up to 4K60 capture presets beyond V1 | S-LIB-27 | DOC | Not started | — | V3 | Defined at that milestone's Gate A | — | Proposed — not authorised | FP-VID-05 |
 
 ## M9 Enterprise (7)
 
@@ -369,7 +403,8 @@ here authorises work beyond milestone 3).
 | Approved — product decision (owner, 2026-11-25) | 5 |
 | Approved — Gate B (owner, 2026-11-25) | 62 |
 | Delivered M1/M2 — under independent review | 37 |
-| Proposed — not authorised | 110 |
+| Proposed — not authorised | 108 |
+| Approved — Milestone V1 (owner, 2026-11-26) | 26 |
 | Deferred — owner (2026-11-26) | 7 |
 | Approved — owner (small items, 2026-11-26) | 4 |
-| **Total** | **234** |
+| **Total** | **258** |
