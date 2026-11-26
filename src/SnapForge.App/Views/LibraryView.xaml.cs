@@ -89,6 +89,7 @@ internal sealed class LibraryTileViewModel : ObservableObject
         Record.HasReversibleRedactions ? "The Library copy still holds original pixels under redactions (Sanitize removes them)." : null,
         Record.IsVideo ? $"Video · {DurationText} · {Record.FramesPerSecond} FPS · {(Record.HasAudio ? "with sound" : "no sound")}. Videos cannot be redacted or sanitized." : null,
         Record.Recovered ? "Recovered after the recording was interrupted; the last seconds before the interruption may be missing." : null,
+        Record.VideoFragmented ? "Kept in its recording (fragmented) form because it could not be optimised — usually too little free disk space. Windows players may show sound slightly out of step." : null,
         Record.IsDeleted ? "In Trash" : null,
     }.Where(s => s is not null));
 
