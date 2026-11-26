@@ -24,16 +24,16 @@
                                 AutomationProperties.Name="{Binding Title}">
                             <Border.ContextMenu>
                                 <ContextMenu Opened="OnTileContextOpened">
-                                    <MenuItem Header="_Open in Editor" Click="OnOpenSelected" FontWeight="SemiBold" InputGestureText="Enter" />
+                                    <MenuItem Header="_Open in Editor" Tag="open" Click="OnOpenSelected" FontWeight="SemiBold" InputGestureText="Enter" />
                                     <MenuItem Header="_Rename…" Click="OnRename" InputGestureText="F2" />
-                                    <MenuItem Header="_Duplicate" Click="OnDuplicate" />
+                                    <MenuItem Header="_Duplicate" Tag="image-only" Click="OnDuplicate" />
                                     <MenuItem Header="Toggle _favorite" Click="OnToggleFavorite" />
                                     <MenuItem Header="_Tags…" Click="OnEditTags" />
                                     <MenuItem Header="Move to _folder…" Click="OnSetFolder" />
                                     <Separator />
-                                    <MenuItem Header="_Export as PNG/JPEG…" Click="OnExport" />
-                                    <MenuItem Header="Export editable capture (.sfcap)…" Click="OnExportPackage" />
-                                    <MenuItem Header="_Sanitize…" Click="OnSanitize" />
+                                    <MenuItem Header="_Export as PNG/JPEG…" Tag="export" Click="OnExport" />
+                                    <MenuItem Header="Export editable capture (.sfcap)…" Tag="image-only" Click="OnExportPackage" />
+                                    <MenuItem Header="_Sanitize…" Tag="image-only" Click="OnSanitize" />
                                     <Separator />
                                     <MenuItem x:Name="TrashItem" Header="Move to _Trash" Click="OnDelete" InputGestureText="Del" />
                                     <MenuItem Header="_Restore" Click="OnRestore" />
@@ -44,6 +44,14 @@
                                 <Grid Height="{Binding ImageHeight}">
                                     <Border Background="{DynamicResource CanvasBackdropBrush}" CornerRadius="4" />
                                     <Image Source="{Binding Thumbnail}" Stretch="Uniform" RenderOptions.BitmapScalingMode="HighQuality" />
+                                    <!-- Video: play badge and duration -->
+                                    <Grid Visibility="{Binding IsVideo, Converter={StaticResource BoolToVis}}" IsHitTestVisible="False">
+                                        <Ellipse Width="40" Height="40" Fill="#B0000000" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Path Data="M0,0 L14,8 L0,16 Z" Fill="White" Width="14" Height="16" Margin="4,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                                        <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="4" CornerRadius="3" Padding="5,1" Background="#C8000000">
+                                            <TextBlock Text="{Binding DurationText}" FontSize="11" Foreground="White" />
+                                        </Border>
+                                    </Grid>
                                     <Path Data="{StaticResource IconStar}" Fill="{DynamicResource AccentBrush}" Width="24" Height="24" Stretch="None"
                                           HorizontalAlignment="Right" VerticalAlignment="Top" Margin="2" Visibility="{Binding Favorite, Converter={StaticResource BoolToVis}}" />
                                     <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4" CornerRadius="3" Padding="4,1"
@@ -93,6 +101,9 @@
                     </RadioButton>
                     <RadioButton x:Name="FavoritesView" GroupName="View" Style="{StaticResource SidebarItem}" Tag="Favorites" Checked="OnViewChecked">
                         <DockPanel><TextBlock x:Name="FavoritesCount" DockPanel.Dock="Right" Foreground="{DynamicResource MutedTextBrush}" /><StackPanel Orientation="Horizontal"><Path Style="{StaticResource IconPath}" Data="{StaticResource IconStar}" Width="22" /><TextBlock Text="Favorites" Margin="6,0,0,0" VerticalAlignment="Center" /></StackPanel></DockPanel>
+                    </RadioButton>
+                    <RadioButton x:Name="VideosView" GroupName="View" Style="{StaticResource SidebarItem}" Tag="Videos" Checked="OnViewChecked">
+                        <DockPanel><TextBlock x:Name="VideosCount" DockPanel.Dock="Right" Foreground="{DynamicResource MutedTextBrush}" /><StackPanel Orientation="Horizontal"><Path Style="{StaticResource IconPath}" Data="{StaticResource IconVideoMode}" Width="22" /><TextBlock Text="Videos" Margin="6,0,0,0" VerticalAlignment="Center" /></StackPanel></DockPanel>
                     </RadioButton>
                     <RadioButton x:Name="TrashView" GroupName="View" Style="{StaticResource SidebarItem}" Tag="Trash" Checked="OnViewChecked">
                         <DockPanel><TextBlock x:Name="TrashCount" DockPanel.Dock="Right" Foreground="{DynamicResource MutedTextBrush}" /><StackPanel Orientation="Horizontal"><Path Style="{StaticResource IconPath}" Data="{StaticResource IconTrash}" Width="22" /><TextBlock Text="Trash" Margin="6,0,0,0" VerticalAlignment="Center" /></StackPanel></DockPanel>

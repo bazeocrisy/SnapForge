@@ -88,6 +88,9 @@
                 </WrapPanel>
                 <TextBlock x:Name="UsageText" FontSize="12" TextWrapping="Wrap" Margin="0,4,0,0" />
 
+                <TextBlock Text="Recording" FontSize="13" FontWeight="SemiBold" Margin="0,14,0,4" />
+                <StackPanel x:Name="RecordingSection" />
+
                 <TextBlock Text="Retention" FontSize="13" FontWeight="SemiBold" Margin="0,14,0,4" />
                 <DockPanel>
                     <TextBox x:Name="TrashDaysBox" DockPanel.Dock="Right" Width="70" LostFocus="OnRetentionChanged" AutomationProperties.Name="Days to keep items in Trash" />

@@ -17,7 +17,11 @@ namespace SnapForge.App.Services;
 /// Returns the image exactly as File → Export would write it: annotations drawn, redactions burned in. Called on
 /// the UI thread only if a drop target asks for files.
 /// </param>
-internal sealed record DragCapture(Guid Key, string Title, DateTime CreatedLocal, Func<PixelBuffer> RenderFlattened);
+internal sealed record DragCapture(Guid Key, string Title, DateTime CreatedLocal, Func<PixelBuffer> RenderFlattened)
+{
+    /// <summary>For a recording: the Library MP4, copied (streamed) into the drag folder — never offered in place.</summary>
+    public string? VideoSource { get; init; }
+}
 
 /// <summary>
 /// Dragging captures out of SnapForge (Recent Captures tray and Library) to Explorer, the desktop, Office, mail,
@@ -174,6 +178,14 @@ internal static class CaptureDragDrop
             {
                 foreach (DragCapture item in Items)
                 {
+                    if (item.VideoSource is { } video)
+                    {
+                        string mp4 = Path.Combine(dir, ExportFileNames.For(item.Title, item.CreatedLocal, ".mp4", used));
+                        File.Copy(video, mp4);
+                        paths.Add(mp4);
+                        continue;
+                    }
+
                     PixelBuffer flat = item.RenderFlattened();
                     string path = Path.Combine(dir, ExportFileNames.For(item.Title, item.CreatedLocal, settings.Format, used));
                     File.WriteAllBytes(path, ImageExporter.Encode(flat, settings.Format, settings.JpegQuality));

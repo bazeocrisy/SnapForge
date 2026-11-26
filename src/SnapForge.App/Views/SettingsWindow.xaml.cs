@@ -51,6 +51,7 @@ public partial class SettingsWindow : Window
             + "\nSnapForge has no network features: captures are never uploaded or synchronized by SnapForge.";
         UpdateHotkeyStatus();
         LoadGateBSettings(s);
+        BuildRecordingSection();
         _loading = false;
     }
 

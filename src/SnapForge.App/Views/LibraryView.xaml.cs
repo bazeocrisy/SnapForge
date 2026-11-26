@@ -68,11 +68,17 @@ internal sealed class LibraryTileViewModel : ObservableObject
 
     public string Subtitle => Record.Damage is not null
         ? "Damaged — cannot be opened"
-        : $"{Record.CreatedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)} · {Record.Width}×{Record.Height}";
+        : Record.IsVideo
+            ? $"{Record.CreatedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)} · {Record.Width}×{Record.Height} · {Video.VideoPlayerWindow.FormatSize(Record.SizeBytes)}"
+            : $"{Record.CreatedUtc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture)} · {Record.Width}×{Record.Height}";
 
-    public bool HasWarning => Record.Damage is not null || Record.HasReversibleRedactions;
+    public bool IsVideo => Record.IsVideo;
 
-    public string WarningText => Record.Damage is not null ? "Damaged" : "Unsanitized redactions";
+    public string DurationText => Video.VideoPlayerWindow.Format(TimeSpan.FromMilliseconds(Record.DurationMs));
+
+    public bool HasWarning => Record.Damage is not null || Record.HasReversibleRedactions || Record.Recovered;
+
+    public string WarningText => Record.Damage is not null ? "Damaged" : Record.Recovered ? "Recovered" : "Unsanitized redactions";
 
     public string Tooltip => string.Join("\n", new[]
     {
@@ -81,6 +87,8 @@ internal sealed class LibraryTileViewModel : ObservableObject
         Record.Meta.Tags.Count > 0 ? "Tags: " + string.Join(", ", Record.Meta.Tags) : null,
         Record.Meta.Folder.Length > 0 ? "Folder: " + Record.Meta.Folder : null,
         Record.HasReversibleRedactions ? "The Library copy still holds original pixels under redactions (Sanitize removes them)." : null,
+        Record.IsVideo ? $"Video · {DurationText} · {Record.FramesPerSecond} FPS · {(Record.HasAudio ? "with sound" : "no sound")}. Videos cannot be redacted or sanitized." : null,
+        Record.Recovered ? "Recovered after the recording was interrupted; the last seconds before the interruption may be missing." : null,
         Record.IsDeleted ? "In Trash" : null,
     }.Where(s => s is not null));
 
@@ -211,6 +219,7 @@ public partial class LibraryView : UserControl
             (true, _) => ("No matches", $"Nothing matches \"{_query.Search}\" in this view."),
             (_, Core.Library.LibraryView.Trash) => ("Trash is empty", "Deleted captures stay here until you empty the Trash."),
             (_, Core.Library.LibraryView.Favorites) => ("No favorites", "Right-click a capture → Toggle favorite."),
+            (_, Core.Library.LibraryView.Videos) => ("No recordings yet", "Choose Video in the capture panel, or press the recording hotkey, to record your screen."),
             _ => ("No captures yet", "Captures you take are saved here automatically (unless you turn that off in the Capture window)."),
         };
         bool trash = _query.View == Core.Library.LibraryView.Trash;
@@ -269,6 +278,7 @@ public partial class LibraryView : UserControl
         IReadOnlyList<CaptureRecord> all = library.Records;
         AllCount.Text = all.Count(r => !r.IsDeleted).ToString(CultureInfo.CurrentCulture);
         RecentCount.Text = new LibraryQuery { View = Core.Library.LibraryView.Recent }.Apply(all, now).Count().ToString(CultureInfo.CurrentCulture);
+        VideosCount.Text = new LibraryQuery { View = Core.Library.LibraryView.Videos }.Apply(all, now).Count().ToString(CultureInfo.CurrentCulture);
         FavoritesCount.Text = all.Count(r => !r.IsDeleted && r.IsFavorite).ToString(CultureInfo.CurrentCulture);
         TrashCount.Text = all.Count(r => r.IsDeleted).ToString(CultureInfo.CurrentCulture);
 
@@ -554,12 +564,33 @@ public partial class LibraryView : UserControl
 
     private void OnTileContextOpened(object sender, RoutedEventArgs e)
     {
-        if (sender is ContextMenu { PlacementTarget: FrameworkElement { Tag: LibraryTileViewModel tile } } && !_selected.Contains(tile.Record.Id))
+        if (sender is ContextMenu { PlacementTarget: FrameworkElement { Tag: LibraryTileViewModel tile } } menu)
         {
-            _selected.Clear();
-            _selected.Add(tile.Record.Id);
-            _anchor = _focusIndex = tile.Index;
-            ApplySelection();
+            if (!_selected.Contains(tile.Record.Id))
+            {
+                _selected.Clear();
+                _selected.Add(tile.Record.Id);
+                _anchor = _focusIndex = tile.Index;
+                ApplySelection();
+            }
+
+            // Videos: Play instead of Open in Editor; image-only commands are not offered.
+            bool video = tile.IsVideo;
+            foreach (MenuItem item in menu.Items.OfType<MenuItem>())
+            {
+                switch (item.Tag as string)
+                {
+                    case "open":
+                        item.Header = video ? "_Play" : "_Open in Editor";
+                        break;
+                    case "export":
+                        item.Header = video ? "_Export MP4 video…" : "_Export as PNG/JPEG…";
+                        break;
+                    case "image-only":
+                        item.Visibility = video ? Visibility.Collapsed : Visibility.Visible;
+                        break;
+                }
+            }
         }
     }
 
@@ -710,6 +741,49 @@ public partial class LibraryView : UserControl
         }
     }
 
+    /// <summary>Exports recordings as MP4 copies (streamed file copy; the video is never loaded into memory).</summary>
+    private async Task ExportVideosAsync(List<CaptureRecord> videos)
+    {
+        string? folder = null;
+        if (videos.Count == 1)
+        {
+            var dialog = new Microsoft.Win32.SaveFileDialog
+            {
+                Title = "Export video",
+                Filter = "MP4 video (*.mp4)|*.mp4",
+                FileName = SnapForge.Core.Export.ExportFileNames.For(videos[0].Title, videos[0].CreatedUtc.ToLocalTime(), ".mp4", new HashSet<string>()),
+            };
+            if (dialog.ShowDialog(Window.GetWindow(this)) != true)
+            {
+                return;
+            }
+
+            string target = dialog.FileName;
+            await RunAsync(() => File.Copy(_services!.Library.VideoPath(videos[0].Id), target, overwrite: true), $"Exported {target}").ConfigureAwait(true);
+            return;
+        }
+
+        var picker = new Microsoft.Win32.OpenFolderDialog { Title = "Export videos to folder" };
+        if (picker.ShowDialog(Window.GetWindow(this)) == true)
+        {
+            folder = picker.FolderName;
+        }
+
+        if (folder is null)
+        {
+            return;
+        }
+
+        var used = new HashSet<string>(Directory.EnumerateFiles(folder).Select(Path.GetFileName).OfType<string>(), StringComparer.OrdinalIgnoreCase);
+        await RunAsync(() =>
+        {
+            foreach (CaptureRecord v in videos)
+            {
+                File.Copy(_services!.Library.VideoPath(v.Id), Path.Combine(folder, SnapForge.Core.Export.ExportFileNames.For(v.Title, v.CreatedUtc.ToLocalTime(), ".mp4", used)));
+            }
+        }, $"Exported {videos.Count} videos to {folder}").ConfigureAwait(true);
+    }
+
     private async void OnRename(object sender, RoutedEventArgs e)
     {
         if (SelectedRecords() is not [var r])
@@ -726,7 +800,7 @@ public partial class LibraryView : UserControl
 
     private async void OnDuplicate(object sender, RoutedEventArgs e)
     {
-        List<CaptureRecord> records = SelectedRecords();
+        List<CaptureRecord> records = [.. SelectedRecords().Where(r => !r.IsVideo)];
         await RunAsync(() =>
         {
             foreach (CaptureRecord r in records)
@@ -805,6 +879,16 @@ public partial class LibraryView : UserControl
             return;
         }
 
+        if (records.Any(r => r.IsVideo))
+        {
+            await ExportVideosAsync([.. records.Where(r => r.IsVideo)]).ConfigureAwait(true);
+            records = [.. records.Where(r => !r.IsVideo)];
+            if (records.Count == 0)
+            {
+                return;
+            }
+        }
+
         if (records.Count == 1)
         {
             CaptureRecord r = records[0];
@@ -853,9 +937,9 @@ public partial class LibraryView : UserControl
 
     private async void OnExportPackage(object sender, RoutedEventArgs e)
     {
-        if (SelectedRecords() is not [var r])
+        if (SelectedRecords() is not [var r] || r.IsVideo)
         {
-            _host?.SetStatus("Select one capture to export it as an editable package.");
+            _host?.SetStatus("Select one image capture to export it as an editable package (videos are exported as MP4).");
             return;
         }
 
@@ -881,7 +965,12 @@ public partial class LibraryView : UserControl
 
     private async void OnSanitize(object sender, RoutedEventArgs e)
     {
-        List<CaptureRecord> records = [.. SelectedRecords().Where(r => r.Damage is null)];
+        List<CaptureRecord> records = [.. SelectedRecords().Where(r => r.Damage is null && !r.IsVideo)];
+        if (SelectedRecords().Any(r => r.IsVideo))
+        {
+            _host?.SetStatus("Videos cannot be sanitized or redacted; only image captures were included.");
+        }
+
         if (records.Count == 0 || _host is null)
         {
             return;

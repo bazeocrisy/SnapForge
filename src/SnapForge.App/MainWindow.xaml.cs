@@ -263,6 +263,13 @@ public partial class MainWindow : Window
         }
 
         CaptureRecord? record = _services.Library.Find(id);
+        if (record is { IsVideo: true })
+        {
+            App.ShowVideo(id);
+            _services.Tray.Add(id);
+            return;
+        }
+
         if (record is null)
         {
             SetStatus("That capture no longer exists.");

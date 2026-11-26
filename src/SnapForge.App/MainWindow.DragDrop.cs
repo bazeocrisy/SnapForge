@@ -33,6 +33,14 @@ public partial class MainWindow
             return new DragCapture(key, session.Title, session.CapturedAt, () => ImageExporter.Flatten(session.Document.Image, session.Document.Annotations));
         }
 
+        if (_services.Library.Find(key) is { IsDeleted: false, Damage: null, IsVideo: true } video)
+        {
+            return new DragCapture(key, video.Title, video.CreatedUtc.ToLocalTime(), () => throw new InvalidOperationException("A video has no image."))
+            {
+                VideoSource = _services.Library.VideoPath(key),
+            };
+        }
+
         if (_services.Library.Find(key) is { IsDeleted: false, Damage: null } record)
         {
             return new DragCapture(key, record.Title, record.CreatedUtc.ToLocalTime(), () =>
@@ -70,7 +78,9 @@ public partial class MainWindow
         else if (effect != DragDropEffects.None && CaptureDragDrop.LastDrag is { FilesCreated: true })
         {
             string format = _services.Settings.DragDrop.Format == Core.Export.ImageFileFormat.Jpeg ? "JPEG" : "PNG";
-            SetStatus(items.Count == 1 ? $"Copied \"{items[0].Title}\" as a {format} image." : $"Copied {items.Count} captures as {format} images.");
+            SetStatus(items.Count == 1
+                ? (items[0].VideoSource is null ? $"Copied \"{items[0].Title}\" as a {format} image." : $"Copied \"{items[0].Title}\" as an MP4 video.")
+                : $"Copied {items.Count} items ({format} images / MP4 videos).");
         }
 
         return effect;

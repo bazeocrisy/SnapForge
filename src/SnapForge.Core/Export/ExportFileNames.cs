@@ -21,8 +21,13 @@ public static class ExportFileNames
     /// repeated if the title already contains it. <paramref name="used"/> collects names already handed out (case-
     /// insensitive); duplicates get " (2)", " (3)" … appended.
     /// </summary>
-    public static string For(string? title, DateTime createdLocal, ImageFileFormat format, ISet<string> used)
+    public static string For(string? title, DateTime createdLocal, ImageFileFormat format, ISet<string> used) =>
+        For(title, createdLocal, ExportRules.Extension(format), used);
+
+    /// <summary>Same naming rules for any extension (e.g. ".mp4" for recordings).</summary>
+    public static string For(string? title, DateTime createdLocal, string ext, ISet<string> used)
     {
+        ArgumentException.ThrowIfNullOrEmpty(ext);
         ArgumentNullException.ThrowIfNull(used);
         string stamp = createdLocal.ToString("yyyy-MM-dd HHmmss", CultureInfo.InvariantCulture);
         string clean = Sanitize(title);
@@ -43,7 +48,6 @@ public static class ExportFileNames
             stem = "_" + stem;
         }
 
-        string ext = ExportRules.Extension(format);
         string name = stem + ext;
         for (int n = 2; used.Contains(name); n++)
         {
