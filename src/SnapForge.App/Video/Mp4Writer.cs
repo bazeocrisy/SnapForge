@@ -48,6 +48,11 @@ internal sealed unsafe class Mp4Writer : IDisposable
         {
             Mf.SetGuid(attrs, Mf.TRANSCODE_CONTAINERTYPE, fragmented ? Mf.TranscodeContainerType_FMPEG4 : Mf.TranscodeContainerType_MPEG4);
             Mf.SetUInt32(attrs, Mf.READWRITE_ENABLE_HARDWARE_TRANSFORMS, allowHardware ? 1u : 0u);
+
+            // Low-latency encoding: no B-frames, so every frame is stored in presentation order and its timestamp is
+            // exact in the file. With B-frames the decoded timestamps of fragmented MP4s were measured up to 300 ms
+            // off (CI A/V sync test, 2026-11-26).
+            Mf.SetUInt32(attrs, Mf.LOW_LATENCY, 1);
             if (input == EncoderInput.GpuTextures)
             {
                 Mf.SetUnknown(attrs, Mf.SINK_WRITER_D3D_MANAGER, dxgiDeviceManager);

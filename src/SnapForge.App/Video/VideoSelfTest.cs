@@ -67,6 +67,7 @@ internal static partial class VideoSelfTest
             report["sync"] = new { result = Summary(r), sync = SyncSummary(sync), diagnostics = LastDiagnostics, decodedFlashesMs = sync.FlashesMs.Select(f => Math.Round(f, 1)), decodedBeepsMs = sync.BeepsMs.Select(b => Math.Round(b, 1)), frames = VideoAnalysis.FrameTimeline(path, 0, 75) };
             Check("av-sync", sync.OffsetsMs.Count >= 10 && sync.MaxAbsOffsetMs <= 45, $"{sync.OffsetsMs.Count} flash/beep pairs, mean {sync.MeanOffsetMs} ms, max |offset| {sync.MaxAbsOffsetMs} ms, drift {sync.DriftMsPerMinute} ms/min");
             Check("constant-frame-rate", Math.Abs(sync.VideoFrames - (r.DurationMs * 30 / 1000.0)) <= 2, $"{sync.VideoFrames} frames for {r.DurationMs} ms");
+            Check("timestamps-exact", sync.NonMonotonicTimestamps == 0 && Math.Abs(sync.FirstVideoMs) < 1, $"first decoded frame at {sync.FirstVideoMs} ms, {sync.NonMonotonicTimestamps} out-of-order timestamps");
             Check("fragmented-mp4", Mp4Inspector.Inspect(path) is { IsComplete: true, IsFragmented: true } s1 && s1.CompleteFragments >= 5, Mp4Inspector.Inspect(path).CompleteFragments + " fragments");
         }
 #pragma warning disable CA1031
@@ -389,6 +390,8 @@ internal static partial class VideoSelfTest
         s.MaxAbsOffsetMs,
         s.DriftMsPerMinute,
         s.VideoFrames,
+        s.FirstVideoMs,
+        s.NonMonotonicTimestamps,
         s.VideoDurationMs,
         s.AudioDurationMs,
         flashes = s.FlashesMs.Count,

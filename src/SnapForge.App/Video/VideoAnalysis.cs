@@ -13,7 +13,9 @@ internal sealed record SyncReport(
     double DriftMsPerMinute,
     int VideoFrames,
     double VideoDurationMs,
-    double AudioDurationMs);
+    double AudioDurationMs,
+    double FirstVideoMs,
+    int NonMonotonicTimestamps);
 
 /// <summary>
 /// Reads recordings back with the Windows decoders, without loading the file into memory: decodes frames and audio
@@ -31,6 +33,8 @@ internal static unsafe class VideoAnalysis
         var beeps = new List<double>();
         int frames = 0;
         double lastVideo = 0, lastAudio = 0;
+        double firstVideo = double.NaN;
+        int nonMonotonic = 0;
         nint reader = OpenDecoding(path, video: true, audio: true);
         try
         {
@@ -41,6 +45,15 @@ internal static unsafe class VideoAnalysis
                 double brightness = MeanLuma(sample);
                 Com.Release(ref sample);
                 double ms = ts / 10_000.0;
+                if (double.IsNaN(firstVideo))
+                {
+                    firstVideo = ms;
+                }
+                else if (ms <= lastVideo)
+                {
+                    nonMonotonic++;
+                }
+
                 lastVideo = ms;
                 if (brightness > 200 && !inFlash)
                 {
@@ -122,7 +135,7 @@ internal static unsafe class VideoAnalysis
         double mean = offsets.Count == 0 ? double.NaN : offsets.Average();
         double max = offsets.Count == 0 ? double.NaN : offsets.Max(Math.Abs);
         double drift = Slope(times, offsets) * 60_000;
-        return new SyncReport(flashes, beeps, offsets, Math.Round(mean, 2), Math.Round(max, 2), Math.Round(drift, 3), frames, lastVideo, lastAudio);
+        return new SyncReport(flashes, beeps, offsets, Math.Round(mean, 2), Math.Round(max, 2), Math.Round(drift, 3), frames, lastVideo, lastAudio, Math.Round(firstVideo, 1), nonMonotonic);
     }
 
     /// <summary>Timestamps and mean brightness of decoded frames [from, to) (diagnostics).</summary>
