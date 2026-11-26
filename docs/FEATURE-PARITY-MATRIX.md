@@ -16,7 +16,7 @@ Legend
 
 | ID | Capability | Snagit (Windows) | Src · Ev | SnapForge today | Pri | MS | Req |
 |---|---|---|---|---|---|---|---|
-| FP-CAP-01 | Capture modes All-in-One / Image / Video | Three tabs | S-CAP-01/02 DOC | ◐ mode rail present (M3): Image active; All-in-One and Video disabled, labelled "Not available yet" | P1 (layout) | M3 | CAP-UI-02 |
+| FP-CAP-01 | Capture modes All-in-One / Image / Video | Three tabs | S-CAP-01/02 DOC | ◐ mode rail present (M3): Image active; Video active on the V1 branch (under review); All-in-One disabled, labelled "Not available yet" | P1 (layout) | M3/V1 | CAP-UI-02, VID-01 |
 | FP-CAP-02 | Region selection with crosshairs | Orange crosshairs, drag; 2026.0.0 "simplified crosshairs" | S-CAP-02, S-CAP-22 DOC | ✅ freeze-frame overlay per monitor, real-mouse tests (CI) | — | done | BL-CAP-01 |
 | FP-CAP-03 | Window selection by hover | Dashed border, click | S-CAP-03/04 DOC | ✅ hover highlight + click (`WindowPicker`) | — | done | BL-CAP-02 |
 | FP-CAP-04 | Full screen / single monitor | Fullscreen selection | S-CAP-02 DOC | ✅ Display (one monitor) and Full screen (all) — parity (exceeds claim withdrawn: Snagit monitor choice not researched) | — | done | BL-CAP-03 |
