@@ -33,7 +33,7 @@ internal sealed unsafe class Mp4Writer : IDisposable
     private readonly VideoStreamFormat _format;
     private bool _finalized;
 
-    public Mp4Writer(string path, VideoStreamFormat format, bool withAudio, bool fragmented, EncoderInput input, nint dxgiDeviceManager)
+    public Mp4Writer(string path, VideoStreamFormat format, bool withAudio, bool fragmented, EncoderInput input, nint dxgiDeviceManager, bool allowHardware = true)
     {
         ArgumentNullException.ThrowIfNull(format);
         if (format.Width % 2 != 0 || format.Height % 2 != 0 || format.Width < 16 || format.Height < 16)
@@ -47,7 +47,7 @@ internal sealed unsafe class Mp4Writer : IDisposable
         try
         {
             Mf.SetGuid(attrs, Mf.TRANSCODE_CONTAINERTYPE, fragmented ? Mf.TranscodeContainerType_FMPEG4 : Mf.TranscodeContainerType_MPEG4);
-            Mf.SetUInt32(attrs, Mf.READWRITE_ENABLE_HARDWARE_TRANSFORMS, 1);
+            Mf.SetUInt32(attrs, Mf.READWRITE_ENABLE_HARDWARE_TRANSFORMS, allowHardware ? 1u : 0u);
             if (input == EncoderInput.GpuTextures)
             {
                 Mf.SetUnknown(attrs, Mf.SINK_WRITER_D3D_MANAGER, dxgiDeviceManager);
@@ -69,6 +69,7 @@ internal sealed unsafe class Mp4Writer : IDisposable
             }
 
             Mf.BeginWriting(_writer);
+            Encoder = Mf.GetEncoder(_writer, _videoStream);
         }
         catch
         {
@@ -78,6 +79,16 @@ internal sealed unsafe class Mp4Writer : IDisposable
     }
 
     public EncoderInput Input { get; }
+
+    /// <summary>The video encoder Media Foundation chose (name, hardware?), if Windows reports it.</summary>
+    public (string Name, bool Hardware)? Encoder { get; }
+
+    /// <summary>Video samples handed to the writer but not yet encoded (encoder backlog), and the time gap between them.</summary>
+    public (long Pending, long LatencyMs) Backlog()
+    {
+        Mf.SinkWriterStatistics? s = _writer == 0 ? null : Mf.GetStatistics(_writer, _videoStream);
+        return s is { } st ? ((long)(st.NumSamplesReceived - st.NumSamplesEncoded), Math.Max(0, (st.LastTimestampReceived - st.LastTimestampEncoded) / 10_000)) : (0, 0);
+    }
 
     public bool HasAudio => _audioStream >= 0;
 
@@ -99,6 +110,8 @@ internal sealed unsafe class Mp4Writer : IDisposable
             Mf.SetRatio(output, Mf.MT_FRAME_SIZE, (uint)_format.Width, (uint)_format.Height);
             Mf.SetRatio(output, Mf.MT_FRAME_RATE, (uint)_format.FramesPerSecond, 1);
             Mf.SetRatio(output, Mf.MT_PIXEL_ASPECT_RATIO, 1, 1);
+            // A key frame every 2 s bounds what an interrupted recording can lose to the last fragment.
+            Mf.SetUInt32(output, Mf.MT_MAX_KEYFRAME_SPACING, (uint)(_format.FramesPerSecond * 2));
             int stream = Mf.AddStream(_writer, output);
 
             Mf.SetGuid(input, Mf.MT_MAJOR_TYPE, Mf.MediaType_Video);

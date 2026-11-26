@@ -44,6 +44,9 @@ internal static unsafe partial class Mf
     public static readonly Guid MFT_CATEGORY_AUDIO_ENCODER = new("91c64bd0-f91e-4d8c-9276-db248279d975");
     public static readonly Guid MFT_FRIENDLY_NAME = new("314ffbae-5b41-4c95-9c19-4e7d586face3");
     public static readonly Guid SOURCE_READER_ENABLE_VIDEO_PROCESSING = new("fb394f3d-ccf1-42ee-bbb3-f9b845d5681d");
+    public static readonly Guid MT_MAX_KEYFRAME_SPACING = new("c16eb52b-73a1-476f-8d62-839d6a020652");
+    public static readonly Guid MFT_ENUM_HARDWARE_URL_Attribute = new("2fb866ac-b078-4942-ab6c-003d05cda674");
+    private static readonly Guid IID_IMFSinkWriterEx = new("588d72ab-5bc1-496a-8714-b70617141b25");
     public static readonly Guid PD_DURATION = new("6c990d33-bb8e-477a-8598-0d5d96fcd88a");
 
     public const int MFVideoInterlace_Progressive = 2;
@@ -63,7 +66,8 @@ internal static unsafe partial class Mf
     private const int AttrSetUINT32 = 21, AttrSetUINT64 = 22, AttrSetGUID = 24, AttrSetUnknown = 27;
     private const int SampleSetSampleTime = 36, SampleSetSampleDuration = 38, SampleAddBuffer = 42, SampleConvertToContiguous = 41, SampleGetSampleTime = 35;
     private const int BufferLock = 3, BufferUnlock = 4, BufferGetCurrentLength = 5, BufferSetCurrentLength = 6;
-    private const int SinkAddStream = 3, SinkSetInputMediaType = 4, SinkBeginWriting = 5, SinkWriteSample = 6, SinkSendStreamTick = 7, SinkFinalize = 11;
+    private const int SinkAddStream = 3, SinkSetInputMediaType = 4, SinkBeginWriting = 5, SinkWriteSample = 6, SinkSendStreamTick = 7, SinkFinalize = 11, SinkGetStatistics = 13, SinkExGetTransformForStream = 14;
+    private const int TransformGetAttributes = 8;
     private const int ReaderSetStreamSelection = 4, ReaderGetCurrentMediaType = 6, ReaderSetCurrentMediaType = 7, ReaderReadSample = 9, ReaderGetPresentationAttribute = 12;
     private const int ActivateActivateObject = 33;
     private const int DxgiManagerResetDevice = 7;
@@ -261,6 +265,96 @@ internal static unsafe partial class Mf
         Com.Check(((delegate* unmanaged[Stdcall]<nint, uint, long, int>)Com.Slot(writer, SinkSendStreamTick))(writer, (uint)stream, time100ns), "IMFSinkWriter.SendStreamTick");
 
     public static void FinalizeWriter(nint writer) => Com.Check(Com.Call(writer, SinkFinalize), "IMFSinkWriter.Finalize");
+
+    [StructLayout(LayoutKind.Sequential)]
+    public struct SinkWriterStatistics
+    {
+        public uint Cb;
+        public long LastTimestampReceived;
+        public long LastTimestampEncoded;
+        public long LastTimestampProcessed;
+        public long LastStreamTickReceived;
+        public long LastSinkSampleRequest;
+        public ulong NumSamplesReceived;
+        public ulong NumSamplesEncoded;
+        public ulong NumSamplesProcessed;
+        public ulong NumStreamTicksReceived;
+        public uint ByteCountQueued;
+        public ulong ByteCountProcessed;
+        public uint NumOutstandingSinkSampleRequests;
+        public uint AverageSampleRateReceived;
+        public uint AverageSampleRateEncoded;
+        public uint AverageSampleRateProcessed;
+    }
+
+    /// <summary>Per-stream counters (samples received vs. encoded = encoder backlog / latency).</summary>
+    public static SinkWriterStatistics? GetStatistics(nint writer, int stream)
+    {
+        var stats = new SinkWriterStatistics { Cb = (uint)sizeof(SinkWriterStatistics) };
+        int hr = ((delegate* unmanaged[Stdcall]<nint, uint, SinkWriterStatistics*, int>)Com.Slot(writer, SinkGetStatistics))(writer, (uint)stream, &stats);
+        return hr >= 0 ? stats : null;
+    }
+
+    /// <summary>
+    /// The encoder the sink writer actually chose for a stream: its friendly name and whether it is a hardware MFT
+    /// (hardware MFTs carry MFT_ENUM_HARDWARE_URL_Attribute). Null if Windows does not expose it.
+    /// </summary>
+    public static (string Name, bool Hardware)? GetEncoder(nint writer, int stream)
+    {
+        nint ex = Com.TryQueryInterface(writer, IID_IMFSinkWriterEx);
+        if (ex == 0)
+        {
+            return null;
+        }
+
+        try
+        {
+            for (uint i = 0; i < 8; i++)
+            {
+                Guid category;
+                nint transform;
+                if (((delegate* unmanaged[Stdcall]<nint, uint, uint, Guid*, nint*, int>)Com.Slot(ex, SinkExGetTransformForStream))(ex, (uint)stream, i, &category, &transform) < 0)
+                {
+                    break;
+                }
+
+                try
+                {
+                    if (category != MFT_CATEGORY_VIDEO_ENCODER && category != MFT_CATEGORY_AUDIO_ENCODER)
+                    {
+                        continue;
+                    }
+
+                    nint attrs;
+                    if (((delegate* unmanaged[Stdcall]<nint, nint*, int>)Com.Slot(transform, TransformGetAttributes))(transform, &attrs) < 0 || attrs == 0)
+                    {
+                        return ("Encoder", false);
+                    }
+
+                    try
+                    {
+                        string name = GetString(attrs, MFT_FRIENDLY_NAME) ?? "Encoder";
+                        bool hardware = GetString(attrs, MFT_ENUM_HARDWARE_URL_Attribute) is not null;
+                        return (name, hardware);
+                    }
+                    finally
+                    {
+                        Com.Release(ref attrs);
+                    }
+                }
+                finally
+                {
+                    Com.Release(ref transform);
+                }
+            }
+
+            return null;
+        }
+        finally
+        {
+            Com.Release(ref ex);
+        }
+    }
 
     // ---- source reader (validation, thumbnails, tests)
 

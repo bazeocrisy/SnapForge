@@ -37,6 +37,13 @@ public partial class App : Application
     {
         base.OnStartup(e);
 
+        if (e.Args.Length >= 2 && e.Args[0] is "--video-selftest" or "--video-record-until-killed" or "--video-recover" or "--video-benchmark")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(Video.VideoSelfTest.Run(e.Args));
+            return;
+        }
+
         if (e.Args.Length >= 2 && e.Args[0] == "--video-probe")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;

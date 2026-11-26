@@ -174,6 +174,53 @@ jobs:
           Write-Output "Exit code: $($p.ExitCode)"
           Get-WindowsFeature -Name *Media* -ErrorAction SilentlyContinue | Format-Table -AutoSize | Out-String | Write-Output
 
+      - name: Video recording self-test (A/V sync, pause/resume, 60 FPS, real screen, single session, cancel)
+        if: always()
+        timeout-minutes: 8
+        shell: pwsh
+        working-directory: portable
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "video-samples"
+          $p = Start-Process -FilePath .\SnapForge.exe -ArgumentList '--video-selftest', "`"$out`"" -Wait -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\video-selftest.txt"
+          Get-Content "$env:RUNNER_TEMP\video-selftest.txt"
+          if (Test-Path "$out\report.json") { Get-Content "$out\report.json" }
+          Get-ChildItem $out | Format-Table Name, Length -AutoSize | Out-String | Write-Output
+          Get-FileHash "$out\*.mp4" -Algorithm SHA256 | Format-Table Hash, Path -AutoSize | Out-String -Width 300 | Write-Output
+          Write-Output "Exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "Video self-test failed." }
+
+      - name: Crash recovery (kill the process while recording, then recover at start-up)
+        if: always()
+        timeout-minutes: 5
+        shell: pwsh
+        working-directory: portable
+        run: |
+          $lib = Join-Path $env:RUNNER_TEMP "kill-library"
+          $ready = Join-Path $env:RUNNER_TEMP "kill-ready.txt"
+          $p = Start-Process -FilePath .\SnapForge.exe -ArgumentList '--video-record-until-killed', "`"$lib`"", "`"$ready`"" -PassThru
+          $deadline = (Get-Date).AddSeconds(30)
+          while (-not (Test-Path $ready) -and (Get-Date) -lt $deadline) { Start-Sleep -Milliseconds 200 }
+          if (-not (Test-Path $ready)) { Stop-Process -Id $p.Id -Force; throw "Recording did not start." }
+          Start-Sleep -Seconds 9
+          Stop-Process -Id $p.Id -Force   # no chance to finalize: like a crash or power loss
+          $p.WaitForExit()
+          $mp4 = Get-Content $ready
+          Write-Output "Killed while recording; partial file: $((Get-Item $mp4).Length) bytes"
+          $report = Join-Path $env:RUNNER_TEMP "recovery.json"
+          $r = Start-Process -FilePath .\SnapForge.exe -ArgumentList '--video-recover', "`"$lib`"", "`"$report`"" -Wait -PassThru
+          Get-Content $report
+          Write-Output "Exit code: $($r.ExitCode)"
+          if ($r.ExitCode -ne 0) { throw "Recovery failed." }
+
+      - name: Upload sample recordings
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: video-samples-${{ github.sha }}
+          path: ${{ runner.temp }}/video-samples
+          retention-days: 30
+          if-no-files-found: warn
+
       - name: Real screenshots of the workspaces, capture panel and widget (demo library in a temporary folder)
         if: always()
         shell: pwsh
