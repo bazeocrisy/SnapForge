@@ -608,6 +608,7 @@ public class GateBUiTests
             CaptureWindow panel = App.CapturePanel!;
             Assert.True(panel.IsVisible);
             Assert.True(panel.Topmost);
+            panel.OnViewMenuOpened(panel, new RoutedEventArgs());
             Assert.True(panel.TopmostMenu.IsChecked);
 
             App.ToggleCaptureWindow(); // visible → hidden
@@ -619,10 +620,16 @@ public class GateBUiTests
             await Task.Delay(200);
             Assert.True(App.CapturePanel!.IsVisible);
             Assert.False(App.CapturePanel!.Topmost);
-            App.CapturePanel!.Close();
         }
         finally
         {
+            // Never leave a (possibly topmost) panel on screen for the next real-input test.
+            if (App.CapturePanel is { } p)
+            {
+                p.Topmost = false;
+                p.Close();
+            }
+
             AppServices.Current = previous;
         }
     });

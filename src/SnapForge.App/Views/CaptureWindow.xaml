@@ -29,7 +29,7 @@
                 <MenuItem x:Name="ResetMenu" Header="_Reset capture options" Click="OnReset" />
                 <MenuItem x:Name="UndoResetMenu" Header="_Undo reset" Click="OnUndoReset" IsEnabled="False" />
             </MenuItem>
-            <MenuItem Header="_View">
+            <MenuItem Header="_View" SubmenuOpened="OnViewMenuOpened">
                 <MenuItem Header="Open SnapForge _Editor" Click="OnOpenEditor" />
                 <MenuItem Header="Open _Library" Click="OnOpenLibrary" />
                 <Separator />

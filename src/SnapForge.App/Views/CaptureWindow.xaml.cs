@@ -344,6 +344,9 @@ public partial class CaptureWindow : Window
 
     private void OnToggleWidget(object sender, RoutedEventArgs e) => App.ShowWidget();
 
+    /// <summary>Menu ticks always reflect the current settings when the menu opens.</summary>
+    internal void OnViewMenuOpened(object sender, RoutedEventArgs e) => TopmostMenu.IsChecked = _services.Settings.CapturePanelTopmost;
+
     private void OnToggleTopmost(object sender, RoutedEventArgs e) =>
         _services.UpdateSettings(s => s with { CapturePanelTopmost = TopmostMenu.IsChecked });
 
