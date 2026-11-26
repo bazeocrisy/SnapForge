@@ -182,7 +182,14 @@ public sealed partial class CaptureLibrary
             {
             }
 
+            // Normally the fragmented recording; if the app stopped after converting it but before writing the
+            // manifest, only the finished video.mp4 is left — report that one so it is not discarded.
             string video = Path.Combine(dir, RecordingFile);
+            if (!File.Exists(video) && File.Exists(Path.Combine(dir, VideoFile)))
+            {
+                video = Path.Combine(dir, VideoFile);
+            }
+
             list.Add(new InterruptedRecording(id, video, started, File.Exists(video) ? new FileInfo(video).Length : 0));
         }
 

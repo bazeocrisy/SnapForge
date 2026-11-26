@@ -209,6 +209,20 @@ public class VideoLibraryTests
     }
 
     [Fact]
+    public void Stop_after_conversion_but_before_the_manifest_reports_the_finished_file_not_a_missing_one()
+    {
+        using var dir = new TestDirectory();
+        var lib = CaptureLibrary.Open(dir.Path);
+        (Guid id, string recording) = lib.BeginVideo(Now);
+        string folder = Path.GetDirectoryName(recording)!;
+        File.WriteAllBytes(Path.Combine(folder, CaptureLibrary.VideoFile), [9, 9, 9]); // converted, recording.mp4 already deleted
+        InterruptedRecording i = Assert.Single(CaptureLibrary.Open(dir.Path).InterruptedRecordings());
+        Assert.Equal(id, i.Id);
+        Assert.Equal(CaptureLibrary.VideoFile, Path.GetFileName(i.VideoPath));
+        Assert.Equal(3, i.Bytes);
+    }
+
+    [Fact]
     public void Cancelled_recording_leaves_nothing_and_completed_videos_cannot_be_abandoned()
     {
         using var dir = new TestDirectory();

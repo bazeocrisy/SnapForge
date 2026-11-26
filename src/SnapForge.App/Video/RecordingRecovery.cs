@@ -39,7 +39,9 @@ internal static class RecordingRecovery
         Mp4Structure? s;
         try
         {
-            s = Mp4Inspector.Recover(r.VideoPath);
+            // A finished progressive file (stopped between conversion and manifest) needs no repair.
+            Mp4Structure current = Mp4Inspector.Inspect(r.VideoPath);
+            s = current is { IsComplete: true, IsFragmented: false } ? current : Mp4Inspector.Recover(r.VideoPath);
         }
         catch (IOException ex)
         {
