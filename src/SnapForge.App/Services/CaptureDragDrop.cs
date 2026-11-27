@@ -221,6 +221,7 @@ internal static class CaptureDragDrop
                 return;
             }
 
+            TempExportStore.MarkDropped(dir, DateTime.UtcNow); // FA-009: protection now runs from the drop time
             _ = Task.Run(Sweep);
         }
 

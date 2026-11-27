@@ -10,7 +10,11 @@ namespace SnapForge.Core.Export;
 /// clients attach on send — so a drag's files are kept for <see cref="GracePeriod"/> (24 h), across exit and restart,
 /// and are removed by <see cref="Sweep"/> afterwards. If the store grows beyond <see cref="MaxTotalBytes"/> (large
 /// video drags), the oldest sessions are removed early, but never one younger than <see cref="MinimumAge"/>. A drag
-/// that ended without a drop deletes its files immediately. Contents are flattened exports only (redactions burned in,
+/// that ended without a drop deletes its files immediately. FA-009: a session whose drag is still in progress carries an
+/// <see cref="ActiveMarker"/> file and is never removed by the sweep or the size cap (a marker older than the grace
+/// period is a leftover of a crash and no longer protects); after a drop the session is protected from the size cap
+/// for <see cref="MinimumAge"/> counted from the drop, not from its creation. SnapForge cannot know when every
+/// receiving app has finished reading a file: for a permanent copy, users export the capture instead. Contents are flattened exports only (redactions burned in,
 /// no metadata) — never editable or original data. Deleting a file does not overwrite it on disk.</para>
 /// </summary>
 public sealed class TempExportStore
@@ -32,6 +36,28 @@ public sealed class TempExportStore
 
     public string Root { get; }
 
+    /// <summary>Present while the drag that owns the session is in progress.</summary>
+    public const string ActiveMarker = ".snapforge-drag-active";
+
+    /// <summary>Written when a drag ends with a drop; its time is the drop time.</summary>
+    public const string DroppedMarker = ".snapforge-drag-dropped";
+
+    /// <summary>Marks a session's drag as finished with a drop (protection then runs from the drop time).</summary>
+    public static void MarkDropped(string sessionDir, DateTime utcNow)
+    {
+        try
+        {
+            string dropped = Path.Combine(sessionDir, DroppedMarker);
+            File.WriteAllBytes(dropped, []); // the file time is the drop time; empty so it adds nothing to sizes
+            File.SetLastWriteTimeUtc(dropped, utcNow);
+            File.Delete(Path.Combine(sessionDir, ActiveMarker));
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            // The session stays protected by its active marker until that marker becomes stale.
+        }
+    }
+
     public static string DefaultRoot() =>
         Path.Combine(ProductInfo.DataRoot, "Temp", "Drag");
 
@@ -41,6 +67,9 @@ public sealed class TempExportStore
         string name = string.Create(CultureInfo.InvariantCulture, $"{utcNow:yyyyMMddHHmmss}-{Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(8))}");
         string dir = Path.Combine(Root, name);
         Directory.CreateDirectory(dir);
+        string marker = Path.Combine(dir, ActiveMarker);
+        File.WriteAllText(marker, string.Empty);
+        File.SetLastWriteTimeUtc(marker, utcNow);
         return dir;
     }
 
@@ -55,7 +84,12 @@ public sealed class TempExportStore
         int removed = 0;
         foreach (string dir in Directory.EnumerateDirectories(Root))
         {
-            if (!TryParseCreated(Path.GetFileName(dir), out DateTime created) || utcNow - created >= maxAge)
+            if (IsActive(dir, utcNow))
+            {
+                continue;
+            }
+
+            if (!TryParseCreated(Path.GetFileName(dir), out DateTime created) || utcNow - EffectiveTime(dir, created) >= maxAge)
             {
                 if (TryDelete(dir))
                 {
@@ -82,14 +116,20 @@ public sealed class TempExportStore
         var sessions = Directory.EnumerateDirectories(Root)
             .Select(d => (Dir: d, Ok: TryParseCreated(Path.GetFileName(d), out DateTime c), Created: c, Bytes: SizeOf(d)))
             .Where(s => s.Ok)
-            .OrderBy(s => s.Created)
+            .Select(s => (s.Dir, Time: EffectiveTime(s.Dir, s.Created), s.Bytes, Active: IsActive(s.Dir, utcNow)))
+            .OrderBy(s => s.Time)
             .ToList();
         long total = sessions.Sum(s => s.Bytes);
         foreach (var s in sessions)
         {
-            if (total <= maxTotalBytes || utcNow - s.Created < MinimumAge)
+            if (total <= maxTotalBytes)
             {
                 break;
+            }
+
+            if (s.Active || utcNow - s.Time < MinimumAge)
+            {
+                continue; // a drag in progress or a recent drop is never evicted
             }
 
             if (TryDelete(s.Dir))
@@ -105,8 +145,49 @@ public sealed class TempExportStore
     /// <summary>Total size of all drag sessions (Settings shows it).</summary>
     public long TotalBytes() => Directory.Exists(Root) ? SizeOf(Root) : 0;
 
-    /// <summary>Deletes every session folder now (Settings → "Delete drag copies now"; locked files are skipped).</summary>
-    public int DeleteAll(DateTime utcNow) => Sweep(utcNow.AddYears(100), TimeSpan.Zero);
+    /// <summary>
+    /// Deletes every finished session folder now (Settings → "Delete drag copies now"; locked files and drags still in
+    /// progress are skipped).
+    /// </summary>
+    public int DeleteAll(DateTime utcNow)
+    {
+        if (!Directory.Exists(Root))
+        {
+            return 0;
+        }
+
+        int removed = 0;
+        foreach (string dir in Directory.EnumerateDirectories(Root))
+        {
+            if (!IsActive(dir, utcNow) && TryDelete(dir))
+            {
+                removed++;
+            }
+        }
+
+        return removed;
+    }
+
+    /// <summary>True while the owning drag is in progress (an active marker younger than the grace period).</summary>
+    internal static bool IsActive(string dir, DateTime utcNow)
+    {
+        string marker = Path.Combine(dir, ActiveMarker);
+        return File.Exists(marker) && utcNow - File.GetLastWriteTimeUtc(marker) < GracePeriod;
+    }
+
+    /// <summary>Retention clock of a session: the drop time when known, otherwise the creation time.</summary>
+    private static DateTime EffectiveTime(string dir, DateTime created)
+    {
+        string dropped = Path.Combine(dir, DroppedMarker);
+        try
+        {
+            return File.Exists(dropped) ? new DateTime(Math.Max(created.Ticks, File.GetLastWriteTimeUtc(dropped).Ticks), DateTimeKind.Utc) : created;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return created;
+        }
+    }
 
     private static long SizeOf(string dir)
     {

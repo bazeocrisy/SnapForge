@@ -139,6 +139,7 @@ public class GateBCoreTests
         Assert.True(TempExportStore.DeleteSession(b));
         Assert.Empty(Directory.EnumerateFileSystemEntries(store.Root));
         string c = store.NewSession(Now);
+        TempExportStore.MarkDropped(c, Now);
         Assert.Equal(1, store.DeleteAll(Now));
         Assert.False(Directory.Exists(c));
         Assert.Equal(0, new TempExportStore(dir.Sub("missing")).Sweep(Now, TimeSpan.Zero));
@@ -157,12 +158,59 @@ public class GateBCoreTests
             File.WriteAllBytes(Path.Combine(d, "v.mp4"), new byte[1000]);
         }
 
+        TempExportStore.MarkDropped(old1, Now.AddHours(-3));
+        TempExportStore.MarkDropped(old2, Now.AddHours(-2));
+        TempExportStore.MarkDropped(recent, Now.AddMinutes(-5));
+
         Assert.Equal(3000, store.TotalBytes());
         Assert.Equal(0, store.Enforce(Now, maxTotalBytes: 5000)); // under the cap: nothing removed
         Assert.Equal(2, store.Enforce(Now, maxTotalBytes: 500));  // over the cap: old sessions go, oldest first
         Assert.False(Directory.Exists(old1));
         Assert.False(Directory.Exists(old2));
         Assert.True(Directory.Exists(recent)); // younger than 15 min: kept even though still over the cap
+    }
+
+    [Fact]
+    public void FA009_drag_in_progress_is_never_evicted_by_the_size_cap_or_the_sweep()
+    {
+        using var dir = new TestDirectory();
+        var store = new TempExportStore(dir.Sub("Drag"));
+        string active = store.NewSession(Now.AddHours(-2)); // a long drag (e.g. a slow upload dialog) still in progress
+        File.WriteAllBytes(Path.Combine(active, "big.mp4"), new byte[4000]);
+        File.SetLastWriteTimeUtc(Path.Combine(active, TempExportStore.ActiveMarker), Now.AddMinutes(-30));
+        string finished = store.NewSession(Now.AddHours(-3));
+        File.WriteAllBytes(Path.Combine(finished, "a.png"), new byte[1000]);
+        TempExportStore.MarkDropped(finished, Now.AddHours(-3));
+
+        Assert.Equal(1, store.Enforce(Now, maxTotalBytes: 100)); // only the finished session can go
+        Assert.True(Directory.Exists(active));
+        Assert.False(Directory.Exists(finished));
+        Assert.Equal(0, store.Sweep(Now.AddHours(10), TimeSpan.FromHours(1))); // still active: kept
+        Assert.Equal(0, store.DeleteAll(Now)); // "delete now" skips a drag in progress
+        Assert.True(Directory.Exists(active));
+    }
+
+    [Fact]
+    public void FA009_stale_active_marker_from_a_crash_no_longer_protects()
+    {
+        using var dir = new TestDirectory();
+        var store = new TempExportStore(dir.Sub("Drag"));
+        string crashed = store.NewSession(Now.AddDays(-3)); // marker written 3 days ago, the process died
+        Assert.Equal(1, store.Sweep(Now, TempExportStore.GracePeriod));
+        Assert.False(Directory.Exists(crashed));
+    }
+
+    [Fact]
+    public void FA009_dropped_session_is_protected_from_the_cap_for_15_minutes_after_the_drop()
+    {
+        using var dir = new TestDirectory();
+        var store = new TempExportStore(dir.Sub("Drag"));
+        string s = store.NewSession(Now.AddHours(-5)); // created long ago, dropped just now (drag took long)
+        File.WriteAllBytes(Path.Combine(s, "v.mp4"), new byte[1000]);
+        TempExportStore.MarkDropped(s, Now.AddMinutes(-2));
+        Assert.False(TempExportStore.IsActive(s, Now));
+        Assert.Equal(0, store.Enforce(Now, maxTotalBytes: 10));
+        Assert.Equal(1, store.Enforce(Now.AddMinutes(14), maxTotalBytes: 10));
     }
 
     [Fact]

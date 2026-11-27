@@ -120,8 +120,10 @@
                     <Button Content="Sanitize all captures with redactions…" Click="OnSanitizeAll" Margin="0,0,6,6" />
                     <Button Content="Show privacy &amp; storage notice" Click="OnPrivacyNotice" Margin="0,0,6,6" />
                     <Button x:Name="DragCopiesButton" Content="Delete drag-and-drop copies now" Click="OnDeleteDragCopies" Margin="0,0,6,6"
-                            ToolTip="Copies made for drag-and-drop are kept for 24 hours so apps can finish reading them" />
+                            ToolTip="Copies made for drag-and-drop are kept for up to 24 hours (2 GB in total) so apps can finish reading them. Drags still in progress are never removed." />
                 </WrapPanel>
+                <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,0,0,6"
+                           Text="Files you drag out of SnapForge are temporary copies: they are removed after 24 hours or when space is needed. To keep a file permanently, use Export (Ctrl+S) or drag it into a folder and keep that copy." />
 
                 <TextBlock Text="RESET" Style="{StaticResource SectionHeader}" />
                 <TextBlock FontSize="12" TextWrapping="Wrap" Text="Restores every preference to its default (hotkeys, capture options, presets, widget, recording, appearance). Your captures and the Library location are kept." />
