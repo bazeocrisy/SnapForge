@@ -14,7 +14,7 @@ features.
 
 1. [Getting started and first launch](#1-getting-started-and-first-launch)
 2. [The capture panel](#2-the-capture-panel)
-3. [The desktop widget](#3-the-desktop-widget)
+3. [The QuickDock](#3-the-quickdock)
 4. [Taking screenshots](#4-taking-screenshots)
 5. [Scrolling capture](#5-scrolling-capture)
 6. [Editing images](#6-editing-images)
@@ -39,48 +39,66 @@ features.
 
 ### Starting SnapForge
 
-* **Installed version:** open the Start menu and choose **SnapForge**.
+* **Installed version:** open the Start menu and choose **SnapForge**. (The installer installs SnapForge for all
+  users in `C:\Program Files\SnapForge`; each user has their own captures and settings.)
 * **Portable version:** open the folder you extracted and run `SnapForge.exe`. Keep the other files in that
   folder next to it.
 
-### What you see the first time
+### What you see
 
-1. The **Welcome to SnapForge** window opens. It explains how to take a screenshot, where the capture widget
-   is, where your captures are saved, how to record and how redaction works. Click **Take a capture now** to
-   try it, or **Get started** to close the window. You can open it again later with **Help → Getting
-   started**.
-2. The **main window** opens. It has two workspaces, the **Editor** and the **Library**. Switch between them
-   with the **Editor** and **Library** buttons at the top right, or with **Ctrl+E** and **Ctrl+L**.
-3. The **capture panel** opens (a small window with a big round **Capture** button). See
-   [The capture panel](#2-the-capture-panel).
-4. The **capture widget** opens briefly at the top centre of your screen, then shrinks to a small tab. See
-   [The desktop widget](#3-the-desktop-widget).
-5. A **SnapForge icon** appears in the notification area (next to the clock). You may need to click the
-   **^** arrow to see it.
+SnapForge shows **one window at a time** when it starts:
+
+1. **The very first time**, only the **Welcome to SnapForge** window opens. It explains how to take a screenshot,
+   the QuickDock, where your captures are saved, recording (SnapForge Studio), redaction, and how closing differs
+   from exiting. Click **Take a capture now** to try it, or **Get started** — the compact **capture panel** then
+   opens. You can read the welcome again later with **Help → Getting started**.
+2. **Every later time you open SnapForge**, the **capture panel** opens (or the Editor, if you turned off
+   **Settings → Behaviour → When you open SnapForge, show the capture panel**). Opening SnapForge again while it
+   runs brings that window back; it never starts a second copy.
+3. **When SnapForge starts with Windows** (Settings → Launch SnapForge when I sign in), **no window opens** — only
+   the notification-area icon and, if it is on, the QuickDock.
+
+The **QuickDock** — a small dark pill with the orange SnapForge mark at the top centre of the screen — opens for
+a few seconds the first time so you can see where it lives. A **SnapForge icon** appears in the notification area
+(next to the clock); you may need to click the **^** arrow to see it.
+
+The **main window** (Editor and Library) opens when you ask for it: after a capture with **Preview in Editor** on,
+or from the capture panel, the QuickDock or the notification-area menu. Switch between Editor and Library with
+the buttons at the top right, or **Ctrl+E** and **Ctrl+L**.
+
+If an older SnapForge copy installed only for you (1.0.0-rc.1) is still on the PC, the first start of the
+system-wide copy offers to remove the old program files (your data is kept). See
+[INSTALLATION.md](INSTALLATION.md#upgrading).
 
 ### The notification-area icon
 
 * **Click** the icon to open the capture panel.
-* **Right-click** it for a menu: **Capture**, **Capture panel…**, **Show capture widget**, **Hide capture
-  widget** (only shown while the widget is on), **Open Editor**, **Open Library**, **Settings…** and **Exit
-  SnapForge**.
+* **Right-click** it for a menu: **Capture**, **Capture panel…**, **Show QuickDock**, **Open QuickDock with
+  keyboard**, **Hide QuickDock** (only while it is on), **Open Editor**, **Open Library**, **Settings…** and
+  **Exit SnapForge**.
 
 ### Closing and exiting
 
-* Closing the main window does **not** exit SnapForge. It keeps running in the notification area so your
-  hotkeys keep working. The first time, a notification tells you so. You can change this in **Settings →
-  Behaviour**.
-* To exit completely, choose **File → Exit SnapForge**, or right-click the notification-area icon and choose
-  **Exit SnapForge**.
+* **Closing a window** (the **×** button, **Alt+F4**, or **File → Close window**) does **not** exit SnapForge. It
+  keeps running in the notification area so your hotkeys and the QuickDock keep working. The first time, a
+  notification tells you so. You can change this in **Settings → Behaviour**.
+* **To exit completely**, choose **File → Exit SnapForge**, or right-click the notification-area icon and choose
+  **Exit SnapForge**. If a recording is running, SnapForge asks first; it never stops a recording without asking.
 * Your captures are saved automatically, so you do not need to save before exiting. The only exception is a
   capture taken with **Save to Library** turned off: SnapForge asks before such a capture is lost.
+
+### Windows always stay on screen
+
+Every SnapForge window keeps its title bar, minimize/maximize/close buttons and borders inside the usable area of
+the screen — also with Windows scaling such as 125–200 %, a taskbar on any edge, or after you unplug a monitor or
+change resolution. If a window is larger than the screen, it is made smaller to fit.
 
 ### Where your captures go
 
 Every screenshot is saved automatically to your **Library** on this PC, in
 `%LOCALAPPDATA%\SnapForge\Library` (unless you chose another folder). To see the exact folder, choose **Help →
-Where are my captures? (privacy)**. You can capture without keeping a copy; see
-[Save to Library](#image-mode-options).
+Where are my captures? (privacy)** or **Help → About**. You can capture without keeping a copy; see
+[Save to Library](#image-tab-options).
 
 ### Help inside the app
 
@@ -90,121 +108,131 @@ The **Help** menu works offline:
 * **Keyboard shortcuts** (**F1**) shows the main shortcuts. The complete list is in
   [Keyboard shortcuts](#13-keyboard-shortcuts).
 * **Where are my captures? (privacy)** shows where captures are stored and how redaction works.
-* **About SnapForge** shows the version, build, commit, the program location and the Library location.
+* **About SnapForge** shows the version, build, commit, whether this copy is installed for all users or portable,
+  the data profile and data folder, the program location and the Library location.
 
 ---
 
 ## 2. The capture panel
 
-The capture panel is where you choose what to capture and how. It opens when SnapForge starts (you can turn
-that off in **Settings → Behaviour**). To open it at any time:
+The capture panel is the compact window where you choose what to capture and how. To open it:
 
+* open SnapForge (it is the window a normal start shows),
 * click the notification-area icon,
 * choose **View → Capture panel** or **File → Capture window…** in the main window,
-* click the small settings button next to the orange **Capture** button in the main window,
-* choose **Capture panel…** from the widget's **Presets** menu, or
+* choose **Capture panel…** from the QuickDock's **Presets** menu, or
 * press the **Show / hide capture panel** hotkey, if you set one (**Settings → Hotkeys**).
 
-Press **Esc** (or **File → Close panel**) to close the panel. Closing only hides it; SnapForge keeps running.
-The panel remembers where you put it on the screen.
+Press **Esc** to close the panel. Closing only hides it; SnapForge keeps running. The panel remembers where you
+put it on the screen.
 
-### Modes
+### Tabs
 
-The column on the left chooses the mode:
+The tabs at the top choose what you are making:
 
-| Mode | What it does |
+| Tab | What it does |
 |---|---|
-| **All-in-One** | Not available yet. The button is disabled in this version. |
-| **Image** | Screenshots. The options below are shown and the round button says **Capture**. |
-| **Video** | Screen recording to an MP4 file. Video options are shown and the round button says **Record**. See [Screen recording](#9-screen-recording). |
+| **Image** | Screenshots. The cards below show the image options; the wide button at the bottom says **Capture**. |
+| **Video** | Screen and camera recording. The cards show the recording options; the button says **Open Studio…**. See [Screen recording](#9-screen-recording). |
+| **All-in-One** | Not available yet (marked "Not available yet"). |
 
-### Image mode options
+### Image tab options
+
+**What to capture** — choose one: **Region** (drag to select an area), **Window** (click a window), **Active
+window** (the window you were using, no clicking), **Display** (click a display), **Full screen** (every display)
+or **Scrolling** (a long page that scrolls; see [Scrolling capture](#5-scrolling-capture) — this choice applies to
+the panel's button; the global capture hotkey keeps the other modes).
+
+**After capture**
 
 | Option | What it does |
 |---|---|
-| **Selection** | What to capture: **Region** (drag to select an area), **Window** (click a window), **Active window** (the window you were using, no clicking), **Display** (click a display) or **Full screen** (every display). |
-| **Effects** | Not available yet (always "None"). |
-| **Share** | Not available yet (always "None"). Use the **Copy to Clipboard** and **Save to Library** switches instead. |
 | **Preview in Editor** | Opens the capture in the Editor straight away. |
 | **Copy to Clipboard** | Copies the finished image to the clipboard, ready to paste. |
 | **Save to Library** | Saves the capture in your Library. **Off** means "capture without history": the capture exists only in memory and nothing is written to disk unless you export it. |
+
+**Options**
+
+| Option | What it does |
+|---|---|
 | **Cursor** | Includes the mouse pointer in the image. |
-| **Time Delay** | Waits before capturing. Tick the box to turn it on. Use the small button next to it to choose **No delay**, 1, 2, 3, 5, 10, 15, 30 or 60 seconds, or **Custom…** (any whole number from 1 to 60). |
+| **Time Delay** | Waits before capturing. Tick it to turn it on and use the small button next to it to choose **No delay**, 1, 2, 3, 5, 10, 15, 30 or 60 seconds, or **Custom…** (1–60). |
+| **Effects**, **Share** | Not available yet; they are disabled and their tooltip says why. Use **Copy to Clipboard** and **Save to Library** instead. |
 
 If you turn off **Preview in Editor**, SnapForge stays in the background and shows a short notification
 instead, for example "Capture saved to the Library." If **Preview in Editor**, **Copy to Clipboard** and **Save
 to Library** are all off, the capture opens in the Editor anyway, so it is not lost.
 
-### Video mode options
+### Video tab options
 
-| Option | What it does |
-|---|---|
-| **Record** | What to record: **Region**, **Window** or **Display**. |
-| **Frame rate** | **30 FPS** (default) or **60 FPS**. |
-| **Quality** | **Standard (smaller files)** (default) or **High (sharper, larger files)**. |
-| **System audio** | Records the sound your PC plays. **On** by default. |
-| **Microphone** | Records your microphone. **Off** by default. Choose the device in **Settings → Capture Library → Recording**. |
-| **Cursor** | Shows the mouse pointer in the recording. On by default. |
-| **Countdown** | Counts down before recording starts. On by default, 3 seconds. Use the small button next to it to choose **No countdown**, 3, 5 or 10 seconds. |
+The Video tab shows what to record (**Region**, **Window** or **Display**), audio (system sound on, microphone off
+by default) and options (frame rate, quality, cursor, countdown). **Open Studio…** opens **SnapForge Studio**, where
+you choose screen only, screen + camera or camera only and start the recording. See
+[Screen recording](#9-screen-recording).
 
 ### Other parts of the panel
 
-* **Capture / Record** (the round button): starts a capture or recording with the current options. **Enter**
-  does the same, and so does **File → Capture**.
-* **Hotkey line** under the button: shows the global hotkey for this mode, for example **Print Screen** for
-  Image mode and **Shift+F9** for Video mode. "No hotkey" means none is set. A warning sign and "…unavailable"
-  mean Windows or another program is already using that key; point at it to see why.
-* **Presets** and **+** (Save current settings as a preset): see [Presets](#presets).
-* **Reset capture options** (the reset button, or **Edit → Reset capture options**): puts the Image options
-  back to their defaults. A note "Options reset." with an undo link appears for 15 seconds; you can also use
-  **Edit → Undo reset**.
-* **Open Library** and **Open SnapForge Editor**: bring the main window to the front.
+* **The wide button at the bottom** (**Capture** / **Open Studio…**): starts a capture or opens the Studio with
+  the current options. **Enter** does the same, and so does **File → Capture**. Beside it a key cap shows the
+  global hotkey for this tab (for example **Print Screen**). A warning sign means Windows or another program is
+  already using that key; point at it to see why.
+* **Presets** and **+** (save current settings as a preset): see [Presets](#presets).
+* **Reset capture options** (**Edit → Reset capture options**): puts the Image options back to their defaults. A
+  note with an undo link appears for 15 seconds; you can also use **Edit → Undo reset**.
+* **Library** and **Editor** links: open the main window.
 * **View → Keep capture panel on top**: keeps the panel above other windows.
-* **View → Show capture widget**: turns the widget on and shows it.
+* **View → Show QuickDock** and **View → Open QuickDock with keyboard**.
 * **File → Settings…** opens Settings.
 
 ---
 
-## 3. The desktop widget
+## 3. The QuickDock
 
-The capture widget is a small tab docked to the edge of your screen (top centre by default). It gives you the
-main commands without switching windows.
+The **QuickDock** (provisional name) is a small dark pill with the orange SnapForge mark, docked to the edge of
+your screen (top centre by default). It gives you the main commands without switching windows.
 
-### Using the widget
+### Using the QuickDock
 
-1. Point at the tab (or click it, depending on **Settings → Capture widget → Open the widget**). It opens.
+1. Point at the pill (or click it, depending on **Settings → QuickDock → Open the QuickDock**). It opens.
 2. Choose a button:
    * **Capture** – captures with the current settings of the capture panel.
-   * **Record** – starts a recording with the current video settings. While a recording runs, this button
-     says **Stop** and stops and saves the recording.
-   * **Editor** – opens the Editor.
-   * **Library** – opens the Library.
-   * **Presets** – a menu with your presets (click one to capture with it), **Capture panel…**, **Widget
-     settings…** and **Hide widget**.
-3. Move the pointer away. The widget shrinks back to a tab.
+   * **Record** – opens SnapForge Studio. While a recording runs, this button says **Stop** and stops and saves
+     the recording.
+   * **Text** – select an area of the screen and read its text (offline text recognition; nothing is saved).
+   * **Library**, **Editor** – open the main window.
+   * **Settings** – opens Settings.
+   * **Presets** – a menu with your presets (click one to capture with it), **Capture panel…**, **QuickDock
+     settings…** and **Hide QuickDock**.
+3. Move the pointer away. The QuickDock shrinks back to the pill.
 
-The widget never takes keyboard focus, so it does not interrupt the app you are working in. It is hidden while
-a capture is taken, so it never appears in your screenshots. Keyboard users can reach the same commands from the
-notification-area menu, the capture panel and the main window.
+Used with the mouse, the QuickDock never takes keyboard focus, so it does not interrupt the app you are working
+in. It is hidden while a capture is taken, so it never appears in your screenshots.
 
-### Moving the widget
+### Using the QuickDock with the keyboard
 
-Drag the widget by its grip to the **top**, **left** or **right** edge of any display. It docks to the nearest
+Choose **Open QuickDock with keyboard** in the notification-area menu (Win+B, then the arrow keys and the
+menu key reach the icon) or in the capture panel's **View** menu. The QuickDock opens with the focus on
+**Capture**: **Tab**, **Shift+Tab**, the **arrow keys**, **Home** and **End** move between buttons (the focused
+button has a visible ring), **Enter** or **Space** runs it, and **Esc** closes the QuickDock and returns you to the
+window you were using. Every button has a name and description for screen readers.
+
+### Moving the QuickDock
+
+Drag the QuickDock by its grip to the **top**, **left** or **right** edge of any display. It docks to the nearest
 of those edges and remembers the place, even after a restart.
 
-### Recovering a missing widget
+### Recovering a missing QuickDock
 
-If you cannot find the widget, use any of these:
+If you cannot find the QuickDock, use any of these:
 
-* In the main window, choose **View → Show capture widget**.
-* Right-click the notification-area icon and choose **Show capture widget**.
-* In the capture panel, choose **View → Show capture widget**.
-* In **Settings → Capture widget**, tick **Show the capture widget at the screen edge**, or click **Move widget
-  to top centre**.
+* In the main window, choose **View → Show QuickDock**.
+* Right-click the notification-area icon and choose **Show QuickDock**.
+* In the capture panel, choose **View → Show QuickDock**.
+* In **Settings → QuickDock**, tick **Show the QuickDock at the screen edge**, or click **Move QuickDock to top centre**.
 
-**Show capture widget** turns the widget on, moves it to the top centre of the display the main window is on
-and opens it for a few seconds so you can see it. If **Auto-hide** is on (see [Settings](#capture-widget)), the
-widget is only a thin strip until the pointer touches it.
+**Show QuickDock** turns it on, moves it to the top centre of the display the main window is on and opens it for a
+few seconds so you can see it. If **Auto-hide** is on, the QuickDock is only a thin strip until the pointer touches
+it. If you turned the QuickDock off, upgrading SnapForge keeps it off.
 
 ---
 
@@ -1271,14 +1299,19 @@ capture is already there, SnapForge says "Nothing to restore".
 
 ## 16. Upgrading
 
-Your captures, recordings and settings are stored in `%LOCALAPPDATA%\SnapForge`, not in the program folder, so
-upgrading keeps them.
+Your captures, recordings and settings are stored in your own `%LOCALAPPDATA%\SnapForge`, not in the program
+folder, so upgrading keeps them. Back up first anyway, especially for a release candidate (see
+[Backup and restore](#15-backup-and-restore)).
 
-**Installed version**
+**Installed version (rc.2 and later)**
 
-1. Exit SnapForge (notification-area icon → **Exit SnapForge**). If a recording is running, stop it first. Setup
-   asks you to exit SnapForge if it is still running.
-2. Run the new installer. It installs over the old version.
+1. Exit SnapForge in every user session (notification-area icon → **Exit SnapForge**). If a recording is running,
+   stop it first. Setup asks for SnapForge to be exited if it still runs anywhere; it never closes it by force.
+2. Run the new installer and approve the administrator prompt. It installs over the old version.
+
+**From 1.0.0-rc.1 (installed only for you)**: install rc.2, start it from the Start menu and answer **Yes** when it
+offers to remove the older per-user copy. Only the old program files are removed; your data is kept. Details:
+[INSTALLATION.md](INSTALLATION.md#upgrading).
 
 **Portable version**
 
@@ -1289,10 +1322,14 @@ upgrading keeps them.
    turn that setting off and on again in the new version.
 
 If an older SnapForge is still running when you start the new one, SnapForge tells you which build is running and
-offers to close it. See [Troubleshooting](#another-copy-of-snapforge-is-already-running).
+offers to close it (a running recording is never stopped without asking). See
+[Troubleshooting](#another-copy-of-snapforge-is-already-running).
 
-Making a backup before an upgrade is a good idea, especially for a release candidate. See
-[Backup and restore](#15-backup-and-restore).
+**Downgrading** to an older version is not supported: captures saved by rc.2 use a newer format that older builds
+show as unreadable (they leave them unchanged). Keep a backup if you might go back.
+
+**Trying a test build safely:** run it with its own data profile, for example `SnapForge.exe --profile test`, so it
+never touches your real data. See [INSTALLATION.md](INSTALLATION.md#running-a-test-build-next-to-your-normal-snapforge-isolated-profiles).
 
 ---
 
@@ -1300,14 +1337,13 @@ Making a backup before an upgrade is a good idea, especially for a release candi
 
 ### Installed version
 
-1. Exit SnapForge.
-2. Open Windows **Settings → Apps → Installed apps**, find **SnapForge**, click **…** and choose **Uninstall**.
-3. When the program has been removed, the uninstaller asks whether you also want to **delete your captures,
-   recordings and settings**. The default answer is **No** (keep them).
-4. If you answer **Yes**, it asks a second time ("Are you sure?") before deleting `%LOCALAPPDATA%\SnapForge`.
+1. Exit SnapForge in every user session.
+2. Open Windows **Settings → Apps → Installed apps**, find **SnapForge**, click **…**, choose **Uninstall** and
+   approve the administrator prompt.
 
-The uninstaller always removes the temporary drag-and-drop copies and the "Launch SnapForge when I sign in"
-entry of this installation. A Library you moved to another folder is **never** deleted by the uninstaller.
+The program, its Start menu entry and its Installed-apps entry are removed. **The uninstaller never deletes
+anyone's captures, recordings or settings** — they belong to each user and stay in that user's own folder. If
+"Launch when I sign in" was on, turn it off in Windows **Settings → Apps → Startup**.
 
 ### Portable version
 
@@ -1318,11 +1354,14 @@ entry of this installation. A Library you moved to another folder is **never** d
 
 Your captures, recordings and settings stay in `%LOCALAPPDATA%\SnapForge`.
 
-### Removing your data yourself
+### Deleting your data
 
-To delete your captures, recordings and settings too, delete the folder `%LOCALAPPDATA%\SnapForge` (paste the path
-into the File Explorer address bar). If you moved the Library, delete that folder as well. **This permanently
-deletes your captures.** Back up first if you might need them.
+* In SnapForge, choose **Settings → Reset → Delete my SnapForge data…**. It asks twice, then deletes your
+  settings, captures, recordings, logs and temporary files (only yours) and exits. A Library you moved to a folder
+  of your choice is not deleted; SnapForge shows its path.
+* Or exit SnapForge and delete `%LOCALAPPDATA%\SnapForge` (and a moved Library) yourself.
+
+**This permanently deletes your captures.** Back up first if you might need them.
 
 ---
 

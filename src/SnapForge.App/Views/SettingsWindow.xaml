@@ -32,21 +32,21 @@
                 <TextBlock x:Name="StartupStatus" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="26,0,0,4" />
 
                 <TextBlock Text="QUICKDOCK" Style="{StaticResource SectionHeader}" />
-                <CheckBox x:Name="WidgetEnabledBox" Content="Show the QuickDock at the screen edge" Click="OnWidgetChanged" AutomationProperties.Name="Show the capture widget" />
-                <CheckBox x:Name="WidgetTopmostBox" Content="Keep the widget on top of other windows" Click="OnWidgetChanged" />
+                <CheckBox x:Name="WidgetEnabledBox" Content="Show the QuickDock at the screen edge" Click="OnWidgetChanged" AutomationProperties.Name="Show the QuickDock" />
+                <CheckBox x:Name="WidgetTopmostBox" Content="Keep the QuickDock on top of other windows" Click="OnWidgetChanged" />
                 <CheckBox x:Name="WidgetAutoHideBox" Content="Auto-hide: shrink to a thin strip until the pointer touches it" Click="OnWidgetChanged" />
                 <DockPanel Margin="0,4,0,0">
-                    <TextBlock Text="Open the widget" VerticalAlignment="Center" Width="130" />
+                    <TextBlock Text="Open the QuickDock" VerticalAlignment="Center" Width="130" />
                     <StackPanel Orientation="Horizontal">
                         <RadioButton x:Name="WidgetHover" GroupName="WidgetMode" Style="{StaticResource SegmentButton}" Content="On hover" Checked="OnWidgetChanged" />
                         <RadioButton x:Name="WidgetClick" GroupName="WidgetMode" Style="{StaticResource SegmentButton}" Content="On click" Checked="OnWidgetChanged" />
                     </StackPanel>
                 </DockPanel>
                 <WrapPanel Margin="0,6,0,0">
-                    <Button Content="Move widget to top centre" Click="OnWidgetReset" Margin="0,0,6,6" />
+                    <Button Content="Move QuickDock to top centre" Click="OnWidgetReset" Margin="0,0,6,6" />
                 </WrapPanel>
                 <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}"
-                           Text="Drag the widget by its grip to dock it at the top, left or right edge of any display; it remembers the place. It never takes keyboard focus and is hidden while a capture is taken." />
+                           Text="Drag the QuickDock by its grip to dock it at the top, left or right edge of any display; it remembers the place. It never takes keyboard focus and is hidden while a capture is taken." />
 
                 <TextBlock Text="DRAG AND DROP" Style="{StaticResource SectionHeader}" />
                 <DockPanel>
@@ -126,7 +126,7 @@
                            Text="Files you drag out of SnapForge are temporary copies: they are removed after 24 hours or when space is needed. To keep a file permanently, use Export (Ctrl+S) or drag it into a folder and keep that copy." />
 
                 <TextBlock Text="RESET" Style="{StaticResource SectionHeader}" />
-                <TextBlock FontSize="12" TextWrapping="Wrap" Text="Restores every preference to its default (hotkeys, capture options, presets, widget, recording, appearance). Your captures and the Library location are kept." />
+                <TextBlock FontSize="12" TextWrapping="Wrap" Text="Restores every preference to its default (hotkeys, capture options, presets, QuickDock, recording, appearance). Your captures and the Library location are kept." />
                 <WrapPanel Margin="0,6,0,0">
                     <Button Content="Reset all preferences…" Click="OnResetPreferences" Margin="0,0,6,6" />
                     <Button x:Name="DeleteMyDataButton" Content="Delete my SnapForge data…" Click="OnDeleteMyData" Margin="0,0,6,6"
