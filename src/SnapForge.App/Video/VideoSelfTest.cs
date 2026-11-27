@@ -137,11 +137,14 @@ internal static partial class VideoSelfTest
             Check("av-sync", false, ex.Message);
         }
 
-        // 2. Pause / resume: 4 s, pause 3 s, 4 s → about 8 s of video, still in sync.
+        // 2. Pause / resume: 4.5 s, pause 3 s, 3.5 s → about 8 s of video, still in sync. The pause starts and ends
+        //    between the once-a-second flash/beep markers: a marker exactly at the resume instant is cut by the pause
+        //    in one stream and not the other, depending on sub-frame scheduling (CI runs 113 and 115), which measures
+        //    the cut, not the sync.
         try
         {
             string path = Path.Combine(dir, "pause-resume.mp4");
-            (RecordingResult r, SyncReport sync) = RecordSynthetic(path, 640, 360, 30, TimeSpan.FromSeconds(11), pauseAt: (TimeSpan.FromSeconds(4), TimeSpan.FromSeconds(3)));
+            (RecordingResult r, SyncReport sync) = RecordSynthetic(path, 640, 360, 30, TimeSpan.FromSeconds(11), pauseAt: (TimeSpan.FromSeconds(4.5), TimeSpan.FromSeconds(3)));
             report["pauseResume"] = new { result = Summary(r), sync = SyncSummary(sync) };
             Check("pause-resume-duration", Math.Abs(r.DurationMs - 8000) <= 200, $"{r.DurationMs} ms recorded of 11 s with a 3 s pause");
             SyncError pe = LastSyncError!;

@@ -8,24 +8,10 @@ namespace SnapForge.Core.Video;
 /// </summary>
 public sealed class RecordingClock
 {
-    private readonly long _pauseQuantum;
     private long _start = -1;
     private long _pausedAt = -1;
     private long _pausedTotal;
     private readonly List<(long Start, long End)> _pauses = [];
-
-    /// <summary>
-    /// Creates the clock. With a <paramref name="frameDuration"/> (100 ns), every pause is lengthened to a whole number
-    /// of frames: a constant-frame-rate recording places video on a fixed frame grid while audio is sample-accurate,
-    /// so a pause of an arbitrary length would leave every later video frame up to one frame behind the audio (CI run
-    /// 113: +7.9 ms and +41 ms after a resume, 0.02 ms before the pause). The extra time (less than one frame) is
-    /// dropped from both streams like the rest of the pause.
-    /// </summary>
-    public RecordingClock(long frameDuration = 0)
-    {
-        ArgumentOutOfRangeException.ThrowIfNegative(frameDuration);
-        _pauseQuantum = frameDuration;
-    }
 
     public bool IsStarted => _start >= 0;
 
@@ -67,12 +53,6 @@ public sealed class RecordingClock
         }
 
         long end = Math.Max(sourceTime, _pausedAt);
-        if (_pauseQuantum > 0)
-        {
-            long length = end - _pausedAt;
-            end = _pausedAt + ((length + _pauseQuantum - 1) / _pauseQuantum * _pauseQuantum);
-        }
-
         _pauses.Add((_pausedAt, end));
         _pausedTotal += end - _pausedAt;
         _pausedAt = -1;

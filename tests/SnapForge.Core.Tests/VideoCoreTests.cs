@@ -55,29 +55,6 @@ public class VideoCoreTests
         Assert.Throws<InvalidOperationException>(() => new RecordingClock().Pause(0));
     }
 
-    [Fact]
-    public void Clock_with_a_frame_duration_lengthens_each_pause_to_whole_frames()
-    {
-        const long frame = 333_333; // 30 FPS
-        var c = new RecordingClock(frame);
-        c.Start(1_000);
-        c.Pause(1_000 + (10 * frame));          // after exactly 10 frames
-        c.Resume(1_000 + (10 * frame) + 1_234_567); // 3.7 frames of pause → 4 frames
-        Assert.Equal(4 * frame, c.PausedTotal);
-        // A source frame that was on the grid before the pause is on the grid after it.
-        Assert.True(c.TryMap(1_000 + (20 * frame), out long media));
-        Assert.Equal(0, media % frame);
-        Assert.Equal(16 * frame, media);
-        // Samples in the lengthened part of the pause are dropped like the rest of it.
-        Assert.False(c.TryMap(1_000 + (10 * frame) + 1_300_000, out _));
-        // Without a frame duration nothing changes (audio-only use, existing behaviour).
-        var plain = new RecordingClock();
-        plain.Start(0);
-        plain.Pause(100);
-        plain.Resume(250);
-        Assert.Equal(150, plain.PausedTotal);
-    }
-
     // ---- AudioMixer (VID-R01, VID-R07, VID-R08, VID-R13)
 
     private static float[] Tone(int frames, float value)

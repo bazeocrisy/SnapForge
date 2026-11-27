@@ -698,7 +698,9 @@ jobs:
           while ((Test-Path "$machine\SnapForge.exe") -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 1 }
           if (Test-Path "$machine\SnapForge.exe") { throw "uninstall left SnapForge.exe" }
           if (Test-Path (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\SnapForge.lnk")) { throw "uninstall left the all-users shortcut" }
-          if (Test-Path $hklm.PSPath) { throw "uninstall left the Installed apps entry" }
+          foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall') {
+            if (Test-Path "$k\{6E0C3B1A-58A2-4E39-9F3B-0D6F4C1C7A51}_is1") { throw "uninstall left the Installed apps entry under $k" }
+          }
           if (-not (Test-Path "$data\Library\keep-me\marker.txt")) { throw "UNINSTALL DELETED USER DATA" }
           if (-not (Test-Path 'C:\Users\sftest2\AppData\Local\SnapForge')) { throw "UNINSTALL DELETED THE SECOND USER'S DATA" }
           Write-Output "PASS uninstall removed program, entry and shortcut; both users' data kept"
