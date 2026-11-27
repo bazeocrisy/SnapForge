@@ -14,9 +14,33 @@ internal enum RecorderState
     Recording,
     Paused,
     Stopping,
+
+    /// <summary>Capture and audio have ended; the encoder writes what is queued and completes the file.</summary>
+    Finalizing,
     Finished,
+
+    /// <summary>Faulted: encoding failed, the disk was full, or a recorder thread stalled (<see cref="RecordingResult.Stalled"/>).</summary>
     Failed,
     Cancelled,
+}
+
+/// <summary>
+/// Fault-injection seams (tests and the self-test only; the app never sets them). Each runs on the named recorder
+/// thread and may block (a stalled thread) or throw (e.g. an <see cref="IOException"/> = disk full).
+/// </summary>
+internal sealed class RecorderHooks
+{
+    /// <summary>Encoder thread, before each video frame is written; the argument is the number of frames written so far.</summary>
+    public Action<long>? BeforeVideoWrite { get; init; }
+
+    /// <summary>Capture thread, once per frame slot.</summary>
+    public Action? CaptureIteration { get; init; }
+
+    /// <summary>Encoder thread, just before the file is completed (Sink Writer Finalize).</summary>
+    public Action? BeforeFinalize { get; init; }
+
+    /// <summary>How long Stop waits for each recorder thread before reporting it as stalled.</summary>
+    public TimeSpan JoinTimeout { get; init; } = ScreenRecorder.DefaultJoinTimeout;
 }
 
 /// <summary>Options for one recording.</summary>
@@ -51,7 +75,9 @@ internal sealed record RecordingResult(
     double MaxEncodeLatencyMs,
     long Bytes,
     bool Finalized,
-    PixelBuffer? FirstFrame);
+    PixelBuffer? FirstFrame,
+    bool Cancelled = false,
+    bool Stalled = false);
 
 /// <summary>
 /// One screen recording (Milestone V1). Threads:
@@ -68,6 +94,9 @@ internal sealed record RecordingResult(
 /// </summary>
 internal sealed unsafe class ScreenRecorder : IDisposable
 {
+    /// <summary>Default bound on waiting for each recorder thread when stopping (then it is reported as stalled).</summary>
+    public static readonly TimeSpan DefaultJoinTimeout = TimeSpan.FromSeconds(10);
+
     private const long MemoryBudgetBytes = 256L * 1024 * 1024;
     private const long AudioLatency100ns = 2_000_000; // audio later than 200 ms behind real time is dropped
 
@@ -86,6 +115,13 @@ internal sealed unsafe class ScreenRecorder : IDisposable
     private readonly ConcurrentBag<FrameBuffer> _freeBuffers = [];
     private readonly List<string> _notices = [];
     private readonly int _frameBytes;
+    private readonly RecorderHooks? _hooks;
+    private readonly Lock _lifecycle = new();
+    private readonly TaskCompletionSource _threadsExited = new(TaskCreationOptions.RunContinuationsAsynchronously);
+    private TaskCompletionSource<RecordingResult>? _ending;
+    private int _liveThreads;
+    private volatile bool _finalized;
+    private bool _disposed;
     private Mp4Writer? _writer;
     private Thread? _captureThread, _audioThread, _encoderThread;
     private volatile bool _stopCapture;
@@ -104,8 +140,9 @@ internal sealed unsafe class ScreenRecorder : IDisposable
     private long _wallStart;
     private bool _lowSpaceWarned;
 
-    private ScreenRecorder(IFrameSource video, IEnumerable<IAudioSource> audio, RecorderOptions options, string path)
+    private ScreenRecorder(IFrameSource video, IEnumerable<IAudioSource> audio, RecorderOptions options, string path, RecorderHooks? hooks)
     {
+        _hooks = hooks;
         _video = video;
         _audio = [.. audio];
         _options = options;
@@ -175,6 +212,14 @@ internal sealed unsafe class ScreenRecorder : IDisposable
 
     public string? EncoderName => _writer?.Encoder?.Name;
 
+    /// <summary>The frame source (screen, screen + camera, or camera).</summary>
+    public IFrameSource Source => _video;
+
+    /// <summary>Completes when every recorder thread has exited (at the end of Stop/Cancel if none was started).</summary>
+    public Task ThreadsExited => _threadsExited.Task;
+
+    private TimeSpan JoinTimeout => _hooks?.JoinTimeout ?? DefaultJoinTimeout;
+
     /// <summary>Media time (100 ns) of a source timestamp on this recording's clock, or null if it was paused / before start.</summary>
     internal long? MapSourceTime(long source)
     {
@@ -194,7 +239,7 @@ internal sealed unsafe class ScreenRecorder : IDisposable
     /// Creates the recorder (refusing a second simultaneous recording) and opens the MP4 writer, falling back to the
     /// software encoder if the hardware path cannot start (VID-R02, VID-R03).
     /// </summary>
-    public static ScreenRecorder Create(IFrameSource video, IEnumerable<IAudioSource> audio, RecorderOptions options, string path)
+    public static ScreenRecorder Create(IFrameSource video, IEnumerable<IAudioSource> audio, RecorderOptions options, string path, RecorderHooks? hooks = null)
     {
         ArgumentNullException.ThrowIfNull(video);
         ArgumentNullException.ThrowIfNull(options);
@@ -205,7 +250,7 @@ internal sealed unsafe class ScreenRecorder : IDisposable
                 throw new InvalidOperationException("A recording is already in progress. Stop it before starting another.");
             }
 
-            var recorder = new ScreenRecorder(video, audio ?? [], options, path);
+            var recorder = new ScreenRecorder(video, audio ?? [], options, path, hooks);
             recorder.OpenWriter();
             _active = recorder;
             return recorder;
@@ -231,11 +276,24 @@ internal sealed unsafe class ScreenRecorder : IDisposable
     /// <summary>Starts capturing (call after the countdown).</summary>
     public void Start()
     {
-        if (State != RecorderState.Ready)
+        lock (_lifecycle)
         {
-            throw new InvalidOperationException("The recording has already started.");
-        }
+            if (_ending is not null)
+            {
+                throw new InvalidOperationException("The recording was already stopped.");
+            }
 
+            if (State != RecorderState.Ready)
+            {
+                throw new InvalidOperationException("The recording has already started.");
+            }
+
+            StartLocked();
+        }
+    }
+
+    private void StartLocked()
+    {
         foreach (IAudioSource a in _audio)
         {
             a.Enabled = a.Name == AudioNames.System ? _options.RecordSystemAudio : _options.RecordMicrophone;
@@ -303,8 +361,66 @@ internal sealed unsafe class ScreenRecorder : IDisposable
         }
     }
 
-    /// <summary>Stops, writes what is queued and completes the MP4. Blocks until the file is finished.</summary>
-    public RecordingResult Stop(string? reason = null)
+    /// <summary>
+    /// Stops, writes what is queued and completes the MP4. Idempotent: the first Stop or Cancel does the work; later
+    /// and concurrent calls wait for it and get the same result. Every wait is bounded (<see cref="RecorderHooks.JoinTimeout"/>
+    /// per thread): a thread that does not finish is reported as stalled (<see cref="RecordingResult.Stalled"/>), the
+    /// partial fragmented file is left for recovery, and native objects that thread still uses are not released here.
+    /// </summary>
+    public RecordingResult Stop(string? reason = null) => End(cancel: false, reason);
+
+    /// <summary>Cancels and discards: nothing is kept. Returns false if a Stop got there first (then the recording is saved).</summary>
+    public bool Cancel() => End(cancel: true, null).Cancelled;
+
+    private RecordingResult End(bool cancel, string? reason)
+    {
+        TaskCompletionSource<RecordingResult> ending;
+        bool owner = false;
+        lock (_lifecycle)
+        {
+            if (_ending is null)
+            {
+                _ending = new TaskCompletionSource<RecordingResult>(TaskCreationOptions.RunContinuationsAsynchronously);
+                owner = true;
+                _cancel = cancel;
+            }
+
+            ending = _ending;
+        }
+
+        if (!owner)
+        {
+            // Already ending: the owner's work is bounded (three bounded joins), so this wait is too.
+            TimeSpan budget = (JoinTimeout * 3) + TimeSpan.FromSeconds(10);
+            if (ending.Task.Wait(budget))
+            {
+                return ending.Task.GetAwaiter().GetResult();
+            }
+
+            return BuildResult(finalized: false) with { Stalled = true };
+        }
+
+        RecordingResult result;
+        try
+        {
+            result = EndAsOwner(cancel, reason);
+        }
+#pragma warning disable CA1031 // the result must always be published, or concurrent callers would wait in vain
+        catch (Exception ex)
+#pragma warning restore CA1031
+        {
+            RecordingLog.Write("stopping the recording failed: " + ex);
+            _failure ??= ex;
+            State = RecorderState.Failed;
+            Release();
+            result = BuildResult(finalized: false);
+        }
+
+        ending.TrySetResult(result);
+        return result;
+    }
+
+    private RecordingResult EndAsOwner(bool cancel, string? reason)
     {
         lock (_gate)
         {
@@ -317,65 +433,115 @@ internal sealed unsafe class ScreenRecorder : IDisposable
         }
 
         _stopCapture = true;
-        _captureThread?.Join();
-        _audioThread?.Join();
-        _frames.CompleteAdding();
-        _encoderThread?.Join();
-        bool finalized = false;
-        if (_failure is null && _writer is not null)
+        if (_encoderThread is null)
         {
-            try
+            // Never started (stopped during the countdown): nothing was recorded.
+            _frames.CompleteAdding();
+            _writer?.Dispose();
+            _writer = null;
+            TryDelete(_path);
+            _threadsExited.TrySetResult();
+            State = RecorderState.Cancelled;
+            Release();
+            return BuildResult(finalized: false) with { Cancelled = true };
+        }
+
+        var stalled = new List<string>();
+        if (!Join(_captureThread))
+        {
+            stalled.Add("screen capture");
+        }
+
+        if (!Join(_audioThread))
+        {
+            stalled.Add("audio capture");
+        }
+
+        _frames.CompleteAdding();
+        if (!cancel)
+        {
+            lock (_gate)
             {
-                _writer.Complete();
-                finalized = true;
-            }
-            catch (NativeCallException ex)
-            {
-                _failure = ex;
-                AddNotice($"The video could not be completed normally ({ex.Message}). It will be recovered from its last complete part.");
+                State = RecorderState.Finalizing;
             }
         }
 
-        EncoderNameAtEnd = _writer?.Encoder?.Name;
-        HardwareAtEnd = _writer?.Encoder?.Hardware ?? false;
-        _writer?.Dispose();
-        _writer = null;
-        State = _failure is null ? RecorderState.Finished : RecorderState.Failed;
-        Release();
-        return BuildResult(finalized);
+        if (!Join(_encoderThread))
+        {
+            stalled.Add("video encoder");
+        }
+
+        if (_liveThreads == 0)
+        {
+            _threadsExited.TrySetResult();
+        }
+
+        bool isStalled = stalled.Count > 0;
+        if (isStalled)
+        {
+            string which = string.Join(" and ", stalled);
+            RecordingLog.Write($"{which} did not finish within {JoinTimeout.TotalSeconds:0} s while stopping {_path}; the native objects it uses stay with that thread (released when it exits); the partial file is left for recovery.");
+            AddNotice(cancel
+                ? $"The {which} stopped responding. The recording is discarded as soon as it lets go of the file."
+                : $"The {which} stopped responding, so the recording could not be finished normally. What was recorded is kept and recovered from its last complete part.");
+        }
+        else if (cancel)
+        {
+            TryDelete(_path);
+        }
+
+        bool finalized = !cancel && !isStalled && _failure is null && _finalized;
+        State = cancel ? RecorderState.Cancelled : finalized ? RecorderState.Finished : RecorderState.Failed;
+        Release(); // a new recording may start; a stalled thread keeps only its own objects
+        return BuildResult(finalized) with { Cancelled = cancel, Stalled = isStalled };
     }
 
-    /// <summary>Cancels and discards: nothing is kept.</summary>
-    public void Cancel()
-    {
-        _cancel = true;
-        _stopCapture = true;
-        _captureThread?.Join();
-        _audioThread?.Join();
-        _frames.CompleteAdding();
-        _encoderThread?.Join();
-        _writer?.Dispose();
-        _writer = null;
-        TryDelete(_path);
-        State = RecorderState.Cancelled;
-        Release();
-    }
+    private bool Join(Thread? thread) => thread is null || thread.Join(JoinTimeout);
 
+    /// <summary>
+    /// Releases the sources. A recording still running is cancelled first. Native objects a stalled thread still uses
+    /// are released only once that thread exits (deliberately leaked until then, with a log entry).
+    /// </summary>
     public void Dispose()
     {
-        if (State is RecorderState.Recording or RecorderState.Paused or RecorderState.Stopping)
+        if (_disposed)
         {
-            Cancel();
+            return;
         }
 
+        _disposed = true;
+        bool ending;
+        lock (_lifecycle)
+        {
+            ending = _ending is not null;
+        }
+
+        if (!ending)
+        {
+            End(cancel: true, null);
+        }
+
+        if (ThreadsExited.IsCompleted)
+        {
+            DisposeSources();
+        }
+        else
+        {
+            RecordingLog.Write($"recorder threads for {_path} are still running; the capture sources are released when they exit.");
+            _ = ThreadsExited.ContinueWith(_ => DisposeSources(), CancellationToken.None, TaskContinuationOptions.None, TaskScheduler.Default);
+        }
+
+        Release();
+    }
+
+    private void DisposeSources()
+    {
         _frames.Dispose();
         _video.Dispose();
         foreach (IAudioSource a in _audio)
         {
             a.Dispose();
         }
-
-        Release();
     }
 
     private void Release()
@@ -401,6 +567,8 @@ internal sealed unsafe class ScreenRecorder : IDisposable
         {
             while (!_stopCapture)
             {
+                _hooks?.CaptureIteration?.Invoke();
+
                 // Wait for the next frame slot on the shared clock.
                 long now = Qpc.Now100ns();
                 long mediaNow;
@@ -541,7 +709,17 @@ internal sealed unsafe class ScreenRecorder : IDisposable
 
     private void Enqueue(FrameItem item)
     {
-        if (!_frames.TryAdd(item))
+        bool added;
+        try
+        {
+            added = _frames.TryAdd(item);
+        }
+        catch (InvalidOperationException)
+        {
+            added = false; // Stop gave up waiting for this (stalled) thread and closed the queue
+        }
+
+        if (!added)
         {
             // Encoder is behind and the bounded queue is full: drop rather than grow (VID-R13).
             Interlocked.Increment(ref _framesDropped);
@@ -644,6 +822,7 @@ internal sealed unsafe class ScreenRecorder : IDisposable
                     }
 
                     WriteAudioUpTo(item.Time + item.Duration);
+                    _hooks?.BeforeVideoWrite?.Invoke(_framesWritten);
                     fixed (byte* p = item.Buffer.Data)
                     {
                         WriteFrameWithFallback(p, item);
@@ -683,6 +862,46 @@ internal sealed unsafe class ScreenRecorder : IDisposable
             {
                 rest.Buffer.Release();
             }
+        }
+        finally
+        {
+            FinishWriter();
+        }
+    }
+
+    /// <summary>
+    /// Encoder thread, at its end: completes the file (Sink Writer Finalize) unless cancelled or failed, then releases
+    /// the writer. The encoder thread is the writer's only user from the first frame to its release.
+    /// </summary>
+    private void FinishWriter()
+    {
+        if (_writer is null)
+        {
+            return;
+        }
+
+        if (!_cancel && _failure is null)
+        {
+            try
+            {
+                _hooks?.BeforeFinalize?.Invoke();
+                _writer.Complete();
+                _finalized = true;
+            }
+            catch (Exception ex) when (ex is NativeCallException or IOException)
+            {
+                _failure ??= ex;
+                AddNotice($"The video could not be completed normally ({ex.Message}). It will be recovered from its last complete part.");
+            }
+        }
+
+        EncoderNameAtEnd = _writer.Encoder?.Name;
+        HardwareAtEnd = _writer.Encoder?.Hardware ?? false;
+        _writer.Dispose();
+        _writer = null;
+        if (_cancel)
+        {
+            TryDelete(_path);
         }
     }
 
@@ -844,12 +1063,24 @@ internal sealed unsafe class ScreenRecorder : IDisposable
 
     private bool HardwareAtEnd { get; set; }
 
-    private static Thread StartThread(Action body, string name, ThreadPriority priority)
+    private Thread StartThread(Action body, string name, ThreadPriority priority)
     {
+        Interlocked.Increment(ref _liveThreads);
         var t = new Thread(() =>
         {
-            _ = Com.CoInitializeEx(0, Com.COINIT_MULTITHREADED);
-            body();
+            try
+            {
+                _ = Com.CoInitializeEx(0, Com.COINIT_MULTITHREADED);
+                body();
+            }
+            finally
+            {
+                // Threads that outlive a timed-out Stop complete ThreadsExited when the last one ends.
+                if (Interlocked.Decrement(ref _liveThreads) == 0 && Volatile.Read(ref _ending) is not null)
+                {
+                    _threadsExited.TrySetResult();
+                }
+            }
         })
         { IsBackground = true, Name = name, Priority = priority };
         t.Start();
