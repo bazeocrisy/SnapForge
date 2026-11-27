@@ -3,7 +3,8 @@
   <div class="container">
     <p class="eyebrow">User Guide</p>
     <h1>Using SnapForge</h1>
-    <p class="lead">Written for the current development builds; details may change before the first release.</p>
+    <p class="lead">Written for release candidate 2 (in testing); details may change before the first release.
+    “QuickDock” and “SnapForge Studio” are provisional names.</p>
   </div>
 </section>
 
@@ -17,9 +18,9 @@
       <li><a href="#redact">Redacting</a></li>
       <li><a href="#share">Saving and sharing</a></li>
       <li><a href="#library">The Library</a></li>
-      <li><a href="#widget">The desktop widget</a></li>
+      <li><a href="#widget">QuickDock</a></li>
       <li><a href="#text">Scrolling capture and text</a></li>
-      <li><a href="#record">Screen recording</a></li>
+      <li><a href="#record">Recording with SnapForge Studio</a></li>
       <li><a href="#video-edit">Editing videos</a></li>
       <li><a href="#shortcuts">Keyboard shortcuts</a></li>
       <li><a href="#data">Where your data lives</a></li>
@@ -29,9 +30,12 @@
   <article class="prose">
     <h2 id="start">Getting started</h2>
     <p>Start SnapForge from the Start menu (installer) or run <code>SnapForge.exe</code> (portable ZIP). On the first
-    start a short welcome explains the basics; reopen it with <em>Help → Getting started</em>. The <strong>capture panel</strong> opens, and a small <strong>widget</strong>
-    tab appears at the top centre of your screen. SnapForge also puts an icon in the notification area (next to
-    the clock); click it to open the capture panel, or right-click it for the app's menu, including Exit.</p>
+    start a short welcome explains the basics; reopen it with <em>Help → Getting started</em>. The <strong>capture panel</strong> opens, and
+    <strong>QuickDock</strong> appears at the top centre of your screen. SnapForge also puts an icon in the
+    notification area (next to the clock); click it to open the capture panel, or right-click it for the app's
+    menu, including Exit.</p>
+    <p>If you turned on <em>Launch SnapForge when I sign in to Windows</em>, SnapForge starts quietly: only the
+    notification-area icon and QuickDock appear, and no window opens.</p>
     <p>SnapForge has three workspaces: <strong>Capture</strong> (the panel), the <strong>Editor</strong> and the
     <strong>Library</strong>. Switch with the buttons in the top-right corner or with <kbd>Ctrl</kbd>+<kbd>E</kbd>
     and <kbd>Ctrl</kbd>+<kbd>L</kbd>.</p>
@@ -39,7 +43,7 @@
     <h2 id="capture">Taking a capture</h2>
     <ol>
       <li>In the capture panel, pick a <strong>Selection</strong>: Region, Window, Active window, Display or Full screen.</li>
-      <li>Click the big <strong>Capture</strong> button or press <kbd>Print Screen</kbd> from any app.</li>
+      <li>Click <strong>Capture</strong> or press <kbd>Print Screen</kbd> from any app.</li>
       <li>For a region, drag a rectangle over the frozen screen. For a window or display, click it.
       The magnifier shows the exact pixel; arrow keys move the selection by one pixel (<kbd>Shift</kbd> for ten).
       Press <kbd>Esc</kbd> or right-click to cancel.</li>
@@ -90,10 +94,11 @@
     <kbd>Enter</kbd> to open a capture, <kbd>F2</kbd> to rename, <kbd>Del</kbd> to move it to the Trash, and
     right-click for more. Settings has backup and restore, retention, storage usage and the Library location.</p>
 
-    <h2 id="widget">The desktop widget</h2>
-    <p>Hover over (or click, depending on Settings) the tab at the top of the screen to open Capture, Record, Editor,
-    Library and Presets. Drag it by its grip to the top, left or right edge of any display. If you lose it, choose
-    <em>View → Show capture widget</em>. It never takes keyboard focus and hides itself during a capture.</p>
+    <h2 id="widget">QuickDock</h2>
+    <p>QuickDock (formerly the desktop widget) is the compact rounded bar at the top of the screen. Use it to open
+    Capture, Record, Editor, Library and Presets. Drag it by its grip to the top, left or right edge of any display.
+    If you lose it, use the <em>View</em> menu to show it again (in release candidate 1 this was
+    <em>View → Show capture widget</em>). It never takes keyboard focus and hides itself during a capture.</p>
 
     <h2 id="text">Scrolling capture and text</h2>
     <p><em>Capture → Scrolling capture</em> (<kbd>Ctrl</kbd>+<kbd>6</kbd>): select the part of the window that
@@ -104,12 +109,22 @@
     with Windows' built-in, offline text recognition. Check and edit the text, then copy it. If no recognition
     language is installed, add one in Windows Settings → Time &amp; language → Language &amp; region.</p>
 
-    <h2 id="record">Screen recording</h2>
-    <p>In the capture panel choose <strong>Video</strong>,
-    pick region, window or display, then <strong>Record</strong> (or <kbd>Shift</kbd>+<kbd>F9</kbd>). After a
-    3-second countdown, a floating toolbar shows the elapsed time with Pause/Resume, Stop and Cancel, and switches
-    for system sound and microphone. <kbd>Shift</kbd>+<kbd>F9</kbd> pauses and resumes; <kbd>Shift</kbd>+<kbd>F10</kbd>
-    stops and saves an MP4 to the Library. Windows shows a border around what is being recorded.</p>
+    <h2 id="record">Recording with SnapForge Studio</h2>
+    <p>Choose <strong>Record</strong> on QuickDock or in the capture panel
+    to open <strong>SnapForge Studio</strong>. Pick a mode:</p>
+    <ul>
+      <li><strong>Screen only</strong> — then pick a region, window or display.</li>
+      <li><strong>Screen + camera</strong> — your screen with your camera picture on top.</li>
+      <li><strong>Camera only</strong> — just your camera.</li>
+    </ul>
+    <p>The camera and the microphone are <strong>off by default</strong>: switch them on for the recordings that
+    need them. Windows shows its camera indicator while the camera is on and its microphone indicator while the
+    microphone is on. If the camera is not offered, check Windows Settings → Privacy &amp; security → Camera.</p>
+    <p>Then choose <strong>Record</strong>. After a 3-second countdown, a floating toolbar shows the elapsed time
+    with Pause/Resume, Stop and Cancel, and switches for system sound and microphone. <kbd>Shift</kbd>+<kbd>F9</kbd>
+    pauses and resumes; <kbd>Shift</kbd>+<kbd>F10</kbd> stops and saves an MP4 to the Library. Windows shows a
+    border around the part of the screen being recorded. The exact layout of Studio may still change during
+    testing.</p>
 
     <h2 id="video-edit">Editing videos</h2>
     <p>In the Library, right-click a video and choose <em>Edit video</em>. Set the start and end with
@@ -148,6 +163,9 @@
       <li>Temporary copies for drag-and-drop: removed at once when a drag is cancelled; after a drop they are kept
       up to 24 hours so slow uploads finish. <em>Settings → Delete drag-and-drop copies now</em> removes them.</li>
     </ul>
-    <p>Library backups (.zip) contain images only; back up the Library's <code>videos</code> folder separately.</p>
+    <p>Library backups (.zip) made with release candidate 2 contain your images, videos, the Trash and all
+    metadata (tags, folders, favourites). Backups made with release candidate 1 contained images only.</p>
+    <p>Uninstalling SnapForge keeps all of this; delete <code>%LOCALAPPDATA%\SnapForge</code> yourself to remove
+    it (see <a href="download.html#uninstall">Uninstalling</a>).</p>
   </article>
 </div>

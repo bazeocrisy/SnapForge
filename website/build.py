@@ -56,12 +56,19 @@ FOOTER = [
 
 # ----------------------------------------------------------------------------------------------- configuration
 
-RELEASE_URL = re.compile(r"^https://github\.com/bazeocrisy/SnapForge/releases/download/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.(zip|exe|msi|msix)$")
 NOTES_URL = re.compile(r"^https://github\.com/bazeocrisy/SnapForge/releases/tag/[A-Za-z0-9._-]+$")
 PRIVATE_REPORTING_URL = "https://github.com/bazeocrisy/SnapForge/security/advisories/new"
-# release fields that must be identical in config.json and the verification record
-VERIFIED_FIELDS = ("version", "date", "downloadUrl", "fileName", "sizeBytes", "sha256", "signed", "signer",
-                   "releaseNotesUrl", "packageType")
+DOWNLOAD_PREFIX = "https://github.com/bazeocrisy/SnapForge/releases/download/"
+RUN_URL = re.compile(r"^https://github\.com/bazeocrisy/SnapForge/actions/runs/\d+$")
+SOURCE_URL = re.compile(r"^https://github\.com/bazeocrisy/SnapForge(/tree/[A-Za-z0-9._/-]+)?$")
+VERSION_RX = re.compile(r"^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$")
+# Fields that must be identical in config.json and the verification record — kept equal to
+# tools/verify-release.py RELEASE_FIELDS / ASSET_FIELDS (a unit test checks this).
+RELEASE_FIELDS = ("version", "tag", "date", "releaseNotesUrl", "publisher")
+ASSET_FIELDS = ("kind", "fileName", "downloadUrl", "assetId", "sizeBytes", "sha256", "signed")
+# FA-011: the two package kinds of one release, same version, each with its own asset record.
+ASSET_NAMES = {"installer": "SnapForge-{v}-win-x64-setup.exe", "portable": "SnapForge-{v}-win-x64-portable.zip"}
+ASSET_LABELS = {"installer": "Installer", "portable": "Portable ZIP"}
 DONATION_RULES = {
     "githubSponsors": ("GitHub Sponsors", re.compile(r"^https://github\.com/sponsors/[A-Za-z0-9-]{1,39}$")),
     "buyMeACoffee": ("Buy Me a Coffee", re.compile(r"^https://(www\.)?buymeacoffee\.com/[A-Za-z0-9_]{1,64}/?$")),
@@ -73,6 +80,82 @@ class ConfigError(Exception):
     pass
 
 
+def check_release(rel: dict, errors: list[str]) -> None:
+    """Shape of an owner-approved release (FA-011): distinct installer/portable assets of the same version."""
+    for k in ("version", "tag", "date", "releaseNotesUrl"):
+        if rel.get(k) in (None, ""):
+            errors.append(f"release.{k} is required when release.ownerApproved is true")
+    if rel.get("version") and not VERSION_RX.match(rel["version"]):
+        errors.append("release.version must look like 1.2.3")
+    if rel.get("date"):
+        try:
+            _dt.date.fromisoformat(rel["date"])
+        except ValueError:
+            errors.append("release.date must be YYYY-MM-DD")
+    if rel.get("tag") and rel.get("releaseNotesUrl") and \
+            rel["releaseNotesUrl"] != f"https://github.com/bazeocrisy/SnapForge/releases/tag/{rel['tag']}":
+        errors.append("release.releaseNotesUrl must be https://github.com/bazeocrisy/SnapForge/releases/tag/<tag>")
+    pub = rel.get("publisher") or {}
+    assets = rel.get("assets") or []
+    kinds = [a.get("kind") for a in assets]
+    if not assets:
+        errors.append("release.assets must list at least one asset")
+    if len(set(kinds)) != len(kinds) or not set(kinds) <= set(ASSET_NAMES):
+        errors.append(f"release.assets must have distinct kinds from {sorted(ASSET_NAMES)} (got {kinds})")
+        return
+    for a in assets:
+        kind = a["kind"]
+        for k in ("fileName", "downloadUrl", "assetId", "sizeBytes", "sha256"):
+            if a.get(k) in (None, ""):
+                errors.append(f"release asset {kind}: {k} is required")
+        if rel.get("version") and a.get("fileName") and a["fileName"] != ASSET_NAMES[kind].format(v=rel["version"]):
+            errors.append(f"release asset {kind}: fileName must be {ASSET_NAMES[kind].format(v=rel['version'])} "
+                          "(every asset has the release's version)")
+        if a.get("downloadUrl") and a.get("fileName") and rel.get("tag") and \
+                a["downloadUrl"] != f"{DOWNLOAD_PREFIX}{rel['tag']}/{a['fileName']}":
+            errors.append(f"release asset {kind}: downloadUrl must be a GitHub Release asset "
+                          f"{DOWNLOAD_PREFIX}<tag>/<fileName>; Actions artifacts expire and are not allowed")
+        if a.get("assetId") is not None and (not isinstance(a["assetId"], int) or a["assetId"] <= 0):
+            errors.append(f"release asset {kind}: assetId must be GitHub's numeric asset id")
+        if a.get("sha256") and not re.fullmatch(r"[0-9a-f]{64}", a["sha256"]):
+            errors.append(f"release asset {kind}: sha256 must be 64 lower-case hex characters")
+        if a.get("sizeBytes") is not None and (not isinstance(a["sizeBytes"], int) or a["sizeBytes"] <= 0):
+            errors.append(f"release asset {kind}: sizeBytes must be a positive whole number")
+        if not isinstance(a.get("signed"), bool):
+            errors.append(f"release asset {kind}: signed must be true or false")
+        if a.get("signed") and not (pub.get("subject") and pub.get("thumbprints")):
+            errors.append(f"release asset {kind} is claimed signed: release.publisher.subject (full certificate "
+                          "subject) and release.publisher.thumbprints are required")
+
+
+def check_record(rel: dict, rec: dict, name: str, errors: list[str]) -> None:
+    """The verification record must be for exactly this release and exactly these asset uploads (FA-011/012):
+    a record for an older asset id, another digest or size is stale and refused."""
+    if rec.get("result") != "verified":
+        errors.append(f"{name}: result is not 'verified'")
+    for k in RELEASE_FIELDS:
+        if (rec.get("release") or {}).get(k) != rel.get(k):
+            errors.append(f"{name} does not match config.json for release.{k} "
+                          f"({(rec.get('release') or {}).get(k)!r} vs {rel.get(k)!r}) — re-run verification")
+    have = {a.get("kind"): a for a in rec.get("assets") or []}
+    want = {a.get("kind"): a for a in rel.get("assets") or []}
+    for kind in sorted(set(have) - set(want)):
+        errors.append(f"{name} has a record for a {kind} asset that config.json does not list — stale record")
+    for kind, a in want.items():
+        r = have.get(kind)
+        if r is None:
+            errors.append(f"{name} has no verification record for the {kind} asset — each asset needs its own")
+            continue
+        for k in ASSET_FIELDS:
+            if r.get(k) != a.get(k):
+                errors.append(f"{name} does not match config.json for the {kind} asset's {k} "
+                              f"({r.get(k)!r} vs {a.get(k)!r}) — stale record, re-run verification")
+        if not r.get("signing"):
+            errors.append(f"{name}: the {kind} asset has no signing check")
+        if kind == "portable" and not r.get("innerChecksumsVerified"):
+            errors.append(f"{name}: the portable ZIP's SHA256SUMS.txt was not verified")
+
+
 def load_config(path: Path, verification_path: Path = VERIFICATION) -> dict:
     cfg = json.loads(path.read_text(encoding="utf-8"))
     errors: list[str] = []
@@ -82,53 +165,34 @@ def load_config(path: Path, verification_path: Path = VERIFICATION) -> dict:
         errors.append(f"security.privateReporting.url must be {PRIVATE_REPORTING_URL}")
     if sec.get("verified") and not sec.get("url"):
         errors.append("security.privateReporting.verified needs security.privateReporting.url")
+    if not SOURCE_URL.match(cfg.get("sourceUrl") or ""):
+        errors.append("sourceUrl must be https://github.com/bazeocrisy/SnapForge or a /tree/<branch> of it")
+    tb = cfg.get("testBuild") or {}
+    if tb.get("version") and not VERSION_RX.match(tb["version"]):
+        errors.append("testBuild.version must look like 1.0.0-rc.2")
+    if tb.get("runUrl") and not RUN_URL.match(tb["runUrl"]):
+        errors.append("testBuild.runUrl must be a run page https://github.com/bazeocrisy/SnapForge/actions/runs/<id> "
+                      "(a link to the CI run, never a file hosted on this site)")
+    if tb.get("commit") and not re.fullmatch(r"[0-9a-f]{40}", tb["commit"]):
+        errors.append("testBuild.commit must be a full 40-character lower-case commit SHA")
+    if tb.get("runUrl") and not (tb.get("commit") and tb.get("version")):
+        errors.append("testBuild.runUrl needs testBuild.version and testBuild.commit")
     cfg["_verification"] = None
     if rel.get("ownerApproved"):
         # ownerApproved alone is not proof that a safe release exists: require the record written by
-        # tools/verify-release.py for exactly these release details, and an operational private security contact.
+        # tools/verify-release.py for exactly these release details and asset uploads, and an operational private
+        # security contact.
         if not (sec.get("url") and sec.get("verified")):
             errors.append("a release cannot be shown until private vulnerability reporting is enabled and verified "
                           "(security.privateReporting.url + verified: true) — see LAUNCH-CHECKLIST.md")
+        check_release(rel, errors)
         if not verification_path.exists():
             errors.append(f"release.ownerApproved is true but {verification_path.name} is missing: run "
-                          "tools/verify-release.py against the "
-                          "published GitHub Release first — see LAUNCH-CHECKLIST.md")
+                          "tools/verify-release.py against the published GitHub Release first — see LAUNCH-CHECKLIST.md")
         else:
             rec = json.loads(verification_path.read_text(encoding="utf-8"))
-            if rec.get("result") != "verified":
-                errors.append(f"{verification_path.name}: result is not 'verified'")
-            for k in VERIFIED_FIELDS:
-                if (rec.get("release") or {}).get(k) != rel.get(k):
-                    errors.append(f"{verification_path.name} does not match config.json for release.{k} "
-                                  f"({(rec.get('release') or {}).get(k)!r} vs {rel.get(k)!r}) — re-run verification")
+            check_record(rel, rec, verification_path.name, errors)
             cfg["_verification"] = rec
-        need = ["version", "date", "downloadUrl", "fileName", "sizeBytes", "sha256", "releaseNotesUrl"]
-        for k in need:
-            if rel.get(k) in (None, ""):
-                errors.append(f"release.{k} is required when release.ownerApproved is true")
-        if rel.get("version") and not re.match(r"^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$", rel["version"]):
-            errors.append("release.version must look like 1.2.3")
-        if rel.get("date"):
-            try:
-                _dt.date.fromisoformat(rel["date"])
-            except ValueError:
-                errors.append("release.date must be YYYY-MM-DD")
-        if rel.get("downloadUrl") and not RELEASE_URL.match(rel["downloadUrl"]):
-            errors.append("release.downloadUrl must be a GitHub Release asset of bazeocrisy/SnapForge "
-                          "(https://github.com/bazeocrisy/SnapForge/releases/download/<tag>/<file>); "
-                          "Actions artifacts expire and are not allowed")
-        if rel.get("downloadUrl") and rel.get("fileName") and not rel["downloadUrl"].endswith("/" + rel["fileName"]):
-            errors.append("release.fileName must match the last part of release.downloadUrl")
-        if rel.get("releaseNotesUrl") and not NOTES_URL.match(rel["releaseNotesUrl"]):
-            errors.append("release.releaseNotesUrl must be https://github.com/bazeocrisy/SnapForge/releases/tag/<tag>")
-        if rel.get("sha256") and not re.fullmatch(r"[0-9a-f]{64}", rel["sha256"]):
-            errors.append("release.sha256 must be 64 lower-case hex characters")
-        if rel.get("sizeBytes") is not None and (not isinstance(rel["sizeBytes"], int) or rel["sizeBytes"] <= 0):
-            errors.append("release.sizeBytes must be a positive whole number")
-        if rel.get("signed") and not rel.get("signer"):
-            errors.append("release.signer is required when release.signed is true")
-        if rel.get("packageType") not in ("portable", "installer"):
-            errors.append("release.packageType must be 'portable' or 'installer'")
     for key, (label, rx) in DONATION_RULES.items():
         d = (cfg.get("donations") or {}).get(key) or {}
         url = d.get("url")
@@ -170,90 +234,162 @@ def ext_link(url: str, text: str, cls: str = "") -> str:
     return f'<a{c} href="{esc(url)}" rel="noopener noreferrer">{text}<span class="visually-hidden"> (external site)</span></a>'
 
 
+def live_assets(cfg: dict) -> list[tuple[dict, dict]]:
+    """(config asset, verification record) pairs — only assets with their own matching record (FA-011)."""
+    if not release_live(cfg):
+        return []
+    recs = {a.get("kind"): a for a in (cfg.get("_verification") or {}).get("assets") or []}
+    order = {"installer": 0, "portable": 1}
+    out = [(a, recs[a["kind"]]) for a in cfg["release"]["assets"] if a.get("kind") in recs]
+    return sorted(out, key=lambda p: order[p[0]["kind"]])
+
+
 def download_cta(cfg: dict, large: bool = True) -> str:
     size = " btn-lg" if large else ""
     if release_live(cfg):
         r = cfg["release"]
-        return (f'<a class="btn btn-primary{size}" href="{esc(r["downloadUrl"])}" rel="noopener noreferrer">'
+        kinds = " and ".join(ASSET_LABELS[a["kind"]].lower() for a, _ in live_assets(cfg))
+        return (f'<a class="btn btn-primary{size}" href="download.html#public">'
                 f'<img src="assets/icons/download.svg" alt="" width="20" height="20"> Download for Windows</a>'
-                f'<p class="cta-note">Version {esc(r["version"])} · Windows 11 x64 · {human_size(r["sizeBytes"])} · '
-                f'free</p>')
+                f'<p class="cta-note">Version {esc(r["version"])} · Windows 11 x64 · {esc(kinds)} · free</p>')
     return (f'<button class="btn btn-primary{size}" type="button" disabled aria-describedby="dl-status-note">'
             f'<img src="assets/icons/download.svg" alt="" width="20" height="20"> Download for Windows</button>'
-            f'<p class="cta-note" id="dl-status-note">Not released yet — SnapForge is in development. '
+            f'<p class="cta-note" id="dl-status-note">No public release yet — release candidate 2 is in testing. '
             f'<a href="download.html">See download status</a>.</p>')
 
 
 def release_panel(cfg: dict) -> str:
     if not release_live(cfg):
         return """
-<section class="status-card" aria-labelledby="release-status">
-  <span class="badge badge-dev">In development</span>
-  <h2 id="release-status">No public release yet</h2>
-  <p>SnapForge has not had an approved public release. Development builds are reviewed and tested before a
-  release is published, and the download button on this site stays disabled until the owner approves a
-  GitHub Release.</p>
-  <p>The download will appear here, with its version, date, size, SHA-256 checksum and signing status, as soon
-  as a release is published. Builds produced by automated tests are not offered here: they are temporary,
-  unreviewed and expire.</p>
-  <p><a class="btn btn-secondary" href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">Follow the project on GitHub<span class="visually-hidden"> (external site)</span></a></p>
+<section class="status-card" aria-labelledby="public">
+  <span class="badge badge-dev">Not available yet</span>
+  <h2 id="public">Public download</h2>
+  <p>There is <strong>no public release of SnapForge yet</strong>. The download button stays disabled until the
+  owner approves a release, it is published as a GitHub Release, and each of its files has been checked
+  (size, SHA-256 checksum, contents and signing status).</p>
+  <p><button class="btn btn-primary" type="button" disabled aria-describedby="public-note"><img src="assets/icons/download.svg" alt="" width="20" height="20"> Download for Windows</button></p>
+  <p class="small" id="public-note">When a release is published, this section will list the installer and the
+  portable ZIP separately, each with its own size, checksum and signing status.</p>
 </section>"""
     r = cfg["release"]
-    signed = (f'Signed by {esc(r["signer"])}' if r.get("signed")
-              else "Not code-signed — Windows SmartScreen may show a warning (see below)")
-    kind = "Portable ZIP (no installer)" if r.get("packageType") == "portable" else "Installer"
+    rec = cfg["_verification"]
     d = _dt.date.fromisoformat(r["date"])
     date = f"{d.day} {d:%B %Y}"
+    cards = []
+    for a, v in live_assets(cfg):
+        kind = a["kind"]
+        signed = ("Signed (verified: exact publisher, trusted chain, timestamp)" if a.get("signed")
+                  else "Not code-signed — Windows SmartScreen may show a warning (see below)")
+        what = ("Installs for all users into Program Files; asks for administrator approval once"
+                if kind == "installer" else "No installation and no administrator rights; extract and run")
+        hid = f"sha256-{kind}"
+        cards.append(f"""
+  <section class="asset-card" aria-labelledby="asset-{kind}">
+    <h3 id="asset-{kind}">{ASSET_LABELS[kind]}</h3>
+    <p><a class="btn btn-primary" href="{esc(a["downloadUrl"])}" rel="noopener noreferrer"><img src="assets/icons/download.svg" alt="" width="20" height="20"> Download {ASSET_LABELS[kind].lower()}<span class="visually-hidden"> (external site)</span></a></p>
+    <dl class="facts">
+      <div><dt>File</dt><dd><code>{esc(a["fileName"])}</code> · {human_size(a["sizeBytes"])}</dd></div>
+      <div><dt>Package</dt><dd>{what}</dd></div>
+      <div><dt>Signing</dt><dd>{signed}</dd></div>
+      <div class="wide"><dt>SHA-256</dt><dd><code class="hash" id="{hid}">{esc(a["sha256"])}</code>
+        <button class="btn btn-small copy" type="button" data-copy="{hid}">Copy</button></dd></div>
+    </dl>
+  </section>""")
+    checked = esc(rec["checkedAt"][:10])
     return f"""
-<section class="status-card status-live" aria-labelledby="release-status">
+<section class="status-card status-live" aria-labelledby="public">
   <span class="badge badge-live">Released</span>
-  <h2 id="release-status">SnapForge {esc(r["version"])}</h2>
-  {download_cta(cfg)}
+  <h2 id="public">Public download: SnapForge {esc(r["version"])}</h2>
   <dl class="facts">
     <div><dt>Version</dt><dd>{esc(r["version"])}</dd></div>
     <div><dt>Released</dt><dd><time datetime="{esc(r["date"])}">{esc(date)}</time></dd></div>
-    <div><dt>File</dt><dd><code>{esc(r["fileName"])}</code> · {human_size(r["sizeBytes"])}</dd></div>
-    <div><dt>Package</dt><dd>{kind}</dd></div>
-    <div><dt>Signing</dt><dd>{signed}</dd></div>
-    <div><dt>Verified</dt><dd>Download, size, checksum and signing checked on
-      <time datetime="{esc(cfg["_verification"]["checkedAt"][:10])}">{esc(cfg["_verification"]["checkedAt"][:10])}</time></dd></div>
-    <div class="wide"><dt>SHA-256</dt><dd><code class="hash" id="sha256">{esc(r["sha256"])}</code>
-      <button class="btn btn-small copy" type="button" data-copy="sha256">Copy</button></dd></div>
+    <div><dt>Verified</dt><dd>Each file's download, size, checksum, contents and signing checked on
+      <time datetime="{checked}">{checked}</time></dd></div>
   </dl>
+  {"".join(cards)}
   <p>{ext_link(r["releaseNotesUrl"], "Release notes for " + esc(r["version"]))}</p>
+</section>"""
+
+
+def test_build_panel(cfg: dict) -> str:
+    """FA-014/024, SF-012: honest description of the CI test packages; only a link to the run page."""
+    tb = cfg.get("testBuild") or {}
+    version = esc(tb.get("version") or "the current release candidate")
+    if tb.get("runUrl"):
+        link = (f'<p>{ext_link(tb["runUrl"], "Open the CI run for " + version, "btn btn-secondary")}</p>'
+                f'<p class="small">Built from commit <code>{esc(tb["commit"])}</code>. The package names on that '
+                f'page contain this commit.</p>')
+    else:
+        link = ('<div class="note" role="note"><p><strong>The link to the CI run for this test build will be added here</strong> '
+                'once the maintainer has checked the run. Until then, invited testers receive the link directly.</p></div>')
+    return f"""
+<section class="status-card" aria-labelledby="test-builds">
+  <span class="badge badge-exp">Release candidate 2 (in testing)</span>
+  <h2 id="test-builds">Test builds for invited testers</h2>
+  <p>Test packages of <strong>SnapForge {version}</strong> are produced automatically by the project's continuous
+  integration (CI) on GitHub. They are <strong>not a release</strong>:</p>
+  <ul>
+    <li>They are GitHub Actions <em>artifacts</em> on the CI run page. Downloading them needs a GitHub sign-in.</li>
+    <li><strong>Sign-in is not owner-only access.</strong> The repository is public, so anyone with a free GitHub
+    account can download these artifacts. Treat them as public test files.</li>
+    <li>They <strong>expire</strong> (normally after 30 days) and are then gone.</li>
+    <li>They are <strong>not code-signed</strong> and have not been approved for general use.</li>
+    <li>Nothing is hosted on this website: it only links to the CI run.</li>
+  </ul>
+  {link}
 </section>"""
 
 
 def package_contents(cfg: dict) -> str:
     """What is inside the download — only from the verification record, never assumed."""
-    rec = cfg.get("_verification")
-    if not rec:
-        return ("<p>The exact contents of the release package (for example the license, third-party notices and a "
+    pairs = live_assets(cfg)
+    if not pairs:
+        return ("<p>The exact contents of each release package (for example the license, third-party notices and a "
                 "checksum list) will be listed here once a release has been published and verified. Nothing is "
                 "promised until then.</p>")
-    files = rec.get("packageContents") or []
-    items = "".join(f"<li><code>{esc(f)}</code></li>" for f in files)
-    checked = rec.get("checkedAt", "")[:10]
-    return (f"<p>Verified contents of <code>{esc(cfg['release']['fileName'])}</code> "
-            f"(checked <time datetime=\"{esc(checked)}\">{esc(checked)}</time>):</p><ul>{items}</ul>")
+    checked = cfg["_verification"].get("checkedAt", "")[:10]
+    out = []
+    for a, v in pairs:
+        if a["kind"] == "portable":
+            items = "".join(f"<li><code>{esc(f)}</code></li>" for f in v.get("packageContents") or [])
+            out.append(f"<p>Verified contents of <code>{esc(a['fileName'])}</code> (checked "
+                       f"<time datetime=\"{esc(checked)}\">{esc(checked)}</time>):</p><ul>{items}</ul>")
+        else:
+            out.append(f"<p><code>{esc(a['fileName'])}</code> installs the same <code>SnapForge.exe</code> as the "
+                       "portable ZIP (checked when the release was verified) together with its license and notices.</p>"
+                       if len(pairs) > 1 else
+                       f"<p><code>{esc(a['fileName'])}</code> is a single installer file (verified "
+                       f"<time datetime=\"{esc(checked)}\">{esc(checked)}</time>).</p>")
+    return "".join(out)
 
 
 def sums_sentence(cfg: dict) -> str:
-    rec = cfg.get("_verification")
-    if rec and "SHA256SUMS.txt" in (rec.get("packageContents") or []) and rec.get("innerChecksumsVerified"):
-        return (" The ZIP also contains <code>SHA256SUMS.txt</code> with the checksum of every file inside it; "
-                "these were checked when the release was verified.")
+    for a, v in live_assets(cfg):
+        if a["kind"] == "portable" and v.get("innerChecksumsVerified"):
+            return ("<p>The portable ZIP also contains <code>SHA256SUMS.txt</code> with the checksum of every file "
+                    "inside it; it was checked to cover every file exactly once when the release was verified.</p>")
     return ""
 
 
 def notices_statement(cfg: dict) -> str:
-    rec = cfg.get("_verification")
-    contents = (rec or {}).get("packageContents") or []
-    if "THIRD-PARTY-NOTICES.md" in contents:
-        return ("The full list is in <code>THIRD-PARTY-NOTICES.md</code>, included in the release package "
-                "(verified) and in the source code.")
+    for a, v in live_assets(cfg):
+        if "THIRD-PARTY-NOTICES.md" in (v.get("packageContents") or []):
+            return ("The full list is in <code>THIRD-PARTY-NOTICES.md</code>, included in the release package "
+                    "(verified) and in the source code.")
     return ("The full list is in <code>THIRD-PARTY-NOTICES.md</code> in the source code. Which notice files are "
             "inside a release package is confirmed when that release is verified.")
+
+
+def source_link(cfg: dict, text: str, cls: str = "") -> str:
+    return ext_link(cfg["sourceUrl"], text, cls)
+
+
+def source_note(cfg: dict) -> str:
+    if cfg.get("sourceIsCandidate"):
+        return ("The code is on the <code>release/v1.0-candidate</code> branch, which becomes the main branch after "
+                "the owner approves it; the repository's front page (<code>main</code>) shows only a short README "
+                "until then. ")
+    return ""
 
 
 def security_block(cfg: dict) -> str:
@@ -276,8 +412,10 @@ def security_block(cfg: dict) -> str:
 
 
 def verify_command(cfg: dict) -> str:
-    name = cfg["release"]["fileName"] if release_live(cfg) else "SnapForge-<version>-win-x64.zip"
-    return esc(f'Get-FileHash .\\{name} -Algorithm SHA256')
+    pairs = live_assets(cfg)
+    names = [a["fileName"] for a, _ in pairs] or ["SnapForge-<version>-win-x64-setup.exe",
+                                                  "SnapForge-<version>-win-x64-portable.zip"]
+    return "\n".join(esc(f'Get-FileHash .\\{n} -Algorithm SHA256') for n in names)
 
 
 def donate_block(cfg: dict) -> str:
@@ -308,14 +446,14 @@ def jsonld(cfg: dict) -> str:
         "operatingSystem": "Windows 11",
         "isAccessibleForFree": True,
         "license": "https://opensource.org/licenses/MIT",
-        "codeRepository": REPO,
+        "codeRepository": cfg["sourceUrl"],
         "url": cfg["siteUrl"],
         "offers": {"@type": "Offer", "price": "0", "priceCurrency": "USD"},
     }
     if release_live(cfg):
         r = cfg["release"]
-        data.update({"softwareVersion": r["version"], "downloadUrl": r["downloadUrl"], "datePublished": r["date"],
-                     "fileSize": human_size(r["sizeBytes"])})
+        data.update({"softwareVersion": r["version"], "downloadUrl": cfg["siteUrl"] + "download.html#public",
+                     "datePublished": r["date"]})
     return '<script type="application/ld+json">' + json.dumps(data, ensure_ascii=False) + "</script>"
 
 
@@ -332,12 +470,12 @@ def nav_html(current: str) -> str:
     return "\n".join(items)
 
 
-def footer_html(current: str) -> str:
+def footer_html(current: str, cfg: dict) -> str:
     items = []
     for href, label in FOOTER:
         cur = ' aria-current="page"' if href == current else ""
         items.append(f'<li><a href="{href}"{cur}>{label}</a></li>')
-    items.append(f'<li>{ext_link(REPO, "Source code on GitHub")}</li>')
+    items.append(f'<li>{source_link(cfg, "Source code on GitHub")}</li>')
     return "\n".join(items)
 
 
@@ -360,18 +498,14 @@ def build(cfg: dict, out: Path) -> list[str]:
         "{{sums_sentence}}": sums_sentence(cfg),
         "{{notices_statement}}": notices_statement(cfg),
         "{{security_block}}": security_block(cfg),
-        "{{package_type_sentence}}": (
-            "This release is a <strong>portable ZIP</strong>: nothing is installed system-wide."
-            if release_live(cfg) and cfg["release"].get("packageType") == "portable" else
-            "This release uses an installer; see its release notes." if release_live(cfg) else
-            "SnapForge is planned to ship as a <strong>portable ZIP</strong>: nothing is installed system-wide."),
-        "{{source_status}}": "" if release_live(cfg) else
-            "Until the first release, the application code is on development branches that are under review. ",
+        "{{test_build_panel}}": test_build_panel(cfg),
+        "{{source_note}}": source_note(cfg),
+        "{{source_url}}": esc(cfg["sourceUrl"]),
         "{{donate_block}}": donate_block(cfg),
         "{{donate_teaser}}": donate_teaser(cfg),
         "{{repo}}": REPO,
         "{{status_line}}": ("Version " + esc(cfg["release"]["version"]) + " is available.") if release_live(cfg)
-        else "In development — no public release yet.",
+        else "No public release yet — release candidate 2 is in testing.",
     }
     pages = []
     for src in sorted((SRC / "pages").glob("*.html")):
@@ -393,7 +527,7 @@ def build(cfg: dict, out: Path) -> list[str]:
             "{{canonical}}": esc(canonical),
             "{{site_url}}": esc(cfg["siteUrl"]),
             "{{nav}}": nav_html(name),
-            "{{footer_nav}}": footer_html(name),
+            "{{footer_nav}}": footer_html(name, cfg),
             "{{content}}": body,
             "{{jsonld}}": jsonld(cfg) if name == "index.html" else "",
             "{{robots}}": '<meta name="robots" content="noindex">' if meta.get("noindex") else "",
@@ -447,6 +581,7 @@ class PageParser(HTMLParser):
         self._in_a = None
         self.empty_links = 0
         self._a_text = ""
+        self.imgs: list[dict] = []   # every <img> with its width/height and the href of the link around it
 
     def handle_starttag(self, tag, attrs):
         a = dict(attrs)
@@ -465,6 +600,9 @@ class PageParser(HTMLParser):
                 self.h1 += 1
         if tag == "img" and "alt" not in a:
             self.imgs_without_alt += 1
+        if tag == "img":
+            self.imgs.append({"src": a.get("src", ""), "width": a.get("width"), "height": a.get("height"),
+                              "srcset": a.get("srcset"), "link": (self._in_a or {}).get("href")})
         if tag == "script":
             self.scripts.append(a.get("src"))
         if tag == "iframe":
@@ -512,11 +650,77 @@ def contrast(c1: str, c2: str) -> float:
     return (a + 0.05) / (b + 0.05)
 
 
+SCREENSHOTS = "assets/screenshots/"
+# SF-011: screenshots are native-size captures from a 1920×1080 test display; anything larger was upscaled.
+SCREENSHOT_MAX = (1920, 1080)
+PNG_SIGNATURE = b"\x89PNG\r\n\x1a\n"
+
+
+def png_size(path: Path) -> tuple[int, int]:
+    """(width, height) from the PNG IHDR chunk; raises ValueError for anything that is not a PNG."""
+    with open(path, "rb") as f:
+        head = f.read(24)
+    if len(head) < 24 or head[:8] != PNG_SIGNATURE or head[12:16] != b"IHDR":
+        raise ValueError("not a PNG file")
+    return int.from_bytes(head[16:20], "big"), int.from_bytes(head[20:24], "big")
+
+
+def check_screenshots(out: Path) -> list[str]:
+    """SF-011: every file in assets/screenshots is a PNG no larger than the capture display (no JPEG, no upscaling)."""
+    problems = []
+    folder = out / SCREENSHOTS
+    for f in sorted(folder.rglob("*")) if folder.exists() else []:
+        if not f.is_file():
+            continue
+        rel = f.relative_to(out).as_posix()
+        if f.suffix != ".png":
+            problems.append(f"{rel}: screenshots must be lossless PNG files (no JPEG or other formats)")
+            continue
+        try:
+            w, h = png_size(f)
+        except ValueError:
+            problems.append(f"{rel}: has a .png name but is not a PNG file")
+            continue
+        if w > SCREENSHOT_MAX[0] or h > SCREENSHOT_MAX[1]:
+            problems.append(f"{rel}: {w}×{h} is larger than the {SCREENSHOT_MAX[0]}×{SCREENSHOT_MAX[1]} capture "
+                            "display — upscaled screenshots are not allowed")
+    return problems
+
+
+def check_page_images(out: Path, name: str, imgs: list[dict]) -> list[str]:
+    """SF-011: each screenshot <img> declares the PNG's real size and links to the full-resolution file itself."""
+    problems = []
+    for im in imgs:
+        src = im["src"]
+        if not src.startswith(SCREENSHOTS) and SCREENSHOTS not in src:
+            continue
+        local = src[src.index(SCREENSHOTS):]
+        f = out / local
+        if not f.exists():
+            continue                                   # reported as a broken link
+        try:
+            w, h = png_size(f)
+        except ValueError:
+            problems.append(f"{name}: {src} is not a PNG")
+            continue
+        if (im["width"], im["height"]) != (str(w), str(h)):
+            problems.append(f"{name}: <img src={src}> declares {im['width']}×{im['height']}, the PNG is {w}×{h} "
+                            "(width/height must equal the real size)")
+        if im.get("srcset"):
+            problems.append(f"{name}: {src} must not use srcset (one native-size PNG per screenshot)")
+        link = im.get("link") or ""
+        target = link[link.index(SCREENSHOTS):] if SCREENSHOTS in link else None
+        if target != local:
+            problems.append(f"{name}: {src} is not wrapped in a link to its full-resolution file")
+    return problems
+
+
 def validate(out: Path) -> list[str]:
     problems: list[str] = []
     external: set[str] = set()
     if not (out / ".nojekyll").exists():
         problems.append(".nojekyll missing: GitHub Pages would run Jekyll over the site (keep static/.nojekyll)")
+    problems += check_screenshots(out)
     for page in sorted(out.glob("*.html")):
         text = page.read_text(encoding="utf-8")
         p = PageParser()
@@ -532,6 +736,7 @@ def validate(out: Path) -> list[str]:
             if cur > prev + 1:
                 problems.append(f"{n}: heading level jumps from h{prev} to h{cur}")
                 break
+        problems += check_page_images(out, n, p.imgs)
         if p.imgs_without_alt:
             problems.append(f"{n}: {p.imgs_without_alt} <img> without alt")
         if p.iframes:

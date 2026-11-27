@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Download — SnapForge</title>
-<meta name="description" content="Download status, system requirements, installation, checksum verification and uninstall instructions for SnapForge for Windows.">
+<meta name="description" content="Download status of SnapForge for Windows: no public release yet; release-candidate test builds for invited testers, with system requirements, installation, checksum verification and uninstall instructions.">
 
 <link rel="canonical" href="https://bazeocrisy.github.io/SnapForge/download.html">
 <meta name="theme-color" content="#0b1220">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SnapForge">
 <meta property="og:title" content="Download">
-<meta property="og:description" content="Download status, system requirements, installation, checksum verification and uninstall instructions for SnapForge for Windows.">
+<meta property="og:description" content="Download status of SnapForge for Windows: no public release yet; release-candidate test builds for invited testers, with system requirements, installation, checksum verification and uninstall instructions.">
 <meta property="og:url" content="https://bazeocrisy.github.io/SnapForge/download.html">
 <meta property="og:image" content="https://bazeocrisy.github.io/SnapForge/assets/img/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -48,88 +48,141 @@
       </ul>
     </nav>
   </div>
-  <p class="status-strip"><span class="container">In development — no public release yet. <a href="roadmap.html">Project status</a></span></p>
+  <p class="status-strip"><span class="container">No public release yet — release candidate 2 is in testing. <a href="roadmap.html">Project status</a></span></p>
 </header>
 <main id="main" tabindex="-1">
 <section class="page-hero">
   <div class="container">
     <p class="eyebrow">Download</p>
     <h1>Download SnapForge for Windows</h1>
-    <p class="lead">Free, with no account or subscription.</p>
+    <p class="lead">Free, with no account or subscription. There is no public release yet; release candidate 2 is
+    in testing.</p>
   </div>
 </section>
 
 <div class="container narrow section prose">
   
-<section class="status-card" aria-labelledby="release-status">
-  <span class="badge badge-dev">In development</span>
-  <h2 id="release-status">No public release yet</h2>
-  <p>SnapForge has not had an approved public release. Development builds are reviewed and tested before a
-  release is published, and the download button on this site stays disabled until the owner approves a
-  GitHub Release.</p>
-  <p>The download will appear here, with its version, date, size, SHA-256 checksum and signing status, as soon
-  as a release is published. Builds produced by automated tests are not offered here: they are temporary,
-  unreviewed and expire.</p>
-  <p><a class="btn btn-secondary" href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">Follow the project on GitHub<span class="visually-hidden"> (external site)</span></a></p>
+<section class="status-card" aria-labelledby="public">
+  <span class="badge badge-dev">Not available yet</span>
+  <h2 id="public">Public download</h2>
+  <p>There is <strong>no public release of SnapForge yet</strong>. The download button stays disabled until the
+  owner approves a release, it is published as a GitHub Release, and each of its files has been checked
+  (size, SHA-256 checksum, contents and signing status).</p>
+  <p><button class="btn btn-primary" type="button" disabled aria-describedby="public-note"><img src="assets/icons/download.svg" alt="" width="20" height="20"> Download for Windows</button></p>
+  <p class="small" id="public-note">When a release is published, this section will list the installer and the
+  portable ZIP separately, each with its own size, checksum and signing status.</p>
 </section>
+
+  
+<section class="status-card" aria-labelledby="test-builds">
+  <span class="badge badge-exp">Release candidate 2 (in testing)</span>
+  <h2 id="test-builds">Test builds for invited testers</h2>
+  <p>Test packages of <strong>SnapForge 1.0.0-rc.2</strong> are produced automatically by the project's continuous
+  integration (CI) on GitHub. They are <strong>not a release</strong>:</p>
+  <ul>
+    <li>They are GitHub Actions <em>artifacts</em> on the CI run page. Downloading them needs a GitHub sign-in.</li>
+    <li><strong>Sign-in is not owner-only access.</strong> The repository is public, so anyone with a free GitHub
+    account can download these artifacts. Treat them as public test files.</li>
+    <li>They <strong>expire</strong> (normally after 30 days) and are then gone.</li>
+    <li>They are <strong>not code-signed</strong> and have not been approved for general use.</li>
+    <li>Nothing is hosted on this website: it only links to the CI run.</li>
+  </ul>
+  <div class="note" role="note"><p><strong>The link to the CI run for this test build will be added here</strong> once the maintainer has checked the run. Until then, invited testers receive the link directly.</p></div>
+</section>
+
+  <h2 id="before">Before you test a build</h2>
+  <ul>
+    <li><strong>Back up anything important first.</strong> Release candidates can still have bugs. If you already
+    use SnapForge, make a Library backup in Settings or copy
+    <code>%LOCALAPPDATA%\SnapForge</code> somewhere safe.</li>
+    <li>Only run a build you obtained from the project's CI run page (or, later, its GitHub Release) <strong>and</strong>
+    whose checksum you have <a href="#verify">verified</a>. If you are unsure, wait for the signed release.</li>
+  </ul>
 
   <h2 id="requirements">System requirements</h2>
   <ul>
-    <li><strong>Windows 11, 64-bit (x64)</strong> is the launch platform and the only supported one.</li>
-    <li>Windows 10, Windows on Arm and other operating systems are <strong>not supported</strong> at launch and are
-    not tested.</li>
-    <li>Development builds are self-contained: they do not need a separate .NET installation or administrator
-    rights. The requirements of each release are confirmed when it is published and verified.</li>
-    <li>Screen recording uses Windows' Media Foundation; Windows “N” editions
-    need Microsoft's Media Feature Pack.</li>
+    <li><strong>Windows 11, version 24H2 or later, 64-bit (x64)</strong>. This is the only supported platform.</li>
+    <li>Windows 10, Windows on Arm and other operating systems are <strong>not supported</strong> and are not
+    tested.</li>
+    <li>No separate .NET installation is needed: SnapForge includes the runtime it uses.</li>
+    <li>Screen recording uses Windows' Media Foundation; Windows “N” editions need Microsoft's Media Feature Pack.
+    Camera recording needs a camera that Windows recognises.</li>
   </ul>
 
   <h2 id="package">What is in the download</h2>
-  <p>The exact contents of the release package (for example the license, third-party notices and a checksum list) will be listed here once a release has been published and verified. Nothing is promised until then.</p>
+  <p>SnapForge comes in two forms with the same version and the same application:</p>
+  <ul>
+    <li><strong>Installer</strong> (<code>SnapForge-&lt;version&gt;-win-x64-setup.exe</code>) — installs for all users
+    of the PC.</li>
+    <li><strong>Portable ZIP</strong> (<code>SnapForge-&lt;version&gt;-win-x64-portable.zip</code>) — no installation;
+    contains <code>SHA256SUMS.txt</code> with a checksum for every file in it.</li>
+  </ul>
+  <p>The exact contents of each release package (for example the license, third-party notices and a checksum list) will be listed here once a release has been published and verified. Nothing is promised until then.</p>
 
   <h2 id="install">Installing</h2>
-  <p>SnapForge is planned to ship as a <strong>portable ZIP</strong>: nothing is installed system-wide. These steps are for the portable ZIP.</p>
+  <h3 id="install-installer">With the installer</h3>
   <ol>
-    <li>Download the ZIP with the button above.</li>
-    <li><a href="#verify">Check its SHA-256 checksum</a> against the one shown above.</li>
+    <li><a href="#verify">Check the installer's SHA-256 checksum</a> first.</li>
+    <li>Run <code>SnapForge-&lt;version&gt;-win-x64-setup.exe</code>. SnapForge installs <strong>for all users into
+    <code>Program Files</code></strong>, so Windows asks for <strong>administrator approval (User Account Control)
+    once</strong> for the installation — and once more if you uninstall.</li>
+    <li>SnapForge itself runs <strong>without administrator rights</strong>. Start it from the Start menu.</li>
+  </ol>
+  <h3 id="install-portable">With the portable ZIP</h3>
+  <ol>
+    <li><a href="#verify">Check the ZIP's SHA-256 checksum</a> first.</li>
     <li>Right-click the ZIP, choose <em>Extract All…</em>, and pick a folder you own, for example
-    <code>Documents\SnapForge</code>.</li>
+    <code>Documents\SnapForge</code>. <strong>No administrator rights are needed.</strong></li>
     <li>Open the folder and run <code>SnapForge.exe</code>. Keep the other files in the folder next to it.</li>
   </ol>
-  <p>An installer is not available. If one is published later it will be listed here with its own checksum.</p>
+  <p>When SnapForge starts with Windows, it opens only its notification-area icon and QuickDock — no window.</p>
 
   <h2 id="verify">Verifying the download</h2>
-  <p>Compare the file's SHA-256 checksum with the one on this page and on the GitHub release before you run it.
-  In PowerShell, in the folder containing the download:</p>
-  <pre><code>Get-FileHash .\SnapForge-&lt;version&gt;-win-x64.zip -Algorithm SHA256</code></pre>
-  <p>The <code>Hash</code> it prints must match exactly (letter case does not matter).</p>
+  <p>Before you run anything, compare its SHA-256 checksum with the published one. In PowerShell, in the folder
+  containing the download:</p>
+  <pre><code>Get-FileHash .\SnapForge-&lt;version&gt;-win-x64-setup.exe -Algorithm SHA256
+Get-FileHash .\SnapForge-&lt;version&gt;-win-x64-portable.zip -Algorithm SHA256</code></pre>
+  <ol>
+    <li>The <code>Hash</code> it prints must match exactly (letter case does not matter) the line for that file in
+    the <code>SHA256SUMS.txt</code> that comes with the packages — for a test build, the one in the same CI
+    artifact; for a release, the checksum shown on this page and on the GitHub Release.</li>
+    <li>For the portable ZIP, after extracting, you can also check each file against the
+    <code>SHA256SUMS.txt</code> inside the ZIP: <code>Get-FileHash .\SnapForge.exe -Algorithm SHA256</code>.</li>
+    <li>If any checksum differs, <strong>do not run the file</strong>; delete it and
+    <a href="support.html#security">tell us</a>.</li>
+  </ol>
+  
 
   <h2 id="smartscreen">Windows security prompts</h2>
-  <p>Development builds of SnapForge are not code-signed, and a release may not be either. Windows SmartScreen may
-  then say that it “prevented an unrecognized app from starting”. Each release states its verified signing status
-  above.</p>
+  <p>Test builds are <strong>not code-signed</strong>. Windows SmartScreen will probably warn that it “prevented an
+  unrecognized app from starting”, and Smart App Control may block an unsigned build altogether. A future signed
+  release may still show a warning at first, because SmartScreen also relies on reputation built up over time.</p>
   <ul>
-    <li>Only run SnapForge if you downloaded it from this site or the project's GitHub Releases page
-    <strong>and</strong> the checksum matches.</li>
-    <li>Keep Microsoft Defender and SmartScreen turned on. If Defender reports the file, do not run it — please
-    <a href="support.html#security">report it</a> instead.</li>
+    <li>Keep Microsoft Defender, SmartScreen and Smart App Control turned on. This site will never ask you to turn
+    them off.</li>
+    <li>Only run builds you obtained from the project's CI page and whose checksum you verified. <strong>If you are
+    unsure, wait for the signed release.</strong></li>
+    <li>If Defender reports the file, do not run it — please <a href="support.html#security">report it</a>.</li>
   </ul>
 
   <h2 id="uninstall">Uninstalling</h2>
+  <p><strong>Uninstalling keeps your captures.</strong> They live in your own Windows profile,
+  <code>%LOCALAPPDATA%\SnapForge</code> (or the Library folder you chose), not in the program folder.</p>
   <ol>
     <li>If you turned on <em>Launch SnapForge when I sign in to Windows</em>, turn it off in SnapForge's Settings
     (or in Windows Settings → Apps → Startup).</li>
     <li>Exit SnapForge from its notification-area icon.</li>
-    <li>Delete the folder you extracted it to.</li>
+    <li><strong>Installer:</strong> Windows Settings → Apps → Installed apps → SnapForge → Uninstall (asks for
+    administrator approval). <strong>Portable:</strong> delete the folder you extracted it to.</li>
     <li>To remove your captures and settings as well, delete <code>%LOCALAPPDATA%\SnapForge</code> (paste it
     into the File Explorer address bar). If you moved the Library to another folder, delete that folder too.
-    <strong>This permanently deletes your captures.</strong></li>
+    <strong>This permanently deletes your captures, recordings and backups stored there.</strong></li>
   </ol>
 
   <h2 id="source">Source code</h2>
   <p>SnapForge is developed in public on
-  <a href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">GitHub<span class="visually-hidden"> (external site)</span></a>.
-  Until the first release, the application code is on development branches that are under review. Build instructions (with the .NET 10 SDK) are in the project README.</p>
+  <a href="https://github.com/bazeocrisy/SnapForge/tree/release/v1.0-candidate" rel="noopener noreferrer">GitHub<span class="visually-hidden"> (external site)</span></a>.
+  The code is on the <code>release/v1.0-candidate</code> branch, which becomes the main branch after the owner approves it; the repository's front page (<code>main</code>) shows only a short README until then. Build instructions (with the .NET 10 SDK) are in the project README.</p>
 </div>
 
 </main>
@@ -145,7 +198,7 @@
 <li><a href="privacy.html">Privacy</a></li>
 <li><a href="about.html">About & License</a></li>
 <li><a href="support.html">Report a problem</a></li>
-<li><a href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">Source code on GitHub<span class="visually-hidden"> (external site)</span></a></li>
+<li><a href="https://github.com/bazeocrisy/SnapForge/tree/release/v1.0-candidate" rel="noopener noreferrer">Source code on GitHub<span class="visually-hidden"> (external site)</span></a></li>
       </ul>
     </nav>
   </div>

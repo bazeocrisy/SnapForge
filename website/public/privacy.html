@@ -48,7 +48,7 @@
       </ul>
     </nav>
   </div>
-  <p class="status-strip"><span class="container">In development — no public release yet. <a href="roadmap.html">Project status</a></span></p>
+  <p class="status-strip"><span class="container">No public release yet — release candidate 2 is in testing. <a href="roadmap.html">Project status</a></span></p>
 </header>
 <main id="main" tabindex="-1">
 <section class="page-hero">
@@ -65,7 +65,7 @@
   <ul>
     <li><strong>No network access.</strong> The app contains no code that connects to the internet: no uploads,
     sync, accounts, update checks, crash reporting or telemetry.</li>
-    <li><strong>Local storage.</strong> Captures, recordings and settings are stored on your PC in
+    <li><strong>Local storage.</strong> Captures, recordings (including camera recordings) and settings are stored on your PC in
     <code>%LOCALAPPDATA%\SnapForge</code> (or a Library folder you choose). Error logs contain text only — never
     image data — and stay on your PC.</li>
     <li><strong>Not encrypted by SnapForge.</strong> Your files are protected by your Windows account; use Windows
@@ -75,9 +75,19 @@
     Videos cannot be redacted.</li>
     <li><strong>Sharing is your choice.</strong> When you paste, drag or export a capture into another app, that
     app keeps its own copy under its own privacy terms.</li>
-    <li><strong>Screen recording</strong> (experimental) uses Windows' screen capture and audio APIs; Windows shows
-    a border while recording and its microphone indicator while the microphone is on. SnapForge does not hide or
-    bypass these indicators.</li>
+    <li><strong>Recording with SnapForge Studio</strong> (release candidate 2, in testing) uses Windows' screen
+    capture, camera and audio APIs. Windows shows a border while the screen is recorded, its microphone indicator
+    while the microphone is on and its camera indicator while the camera is on. SnapForge does not hide or bypass
+    these indicators.</li>
+    <li><strong>Camera.</strong> The camera and the microphone are <strong>off by default</strong> and are switched
+    on only by you, for a recording. The camera picture is processed only on your PC (through Windows' own camera
+    support) and is saved only into the recording you make, in your Library. It is never uploaded, streamed or
+    analysed. Windows' privacy settings (Settings → Privacy &amp; security → Camera / Microphone) control whether
+    desktop apps may use them at all.</li>
+    <li><strong>Backups</strong> you create contain your captures, recordings, Trash and their metadata. Store them
+    as carefully as the Library itself.</li>
+    <li><strong>Uninstalling keeps your data.</strong> Removing the app does not delete
+    <code>%LOCALAPPDATA%\SnapForge</code>; delete it yourself to remove captures and settings.</li>
   </ul>
 
   <h2 id="website">This website</h2>
@@ -113,7 +123,7 @@
 <li><a href="privacy.html" aria-current="page">Privacy</a></li>
 <li><a href="about.html">About & License</a></li>
 <li><a href="support.html">Report a problem</a></li>
-<li><a href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">Source code on GitHub<span class="visually-hidden"> (external site)</span></a></li>
+<li><a href="https://github.com/bazeocrisy/SnapForge/tree/release/v1.0-candidate" rel="noopener noreferrer">Source code on GitHub<span class="visually-hidden"> (external site)</span></a></li>
       </ul>
     </nav>
   </div>
