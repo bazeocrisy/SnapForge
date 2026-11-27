@@ -308,8 +308,8 @@ public partial class MainWindow
     {
         var dialog = new OpenFileDialog
         {
-            Title = "Import images into the Library",
-            Filter = "Images (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.jpe;*.bmp",
+            Title = "Import images and videos into the Library",
+            Filter = "Images and MP4 videos|*.png;*.jpg;*.jpeg;*.jpe;*.bmp;*.mp4|Images (*.png;*.jpg;*.jpeg;*.bmp)|*.png;*.jpg;*.jpeg;*.jpe;*.bmp|MP4 videos (*.mp4)|*.mp4",
             Multiselect = true,
         };
         if (dialog.ShowDialog(this) == true)
@@ -330,8 +330,8 @@ public partial class MainWindow
         }
 
         SetStatus(failed.Count == 0
-            ? $"Imported {ok.Count} image(s) into the Library."
-            : $"Imported {ok.Count} image(s); {failed.Count} could not be imported.");
+            ? $"Imported {ok.Count} item(s) into the Library."
+            : $"Imported {ok.Count} item(s); {failed.Count} could not be imported.");
         if (failed.Count > 0 && ShowImportErrors)
         {
             MessageBox.Show(this, string.Join("\n", failed.Select(f => $"{Path.GetFileName(f.Path)}: {f.Error}")), "Some images could not be imported", MessageBoxButton.OK, MessageBoxImage.Warning);

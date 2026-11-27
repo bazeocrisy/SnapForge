@@ -25,6 +25,7 @@
                             <Border.ContextMenu>
                                 <ContextMenu Opened="OnTileContextOpened">
                                     <MenuItem Header="_Open in Editor" Tag="open" Click="OnOpenSelected" FontWeight="SemiBold" InputGestureText="Enter" />
+                                    <MenuItem Header="_Edit video (trim, frames, GIF)…" Tag="video-only" Click="OnEditVideo" />
                                     <MenuItem Header="_Rename…" Click="OnRename" InputGestureText="F2" />
                                     <MenuItem Header="_Duplicate" Tag="image-only" Click="OnDuplicate" />
                                     <MenuItem Header="Toggle _favorite" Click="OnToggleFavorite" />

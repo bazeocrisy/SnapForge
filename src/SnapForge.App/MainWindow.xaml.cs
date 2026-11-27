@@ -773,6 +773,8 @@ public partial class MainWindow : Window
 
     private void OnRepeatLastCapture(object sender, RoutedEventArgs e) => _ = App.RepeatLastCaptureAsync();
 
+    private void OnScrollingCapture(object sender, RoutedEventArgs e) => _ = App.CaptureScrollingAsync();
+
     /// <summary>Opens the clipboard's image as a new capture (saved to the Library like any capture).</summary>
     private void OnNewFromClipboard(object sender, RoutedEventArgs e)
     {
@@ -1550,6 +1552,7 @@ public partial class MainWindow : Window
                 case Key.D3 or Key.NumPad3: Handle(e, () => OnCaptureDisplay(this, e)); return;
                 case Key.D4 or Key.NumPad4: Handle(e, () => OnCaptureAll(this, e)); return;
                 case Key.D5 or Key.NumPad5: Handle(e, () => OnCaptureActiveWindow(this, e)); return;
+                case Key.D6 or Key.NumPad6: Handle(e, () => OnScrollingCapture(this, e)); return;
                 case Key.OemCloseBrackets when _current is not null: Handle(e, () => OnRotateRight(this, e)); return;
                 case Key.OemOpenBrackets when _current is not null: Handle(e, () => OnRotateLeft(this, e)); return;
                 case Key.I when alt && _current is not null: Handle(e, () => OnResizeImage(this, e)); return;

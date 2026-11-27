@@ -4,6 +4,11 @@ using System.Windows;
 using System.Windows.Media;
 using System.Windows.Media.Imaging;
 using SnapForge.App.Ocr;
+using SnapForge.App.Video;
+using SnapForge.Core.Editing;
+using SnapForge.Core.Geometry;
+using SnapForge.Core.Settings;
+using SnapForge.Core.Video;
 using SnapForge.App.Rendering;
 using SnapForge.Core.Imaging;
 
@@ -16,7 +21,7 @@ namespace SnapForge.App;
 /// A check whose Windows component is missing on the machine (for example no OCR language installed) is reported
 /// as UNAVAILABLE with the reason — never as passed.
 /// </summary>
-internal static class FeatureSelfTest
+internal static unsafe class FeatureSelfTest
 {
     private sealed class Report(string folder)
     {
@@ -49,6 +54,8 @@ internal static class FeatureSelfTest
         var r = new Report(folder);
         r.Lines.Add($"SnapForge feature self-test {DateTime.Now:O} — {Services.InstanceInfo.CurrentBuild}");
         Ocr(r);
+        VideoEditing(r);
+        ImageTransforms(r);
         File.WriteAllLines(Path.Combine(folder, "report.txt"), r.Lines);
         foreach (string l in r.Lines)
         {
@@ -116,6 +123,206 @@ internal static class FeatureSelfTest
             }
 
             return $"{tall.Width}x{tall.Height}: {o.Lines.Count} of 160 lines; last line once";
+        });
+    }
+
+    /// <summary>
+    /// Writes a 6-second MP4 whose every second has its own solid colour (red, green, blue, yellow, cyan, magenta)
+    /// with a 440 Hz tone, then: trim 0.5 s from the start and end, remove second 2–3, export, and verify by decoding
+    /// the result (duration, the colour of each kept part, audio present). Then a GIF of seconds 1–4.
+    /// </summary>
+    private static void VideoEditing(Report r)
+    {
+        string src = Path.Combine(r.Folder, "edit-source.mp4");
+        (byte R, byte G, byte B)[] colours = [(220, 30, 30), (30, 200, 30), (30, 30, 220), (230, 220, 30), (30, 220, 220), (220, 30, 220)];
+        r.Check("video-source", () =>
+        {
+            _ = Video.Interop.Mf.MFStartup(Video.Interop.Mf.MF_VERSION, 0);
+            const int w = 320, h = 240, fps = 30;
+            using (var writer = new Mp4Writer(src, new VideoStreamFormat(w, h, fps, 1_500_000), withAudio: true, fragmented: false, EncoderInput.SystemMemory, 0))
+            {
+                byte[] frame = new byte[w * h * 4];
+                short[] audio = new short[Mp4Writer.AudioSampleRate / fps * 2];
+                long frameDuration = 10_000_000L / fps;
+                for (int i = 0; i < fps * colours.Length; i++)
+                {
+                    (byte cr, byte cg, byte cb) = colours[i / fps];
+                    for (int o = 0; o < frame.Length; o += 4)
+                    {
+                        frame[o] = cb;
+                        frame[o + 1] = cg;
+                        frame[o + 2] = cr;
+                        frame[o + 3] = 255;
+                    }
+
+                    fixed (byte* p = frame)
+                    {
+                        writer.WriteFrame(p, w * 4, i * frameDuration, frameDuration);
+                    }
+
+                    for (int k = 0; k < audio.Length / 2; k++)
+                    {
+                        long n = ((long)i * (audio.Length / 2)) + k;
+                        short v = (short)(Math.Sin(2 * Math.PI * 440 * n / Mp4Writer.AudioSampleRate) * 8000);
+                        audio[k * 2] = v;
+                        audio[(k * 2) + 1] = v;
+                    }
+
+                    writer.WriteAudio(audio, i * frameDuration);
+                }
+
+                writer.Complete();
+            }
+
+            VideoFileInfo info = VideoExporter.Inspect(src);
+            return $"{info.Width}x{info.Height} {info.FramesPerSecond} fps {info.DurationMs} ms audio={info.HasAudio}";
+        });
+
+        string edited = Path.Combine(r.Folder, "edited.mp4");
+        r.Check("video-trim-and-cut", () =>
+        {
+            var plan = new VideoEditPlan(6000);
+            plan.SetTrim(500, 5500);
+            plan.RemoveSection(2000, 3000);
+            VideoExporter.ExportEdited(src, edited, plan, VideoQuality.Standard, null, CancellationToken.None);
+            VideoFileInfo info = VideoExporter.Inspect(edited);
+            if (Math.Abs(info.DurationMs - 4000) > 150)
+            {
+                throw new InvalidOperationException($"expected ~4000 ms, got {info.DurationMs} ms");
+            }
+
+            if (!info.HasAudio)
+            {
+                throw new InvalidOperationException("the edited video lost its sound");
+            }
+
+            // Output timeline: 0–1.5 s = source 0.5–2 (red then green), 1.5–4 s = source 3–5.5 (yellow, cyan).
+            (double At, int Colour)[] expected = [(200, 0), (1200, 1), (1700, 3), (3000, 4)];
+            foreach ((double at, int c) in expected)
+            {
+                PixelBuffer? f = VideoAnalysis.DecodeFrame(edited, at) ?? throw new InvalidOperationException($"no frame at {at} ms");
+                ArgbColor px = f.GetPixel(f.Width / 2, f.Height / 2);
+                (byte er, byte eg, byte eb) = colours[c];
+                if (Math.Abs(px.R - er) > 40 || Math.Abs(px.G - eg) > 40 || Math.Abs(px.B - eb) > 40)
+                {
+                    throw new InvalidOperationException($"at {at} ms expected colour {c} ({er},{eg},{eb}) but got ({px.R},{px.G},{px.B})");
+                }
+            }
+
+            return $"6.0 s → {info.DurationMs} ms; kept parts in order (red, green | yellow, cyan); audio kept; {new FileInfo(edited).Length / 1024} KB";
+        });
+
+        r.Check("video-gif-export", () =>
+        {
+            string gif = Path.Combine(r.Folder, "clip.gif");
+            long bytes = GifExport.Write(src, gif, 1000, 4000, new GifExportSettings(10, 160, Dither: false, Loop: true), null, CancellationToken.None);
+            byte[] head = File.ReadAllBytes(gif).AsSpan(0, 6).ToArray();
+            if (System.Text.Encoding.ASCII.GetString(head) != "GIF89a")
+            {
+                throw new InvalidOperationException("not a GIF89a file");
+            }
+
+            int frames = CountGifImages(File.ReadAllBytes(gif));
+            return $"{bytes} bytes, {frames} image blocks (3 s at 10 fps with identical frames merged)";
+        });
+
+        r.Check("video-frame-extract", () =>
+        {
+            PixelBuffer f = VideoAnalysis.DecodeFrame(src, 4500) ?? throw new InvalidOperationException("no frame");
+            ArgbColor px = f.GetPixel(10, 10);
+            if (px.R < 150 || px.G > 80 || px.B < 150)
+            {
+                throw new InvalidOperationException($"frame at 4.5 s should be magenta, got ({px.R},{px.G},{px.B})");
+            }
+
+            return $"{f.Width}x{f.Height} frame at 4.5 s has the right colour";
+        });
+    }
+
+    /// <summary>Counts image descriptors (0x2C) in a GIF by walking its blocks.</summary>
+    private static int CountGifImages(byte[] g)
+    {
+        int i = 13 + ((g[10] & 0x80) != 0 ? 3 * (1 << ((g[10] & 7) + 1)) : 0), n = 0;
+        while (i < g.Length && g[i] != 0x3B)
+        {
+            if (g[i] == 0x21)
+            {
+                i += 2;
+                while (g[i] != 0)
+                {
+                    i += g[i] + 1;
+                }
+
+                i++;
+            }
+            else if (g[i] == 0x2C)
+            {
+                n++;
+                byte packed = g[i + 9];
+                i += 10 + ((packed & 0x80) != 0 ? 3 * (1 << ((packed & 7) + 1)) : 0);
+                i++; // LZW minimum code size
+                while (g[i] != 0)
+                {
+                    i += g[i] + 1;
+                }
+
+                i++;
+            }
+            else
+            {
+                throw new InvalidDataException($"unexpected GIF block 0x{g[i]:X2}");
+            }
+        }
+
+        return n;
+    }
+
+    /// <summary>The packaged build's image commands (rotate, resize, blur) produce the expected pixels.</summary>
+    private static void ImageTransforms(Report r)
+    {
+        r.Check("image-performance", () =>
+        {
+            var big = new PixelBuffer(3840, 2160);
+            for (int i = 0; i < big.Pixels.Length; i++)
+            {
+                big.Pixels[i] = (byte)(i * 7);
+            }
+
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            _ = ImageOps.Rotate90Clockwise(big);
+            _ = ImageOps.Resize(big, 1920, 1080);
+            _ = ImageOps.Resize(big, 5000, 3000);
+            _ = ImageOps.BoxBlur(big, big.Bounds, 8);
+            sw.Stop();
+            if (sw.Elapsed > TimeSpan.FromSeconds(10))
+            {
+                throw new InvalidOperationException($"4K rotate + 2 resizes + blur took {sw.Elapsed.TotalSeconds:0.0} s (target < 10 s)");
+            }
+
+            return $"4K rotate + downscale + upscale to 5000x3000 + blur r8: {sw.Elapsed.TotalMilliseconds:0} ms";
+        });
+
+        r.Check("image-transforms", () =>
+        {
+            PixelBuffer img = RenderText(["Transform check 123"], 20);
+            var doc = new EditorDocument(img);
+            doc.Execute(new TransformImageCommand(ImageTransform.Rotate90));
+            doc.Execute(new ResizeImageCommand(doc.Image.Width * 2, doc.Image.Height * 2));
+            doc.Execute(new ApplyRegionEffectCommand(new PixelRect(0, 0, 10, 10), RegionEffect.Pixelate, 5));
+            if (doc.Image.Width != img.Height * 2 || doc.Image.Height != img.Width * 2)
+            {
+                throw new InvalidOperationException($"size {doc.Image.Width}x{doc.Image.Height}");
+            }
+
+            doc.Undo();
+            doc.Undo();
+            doc.Undo();
+            if (!doc.Image.Pixels.AsSpan().SequenceEqual(img.Pixels))
+            {
+                throw new InvalidOperationException("undo did not restore the original pixels");
+            }
+
+            return "rotate 90 + 200 % resize + pixelate, then undo ×3 restores the exact original";
         });
     }
 

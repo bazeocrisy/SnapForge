@@ -253,6 +253,50 @@ public partial class App : Application
     }
 
     /// <summary>Runs a capture with the given options and hands the result to the Editor / Library / clipboard.</summary>
+    /// <summary>
+    /// Scrolling capture: select the area that scrolls, then auto-scroll or add frames manually; the stitched image
+    /// opens in the Editor for review. SnapForge's own windows are hidden meanwhile (the control panel is excluded
+    /// from capture).
+    /// </summary>
+    internal static async Task CaptureScrollingAsync()
+    {
+        MainWindow? main = MainShell;
+        if (main is null || CaptureController.IsBusy || AppServices.Current is not { } services)
+        {
+            return;
+        }
+
+        CaptureResult? first = await CaptureController.CaptureAsync(services.Settings.Capture with { Mode = Core.Capture.CaptureMode.Region, DelaySeconds = 0, CaptureCursor = false }).ConfigureAwait(true);
+        if (first is null || CaptureController.LastSelection is not { } region)
+        {
+            main.SetStatus("Scrolling capture cancelled.");
+            return;
+        }
+
+        var hidden = Current.Windows.Cast<Window>().Where(w => w.IsVisible).ToList();
+        hidden.ForEach(w => w.Hide());
+        Core.Imaging.PixelBuffer? image;
+        try
+        {
+            image = await Capture.ScrollingCaptureWindow.RunAsync(region).ConfigureAwait(true);
+        }
+        finally
+        {
+            hidden.ForEach(w => w.Show());
+        }
+
+        if (image is null)
+        {
+            main.SetStatus("Scrolling capture cancelled.");
+            return;
+        }
+
+        main.AcceptCapture(image, DateTime.Now, services.Settings.Capture with { PreviewInEditor = true, CopyToClipboard = false });
+        main.ShowEditorWorkspace();
+        main.Activate();
+        main.SetStatus($"Scrolling capture: {image.Width} × {image.Height}. Check it for gaps or repeats before sharing.");
+    }
+
     /// <summary>Captures the same screen rectangle as the last capture, with the same options (no selection step).</summary>
     internal static Task RepeatLastCaptureAsync()
     {

@@ -471,6 +471,14 @@ public partial class LibraryView : UserControl
         _dragTile = null;
     }
 
+    private void OnEditVideo(object sender, RoutedEventArgs e)
+    {
+        if (SelectedRecords() is [{ IsVideo: true } record] && AppServices.Current is { } services)
+        {
+            new Video.VideoEditorWindow(services, record, services.Library.VideoPath(record.Id)).Show();
+        }
+    }
+
     private async void OnImport(object sender, RoutedEventArgs e)
     {
         if (_host is not null)
@@ -589,6 +597,9 @@ public partial class LibraryView : UserControl
                         break;
                     case "image-only":
                         item.Visibility = video ? Visibility.Collapsed : Visibility.Visible;
+                        break;
+                    case "video-only":
+                        item.Visibility = video ? Visibility.Visible : Visibility.Collapsed;
                         break;
                 }
             }

@@ -158,3 +158,77 @@ public partial class ReleaseCandidateUiTests
         }
     });
 }
+
+/// <summary>Scrolling capture against a real WPF scroll viewer with real mouse-wheel input.</summary>
+[Collection(DesktopTestGroup.Name)]
+public class ScrollingCaptureUiTests
+{
+    [Fact]
+    public void Auto_scroll_capture_stitches_the_whole_page_exactly() => UiThread.Run(async () =>
+    {
+        const int pageHeight = 2400, viewWidth = 420, viewHeight = 360;
+        // Every row is different: vertical gradient plus 13-px stripes of varying shade.
+        var page = new System.Windows.Controls.Canvas { Width = viewWidth, Height = pageHeight, SnapsToDevicePixels = true };
+        page.Background = new System.Windows.Media.LinearGradientBrush(System.Windows.Media.Color.FromRgb(20, 60, 200), System.Windows.Media.Color.FromRgb(230, 120, 20), 90);
+        for (int y = 0; y < pageHeight; y += 26)
+        {
+            var stripe = new System.Windows.Shapes.Rectangle { Width = 60 + (y % 300), Height = 13, Fill = new System.Windows.Media.SolidColorBrush(System.Windows.Media.Color.FromRgb((byte)(y % 251), (byte)((y * 7) % 253), 90)) };
+            System.Windows.Controls.Canvas.SetTop(stripe, y);
+            System.Windows.Controls.Canvas.SetLeft(stripe, 10);
+            page.Children.Add(stripe);
+        }
+
+        var viewer = new ScrollViewer { Content = page, VerticalScrollBarVisibility = ScrollBarVisibility.Hidden, Width = viewWidth, Height = viewHeight };
+        var window = new Window
+        {
+            Content = viewer,
+            SizeToContent = SizeToContent.WidthAndHeight,
+            WindowStyle = WindowStyle.None,
+            ResizeMode = ResizeMode.NoResize,
+            Left = 100,
+            Top = 100,
+            Topmost = true,
+            UseLayoutRounding = true,
+        };
+        window.Show();
+        window.Activate();
+        await Task.Delay(500);
+        try
+        {
+            System.Windows.Point origin = viewer.PointToScreen(new System.Windows.Point(0, 0));
+            double scale = PresentationSource.FromVisual(viewer)!.CompositionTarget!.TransformToDevice.M11;
+            var region = new PixelRect((int)Math.Round(origin.X), (int)Math.Round(origin.Y), (int)Math.Round(viewWidth * scale), (int)Math.Round(viewHeight * scale));
+            (PixelBuffer? image, string status) = await ScrollingCaptureWindow.RunAutoForTestAsync(region);
+            Assert.True(image is not null, status);
+            Assert.True(viewer.VerticalOffset >= viewer.ScrollableHeight - 1, $"did not reach the end: {viewer.VerticalOffset}/{viewer.ScrollableHeight}; {status}");
+            int expectedHeight = (int)Math.Round(pageHeight * scale);
+            Assert.True(Math.Abs(image!.Height - expectedHeight) <= 2, $"stitched {image.Width}x{image.Height}, expected height {expectedHeight}; {status}");
+
+            // Compare with the page rendered directly (no screen involved).
+            var rtb = new System.Windows.Media.Imaging.RenderTargetBitmap((int)Math.Round(viewWidth * scale), expectedHeight, 96 * scale, 96 * scale, System.Windows.Media.PixelFormats.Pbgra32);
+            viewer.ScrollToTop();
+            page.Measure(new Size(viewWidth, pageHeight));
+            page.Arrange(new Rect(0, 0, viewWidth, pageHeight));
+            rtb.Render(page);
+            PixelBuffer reference = BitmapConversion.FromBitmapSource(rtb);
+            int bad = 0, rows = Math.Min(reference.Height, image.Height);
+            for (int y = 0; y < rows; y += 3)
+            {
+                for (int x = 5; x < image.Width - 5; x += 37)
+                {
+                    ArgbColor a = image.GetPixel(x, y), b = reference.GetPixel(x, y);
+                    if (Math.Abs(a.R - b.R) > 6 || Math.Abs(a.G - b.G) > 6 || Math.Abs(a.B - b.B) > 6)
+                    {
+                        bad++;
+                    }
+                }
+            }
+
+            Assert.True(bad == 0, $"{bad} sampled pixels differ from the page (misaligned, repeated or missing rows); {status}");
+        }
+        finally
+        {
+            window.Close();
+        }
+    });
+}
