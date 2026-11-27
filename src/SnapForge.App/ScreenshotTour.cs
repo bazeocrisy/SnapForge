@@ -20,8 +20,8 @@ namespace SnapForge.App;
 
 /// <summary>
 /// <c>SnapForge.exe --screenshots &lt;folder&gt;</c>: builds a throw-away demo library in a temporary folder, shows
-/// the real windows on the desktop and saves screen captures of the Editor, tray, Library, capture panel, widget
-/// (collapsed, expanded, docked left) and Settings in light and dark themes. Used by CI to produce review
+/// the real windows on the desktop and saves screen captures of the Editor, tray, Library, capture panel (image and
+/// video tabs), QuickDock (collapsed, expanded, keyboard mode, docked left) and Settings in light and dark themes. Used by CI to produce review
 /// screenshots; it never reads or writes the user's real library or settings.
 /// </summary>
 internal static class ScreenshotTour
@@ -183,15 +183,25 @@ internal static class ScreenshotTour
                     outline.Close();
                 }
 
-                // Widget: collapsed tab at the top centre, then expanded, then docked on the left edge.
+                // QuickDock: collapsed pill at the top centre (wide context and close-up), expanded, keyboard mode
+                // with a visible focus ring, then docked on the left edge.
                 services.UpdateSettings(x => x with { Widget = x.Widget with { Enabled = true, Placement = null } });
                 var widget = new CaptureWidget(services);
                 widget.Show();
                 Pump(400);
                 SaveScreen(widget, 70, Path.Combine(outputFolder, $"widget-collapsed-{suffix}.png"), log);
+                SaveScreen(widget, 16, Path.Combine(outputFolder, $"quickdock-collapsed-{suffix}.png"), log);
                 widget.Expand();
                 Pump(400);
                 SaveScreen(widget, 40, Path.Combine(outputFolder, $"widget-expanded-{suffix}.png"), log);
+                widget.Collapse();
+                widget.EnterKeyboardMode();
+                Pump(400);
+                System.Windows.Input.Keyboard.Focus(widget.RecordButton); // show the focus ring on a non-accent button
+                Pump(300);
+                SaveScreen(widget, 40, Path.Combine(outputFolder, $"quickdock-keyboard-{suffix}.png"), log);
+                widget.ExitKeyboardMode(restoreForeground: true);
+                Pump(200);
                 widget.DockAt(work.X + 2, work.Y + (work.Height / 2));
                 widget.Expand();
                 Pump(400);
