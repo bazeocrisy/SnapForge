@@ -33,6 +33,12 @@ internal sealed class RecorderHooks
     /// <summary>Encoder thread, before each video frame is written; the argument is the number of frames written so far.</summary>
     public Action<long>? BeforeVideoWrite { get; init; }
 
+    /// <summary>Encoder thread, after each video frame was handed to the writer: (presentation time, repeated).</summary>
+    public Action<long, bool>? AfterVideoWrite { get; init; }
+
+    /// <summary>Encoder thread, when the writer was restarted on the software encoder.</summary>
+    public Action<long>? EncoderRestarted { get; init; }
+
     /// <summary>Capture thread, once per frame slot.</summary>
     public Action? CaptureIteration { get; init; }
 
@@ -923,6 +929,7 @@ internal sealed unsafe class ScreenRecorder : IDisposable
         try
         {
             _writer!.WriteFrame(p, _video.Width * 4, item.Time, item.Duration);
+            _hooks?.AfterVideoWrite?.Invoke(item.Time, item.Repeat);
         }
         catch (NativeCallException ex) when (!_softwareFallback && _framesWritten < _options.FramesPerSecond)
         {
@@ -934,6 +941,8 @@ internal sealed unsafe class ScreenRecorder : IDisposable
             var format = new VideoStreamFormat(_video.Width, _video.Height, _options.FramesPerSecond, VideoSettings.BitRate(_video.Width, _video.Height, _options.FramesPerSecond, _options.Quality));
             _writer = new Mp4Writer(_path, format, _options.AudioTrack, fragmented: true, EncoderInput.SystemMemory, 0, allowHardware: false);
             _writer.WriteFrame(p, _video.Width * 4, item.Time, item.Duration);
+            _hooks?.EncoderRestarted?.Invoke(item.Time);
+            _hooks?.AfterVideoWrite?.Invoke(item.Time, item.Repeat);
         }
     }
 

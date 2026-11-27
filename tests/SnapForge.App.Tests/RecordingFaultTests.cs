@@ -175,7 +175,10 @@ public sealed class RecordingFaultTests : IDisposable
         camera.Start();
         var composite = new CompositeFrameSource(new SyntheticFrameSource(640, 360, 30, 0), camera, CameraOverlayShape.Circle, CameraOverlaySize.Medium, CameraCorner.TopLeft, mirror: true);
         RecordingResult r;
-        using (ScreenRecorder rec = ScreenRecorder.Create(composite, [], Options, path))
+        var writes = new System.Collections.Concurrent.ConcurrentQueue<(long Time, bool Repeat)>();
+        var restarts = new System.Collections.Concurrent.ConcurrentQueue<long>();
+        var hooks = new RecorderHooks { AfterVideoWrite = (t, rep) => writes.Enqueue((t, rep)), EncoderRestarted = restarts.Enqueue };
+        using (ScreenRecorder rec = ScreenRecorder.Create(composite, [], Options, path, hooks))
         {
             rec.Start();
             Thread.Sleep(2500);
@@ -192,7 +195,7 @@ public sealed class RecordingFaultTests : IDisposable
             $"TL {SyntheticShare(frame, 0, 0, l.Width, l.Height):0.00} TR {SyntheticShare(frame, frame.Width - l.Width, 0, l.Width, l.Height):0.00} " +
             $"BL {SyntheticShare(frame, 0, frame.Height - l.Height, l.Width, l.Height):0.00} BR {SyntheticShare(frame, frame.Width - l.Width, frame.Height - l.Height, l.Width, l.Height):0.00}; " +
             $"centre pixel BGRA {Px(frame, l.X + (l.Width / 2), l.Y + (l.Height / 2))}; written {r.FramesWritten}, captured {r.FramesCaptured}, repeated {r.FramesRepeated}, dropped {r.FramesDropped}; " +
-            $"overlay frames {composite.FramesWithOverlay}, camera running {camera.IsRunning}, camera sequence {camera.FrameSequence}, lost {camera.LostReason}; first-frame centre {(r.FirstFrame is { } ff ? Px(ff, l.X + (l.Width / 2), l.Y + (l.Height / 2)) : "none")}; {Timestamps(path)}";
+            $"overlay frames {composite.FramesWithOverlay}, camera running {camera.IsRunning}, camera sequence {camera.FrameSequence}, lost {camera.LostReason}; first-frame centre {(r.FirstFrame is { } ff ? Px(ff, l.X + (l.Width / 2), l.Y + (l.Height / 2)) : "none")}; decoded@0 centre {(VideoAnalysis.DecodeFrame(path, 0) is { } d0 ? Px(d0, l.X + (l.Width / 2), l.Y + (l.Height / 2)) : "none")}; {Timestamps(path)}; {WriteDiag(writes, restarts)}";
         Assert.True(inside > 0.9, diag);
         Assert.True(opposite < 0.05, diag);
     }
@@ -204,7 +207,10 @@ public sealed class RecordingFaultTests : IDisposable
         var camera = new SyntheticCameraSource(640, 360, 30);
         camera.Start();
         RecordingResult r;
-        using (ScreenRecorder rec = ScreenRecorder.Create(new CameraFrameSource(camera, mirror: false), [], Options, path))
+        var writes = new System.Collections.Concurrent.ConcurrentQueue<(long Time, bool Repeat)>();
+        var restarts = new System.Collections.Concurrent.ConcurrentQueue<long>();
+        var hooks = new RecorderHooks { AfterVideoWrite = (t, rep) => writes.Enqueue((t, rep)), EncoderRestarted = restarts.Enqueue };
+        using (ScreenRecorder rec = ScreenRecorder.Create(new CameraFrameSource(camera, mirror: false), [], Options, path, hooks))
         {
             rec.Start();
             Thread.Sleep(3000);
@@ -215,7 +221,7 @@ public sealed class RecordingFaultTests : IDisposable
         (long durationMs, int w, int h, bool _, int samples) = RecordingRecovery.Probe(path);
         Assert.Equal(640, w);
         Assert.Equal(360, h);
-        string diag = $"probe {durationMs} ms / {samples} samples; result {r.DurationMs} ms, written {r.FramesWritten}, captured {r.FramesCaptured}, repeated {r.FramesRepeated}, dropped {r.FramesDropped}, end {r.EndReason}; {Timestamps(path)}";
+        string diag = $"probe {durationMs} ms / {samples} samples; result {r.DurationMs} ms, written {r.FramesWritten}, captured {r.FramesCaptured}, repeated {r.FramesRepeated}, dropped {r.FramesDropped}, end {r.EndReason}; {Timestamps(path)}; {WriteDiag(writes, restarts)}";
         Assert.True(durationMs is >= 2700 and <= 3300, diag);
         Assert.True(Math.Abs(samples - (durationMs * 30 / 1000)) <= 2, diag);
         Assert.False(camera.IsRunning); // the recorder released the camera
@@ -283,6 +289,15 @@ public sealed class RecordingFaultTests : IDisposable
     }
 
     /// <summary>Share of pixels in a rectangle that look like the SYNTHETIC camera (full red: magenta or yellow).</summary>
+    /// <summary>What the recorder handed to the writer: count, first times, largest gap and encoder restarts.</summary>
+    private static string WriteDiag(System.Collections.Concurrent.ConcurrentQueue<(long Time, bool Repeat)> writes, System.Collections.Concurrent.ConcurrentQueue<long> restarts)
+    {
+        var t = writes.Select(w => w.Time / 10_000).ToList();
+        long maxGap = t.Zip(t.Skip(1), (a, b) => b - a).DefaultIfEmpty(0).Max();
+        int at = t.Zip(t.Skip(1), (a, b) => b - a).ToList().FindIndex(g => g == maxGap);
+        return $"writer got {t.Count} frames ({writes.Count(w => w.Repeat)} repeats): first {string.Join(",", t.Take(4))}, max gap {maxGap} ms after {(at >= 0 ? t[at] : -1)} ms; encoder restarts at {string.Join(",", restarts.Select(x => x / 10_000))}";
+    }
+
     /// <summary>First and last video sample presentation times (ms) and the largest gap, for CI diagnostics.</summary>
     private static string Timestamps(string path)
     {
