@@ -29,7 +29,8 @@ internal sealed partial class ScrollingCaptureWindow : Window
     private static readonly TimeSpan SettleTime = TimeSpan.FromMilliseconds(400);
 
     private readonly PixelRect _region;
-    private readonly ScrollStitcher _stitcher = new(new ScrollStitcherOptions { MaxOutputPixels = 120_000_000, MaxLength = 30_000 });
+    private static readonly ScrollStitcherOptions StitchOptions = new() { MaxOutputPixels = 120_000_000, MaxLength = 30_000 };
+    private ScrollStitcher _stitcher = new(StitchOptions);
     private readonly TextBlock _status;
     private readonly Button _auto, _add, _finish, _cancel;
     private readonly TaskCompletionSource<PixelBuffer?> _done = new();
@@ -106,7 +107,8 @@ internal sealed partial class ScrollingCaptureWindow : Window
         var w = new ScrollingCaptureWindow(region, first);
         w.Show();
         await w.AutoScrollAsync().ConfigureAwait(true);
-        string status = w._status.Text;
+        PixelRect? self = Interop.PhysicalPlacement.GetBounds(w);
+        string status = $"{w._status.Text} [region {region.X},{region.Y} {region.Width}x{region.Height}; this window {self?.X},{self?.Y} {self?.Width}x{self?.Height}]";
         w.Complete(cancel: false);
         return (await w._done.Task.ConfigureAwait(true), status);
     }
@@ -171,6 +173,19 @@ internal sealed partial class ScrollingCaptureWindow : Window
         int still = 0;
         try
         {
+            // Nothing added yet: take the first frame again now, with the pointer already where the wheel input goes.
+            // The frame taken when the session opened can differ from what is on screen by the time Auto-scroll
+            // starts (a hover highlight under the pointer on its way to this button, a tooltip, a notification);
+            // every later frame would then fail to match it (CI runs 111 and 123: unaligned after the first step).
+            if (_stitcher.FrameCount == 1)
+            {
+                NativeMethods.SetCursorPos(_region.X + (_region.Width / 2), _region.Y + (_region.Height / 2));
+                await Task.Delay(SettleTime).ConfigureAwait(true);
+                var fresh = new ScrollStitcher(StitchOptions);
+                fresh.AddFrame(ScreenCaptureService.CaptureRegion(_region));
+                _stitcher = fresh;
+            }
+
             for (int step = 0; step < MaxFrames && !_stopAuto; step++)
             {
                 // The wheel goes to the window under the pointer: put it in the middle of the area for each step.
