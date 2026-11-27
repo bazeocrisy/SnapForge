@@ -32,10 +32,13 @@ Core library operations (production durability: temp file + flush + atomic renam
 at every size (index continues in the background); the UI stays responsive (p95 tick ≤ 57 ms above 100 captures; the
 longest single freeze 127–210 ms); memory grows slowly with library size (226 → 261 MB).
 
-## Editing (packaged build, feature self-test, CI run 77)
+## Editing and GIF (packaged build, feature self-test)
 
-4K (3840×2160) rotate + downscale to 1080p + upscale to 5000×3000 + full-image blur radius 8: **942 ms** (target
-< 10 s).
+| Check | CI run 77 (`0edd5f3`) | CI run 82 (`e5f5363`) | Target |
+|---|---|---|---|
+| 4K (3840×2160) rotate + downscale to 1080p + upscale to 5000×3000 + full-image blur radius 8 | 942 ms | 771 ms | < 10 s |
+| GIF encoder: 30 frames 640×360, ordered dither | — | 282 ms (119 KB) | < 3 s |
+| Video trim + cut (6 s source → 4.0 s, re-encoded with audio) | pass | pass | correct order, audio kept |
 
 ## Recording (existing V1 benchmarks)
 

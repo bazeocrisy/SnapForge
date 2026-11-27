@@ -24,9 +24,9 @@ stated). Evidence links: [RELEASE-CANDIDATE-HANDOFF.md](RELEASE-CANDIDATE-HANDOF
 
 | Status | Count |
 |---|---|
-| Manual verification pending | 52 |
-| Automated test passed | 42 |
-| Implemented | 10 |
+| Manual verification pending | 53 |
+| Automated test passed | 43 |
+| Implemented | 8 |
 | Verified | 4 |
 | Blocked | 3 |
 | Deferred with justification | 2 |
@@ -45,12 +45,12 @@ P2 = enhancement.
 | CAP-02 | P0 | Individual monitor capture | Manual verification pending | Capture/OverlaySession.cs | Click a display → exactly that monitor's pixels | InteractiveUiTests (display) | PC: 2+ monitors, mixed DPI | WCI | App tests (CI) | CI has one monitor |
 | CAP-03 | P0 | Region capture, pixel-accurate, size label in pixels | Automated test passed | Core/Capture/SelectionTracker.cs, Capture/SelectionOverlayWindow.cs | Drag → exact physical-pixel rectangle; label shows W × H | SelectionTrackerTests; InteractiveUiTests (real mouse) | PC: mixed DPI | SIM+WCI | Core+App tests | — |
 | CAP-04 | P0 | Window capture (click a window) | Automated test passed | Core/Capture/WindowPicker.cs | Click → window bounds (DWM frame) | InteractiveUiTests | PC: maximised/snapped windows | WCI | App tests | — |
-| CAP-05 | P1 | Active-window capture (no click) | Automated test passed | Services/CaptureController.cs | Captures the foreground window of another program | ReleaseCandidateUiTests.Active_window_* | PC | WCI | App tests (CI run 77) | Falls back to topmost other window when SnapForge was in front |
+| CAP-05 | P1 | Active-window capture (no click) | Automated test passed | Services/CaptureController.cs | Captures the foreground window of another program | ReleaseCandidateUiTests.Active_window_* | PC | WCI | App tests (CI runs 77, 82, 83) | Falls back to topmost other window when SnapForge was in front |
 | CAP-06 | P1 | Multi-monitor and negative coordinates | Manual verification pending | Core/Capture/ScreenLayout.cs | Selections across monitors with negative origins are exact | ScreenLayoutTests (SIM) | PC: monitor left of primary, portrait, mixed DPI | SIM | Core tests | CI single monitor |
 | CAP-07 | P1 | Delayed capture with countdown (Esc cancels) | Automated test passed | Dialogs/InputDialog.cs (CountdownWindow) | Countdown then capture; Esc cancels | GateBUiTests (delay) | — | WCI | App tests | — |
-| CAP-08 | P1 | Repeat last capture | Automated test passed | Services/CaptureController.cs, App.xaml.cs | Same screen rectangle without selection | ReleaseCandidateUiTests.Repeat_last_* | — | WCI | App tests (CI run 77) | In memory only (not after restart) |
+| CAP-08 | P1 | Repeat last capture | Automated test passed | Services/CaptureController.cs, App.xaml.cs | Same screen rectangle without selection | ReleaseCandidateUiTests.Repeat_last_* | — | WCI | App tests (CI runs 77, 82, 83) | In memory only (not after restart) |
 | CAP-09 | P1 | Cursor inclusion/exclusion | Manual verification pending | ScreenCaptureService.cs | Pointer drawn only when enabled | ScreenCaptureTests (cursor) | PC visual check | WCI | App tests | — |
-| CAP-10 | P1 | Capture from clipboard image | Automated test passed | MainWindow.xaml.cs (OnNewFromClipboard) | Clipboard image opens as a capture | ReleaseCandidateUiTests.New_from_clipboard_* | — | WCI | App tests (CI run 77) | — |
+| CAP-10 | P1 | Capture from clipboard image | Automated test passed | MainWindow.xaml.cs (OnNewFromClipboard) | Clipboard image opens as a capture | ReleaseCandidateUiTests.New_from_clipboard_* | — | WCI | App tests (CI runs 77, 82, 83) | — |
 | CAP-11 | P0 | Capture cancellation (Esc / right-click) | Automated test passed | Capture/OverlaySession.cs | Nothing captured, windows restored | InteractiveUiTests | — | WCI | App tests | — |
 | CAP-12 | P1 | Presets with own hotkeys | Automated test passed | Core/Settings/AppSettings.cs, Views/CaptureWindow.xaml.cs | Preset hotkey runs its options | GateBUiTests (presets) | PC: global hotkeys while another app has focus | WCI | App tests | — |
 | CAP-13 | P0 | Configurable shortcuts, Print Screen, conflict reporting | Manual verification pending | Interop/ShellIntegration.cs | Conflicts reported with fix hint | TrayAndSettingsTests | PC: Print Screen with Snipping Tool setting on/off | SIM+WCI | Tests | Windows may reserve Print Screen |
@@ -78,7 +78,7 @@ P2 = enhancement.
 
 | ID | P | Requirement | Status | Source | Acceptance criteria | Automated tests | Manual test still required | Env | Evidence | Limitations |
 |---|---|---|---|---|---|---|---|---|---|---|
-| EDT-01 | P0 | Select, move, resize, recolour, delete annotations | Manual verification pending | Editor/AnnotationCanvas.cs | Works from menu/toolbar/shortcut; undoable where it changes the image | InteractiveUiTests | PC: visual check of output | SIM+WCI | Tests | — |
+| EDT-01 | P0 | Select, move, resize (thickness), recolour, delete annotations; toolbar reachable at 900-1280 px | Manual verification pending | Editor/AnnotationCanvas.cs, MainWindow.xaml | Works from menu/toolbar/shortcut; undoable where it changes the image | InteractiveUiTests; ReleaseCandidateUiTests (toolbar width) | PC: visual check of output | SIM+WCI | Tests | — |
 | EDT-02 | P0 | Crop | Manual verification pending | Core/Editing/CropCommand.cs | Works from menu/toolbar/shortcut; undoable where it changes the image | EditorDocumentTests | PC: visual check of output | SIM+WCI | Tests | — |
 | EDT-03 | P1 | Rotate 90/180/270, flip H/V (annotations follow) | Manual verification pending | Core/Editing/TransformImageCommand.cs | Works from menu/toolbar/shortcut; undoable where it changes the image | TransformCommandTests; ReleaseCandidateUiTests | PC: visual check of output | SIM+WCI | Tests | Text keeps orientation under rotate |
 | EDT-04 | P1 | Resize image (px/percent, aspect lock) | Manual verification pending | Core/Editing/ResizeImageCommand.cs, Dialogs/ImageSizeDialogs.cs | Works from menu/toolbar/shortcut; undoable where it changes the image | TransformCommandTests; feature self-test | PC: visual check of output | SIM+WCI | Tests | — |
@@ -100,7 +100,7 @@ P2 = enhancement.
 | EDT-20 | P0 | Undo/redo for every edit | Manual verification pending | Core/Editing/UndoRedoHistory.cs | Works from menu/toolbar/shortcut; undoable where it changes the image | EditorDocumentTests; TransformCommandTests | PC: visual check of output | SIM+WCI | Tests | — |
 | EDT-21 | P1 | Quick Styles, saved styles, favourites | Manual verification pending | Core/Settings (QuickStyle) | Works from menu/toolbar/shortcut; undoable where it changes the image | TrayAndSettingsTests | PC: visual check of output | SIM+WCI | Tests | — |
 | EDT-22 | P1 | Printing | Implemented | MainWindow.xaml.cs (OnPrint) | Works from menu/toolbar/shortcut; undoable where it changes the image | — | PC: visual check of output | PC | Pending manual | Prints the flattened image fitted to the page; no print preview |
-| EDT-23 | P1 | Copy/paste/duplicate annotations | Implemented | MainWindow.xaml.cs | Works from menu/toolbar/shortcut; undoable where it changes the image | — | PC: visual check of output | PC | Pending manual | Annotation clipboard is in-app only |
+| EDT-23 | P1 | Copy/paste/duplicate annotations | Manual verification pending | MainWindow.xaml.cs | Works from menu/toolbar/shortcut; undoable where it changes the image | InteractiveUiTests (copy, paste, duplicate, delete with real mouse) | PC: visual check of output | SIM+WCI | Tests | Annotation clipboard is in-app only |
 | EDT-24 | P0 | Lossless PNG, JPEG quality, BMP, TIFF export; no metadata | Manual verification pending | Rendering/ImageExporter.cs, Core/Export/ImageFileFormat.cs | Works from menu/toolbar/shortcut; undoable where it changes the image | ExportTests; ExportRulesTests | PC: visual check of output | SIM+WCI | Tests | — |
 | EDT-25 | P0 | Editable project (.sfcap) and flattened exports | Manual verification pending | Core/Storage/CaptureFormat.cs | Works from menu/toolbar/shortcut; undoable where it changes the image | CaptureFormat tests | PC: visual check of output | SIM+WCI | Tests | — |
 | EDT-26 | P2 | Alignment, grouping, snapping, templates | Deferred with justification | — | — | — | — | — | — | Evaluated; deferred to 1.x (owner disposition): annotations are free-positioned; Shift constrains angles/squares |
@@ -117,7 +117,7 @@ P2 = enhancement.
 
 | ID | P | Requirement | Status | Source | Acceptance criteria | Automated tests | Manual test still required | Env | Evidence | Limitations |
 |---|---|---|---|---|---|---|---|---|---|---|
-| OCR-01 | P1 | Offline OCR of a capture (Windows.Media.Ocr), review, copy | Manual verification pending | Ocr/OcrService.cs, Ocr/TextRecognitionWindow.cs | Known text recognised in order; nothing stored or sent | feature self-test ocr-recognize (UNAVAILABLE on runners without an OCR language) | PC: English OCR on screenshots | WCI/PC | Feature self-test report | Accuracy not guaranteed; language must be installed in Windows |
+| OCR-01 | P1 | Offline OCR of a capture (Windows.Media.Ocr), review, copy | Manual verification pending | Ocr/OcrService.cs, Ocr/TextRecognitionWindow.cs | Known text recognised in order; nothing stored or sent | feature self-test ocr-recognize (3 lines in order, en-US) and ocr-tall-image (160/160 lines) | PC: English OCR on real screenshots; other languages | WCI | Feature self-test PASS (CI runs 77, 82, 83) | Accuracy not guaranteed; language must be installed in Windows |
 | OCR-02 | P1 | Language list/choice, clear missing-language and failure messages | Implemented | OcrService.cs | Messages name the Windows setting to change | feature self-test ocr-languages | PC: remove OCR language and retry | PC | — | — |
 | OCR-03 | P1 | OCR from a Library image | Implemented | Open capture → Image → Extract text | Same as OCR-01 | — | PC | PC | — | From the Editor (open the Library item first) |
 | OCR-04 | P1 | Tall images (scrolling captures) recognised in bands | Automated test passed | OcrService.cs | Last line found exactly once | feature self-test ocr-tall-image | — | WCI | Feature self-test | Requires OCR language on the machine |
@@ -220,7 +220,7 @@ P2 = enhancement.
 | ID | P | Requirement | Status | Source | Acceptance criteria | Automated tests | Manual test still required | Env | Evidence | Limitations |
 |---|---|---|---|---|---|---|---|---|---|---|
 | WEB-01 | P0 | Website on gh-pages, accurate claims, download disabled until approval, donations hidden | Automated test passed | website/ | build.py --check, browser tests | Website workflow | Owner: Pages enabled | WCI | Website CI | — |
-| WEB-02 | P1 | High-resolution real screenshots gallery | Implemented | website/static/assets/screenshots | 1920×1080 PNG from the packaged build | Screenshot tour (CI) | Visual review | WCI | CI log PNGs | — |
+| WEB-02 | P1 | High-resolution real screenshots gallery | Automated test passed | website/static/assets/screenshots, website/src/pages/features.html | Full-resolution PNG (1920×1080 desktop) from the packaged build, sha256-verified | Screenshot tour (CI run 83); website build validation, unit tests and Chromium/axe check | Owner visual review | WCI | 15 PNGs, checksums verified | — |
 
 ### DOC
 

@@ -9,9 +9,9 @@ need the owner's explicit approval (see [RELEASE-PROCESS.md](RELEASE-PROCESS.md)
 | Item | Link |
 |---|---|
 | Integration pull request (`release/v1.0-candidate` → `main`, **do not merge without approval**) | {{PR}} |
-| Exact source commit | {{COMMIT}} |
-| Latest CI run for that commit | {{RUN}} |
-| Windows packages (portable ZIP, per-user installer, SBOM, `SHA256SUMS.txt`) | Artifact `{{PKG_ARTIFACT}}` on that run (GitHub sign-in required; Actions artifacts expire after 14–30 days — not a public download) |
+| Exact source commit of the verified packages | [`748eedb`](https://github.com/bazeocrisy/SnapForge/commit/748eedba8cf5d9281cbd04aa7311e02ce8ab96c3) (`748eedba8cf5d9281cbd04aa7311e02ce8ab96c3`). Later commits on the branch change only documentation, the website and this page — check with `git diff --stat 748eedb release/v1.0-candidate` |
+| CI run for that commit (all 5 jobs passed) | [CI run 83](https://github.com/bazeocrisy/SnapForge/actions/runs/46034042240) — previous fully green run: [CI run 82](https://github.com/bazeocrisy/SnapForge/actions/runs/46030782634) (`e5f5363`) |
+| Windows packages (portable ZIP, per-user installer, SBOM, `SHA256SUMS.txt`) | [`SnapForge-1.0.0-rc.1-packages-748eedb…`](https://github.com/bazeocrisy/SnapForge/actions/runs/46034042240/artifacts/15215118886) on that run (GitHub sign-in required; Actions artifacts expire after 14–30 days — not a public download) |
 | Portable build only | Artifact `SnapForge-portable-win-x64-dev-<commit>` on that run |
 | Test results (TRX + coverage) | Artifact `test-results` on that run |
 | Library benchmarks | Artifact `benchmarks-<commit>`; summary in [BENCHMARKS-1.0.md](BENCHMARKS-1.0.md) |
@@ -25,14 +25,35 @@ need the owner's explicit approval (see [RELEASE-PROCESS.md](RELEASE-PROCESS.md)
 
 **Package checksums** (from the CI log of the run above; verify with `Get-FileHash` against `SHA256SUMS.txt`):
 
-{{SHA}}
+| File | SHA-256 |
+|---|---|
+| `SnapForge-1.0.0-rc.1-win-x64-portable.zip` | `32026af60042f20ca199b79d38eaee95c37f7a9d66ea6d51de3d47551deefee5` |
+| `SnapForge-1.0.0-rc.1-win-x64-setup.exe` | `01a8d4ffb8e77f1dac8902940aed5455a284be9d24a312f0b50b9ec954d1d618` |
+| `SnapForge-1.0.0-rc.1-sbom.cdx.json` (CycloneDX 1.5, 14 components) | `e544f9e02f161e79724be6c630590527c17fa5663e9ec91ba61bd1be270733b4` |
+
+File version 1.0.0.83; product version 1.0.0-rc.1; channel "Release candidate (not approved for public release)". Unsigned.
 
 ## 2. What CI proved for this commit
 
-{{CI_EVIDENCE}}
+CI run 83 (`748eedb`) — every job passed. Numbers below are copied from the job logs:
+
+| Job | Result |
+|---|---|
+| Core tests (Linux) | 346 / 346 passed |
+| Windows build (warnings as errors), locked restore, vulnerability audit | Passed; no vulnerable packages |
+| Windows tests | Core 346 / 346 and App 63 / 63 passed. The App tests use real mouse/keyboard input, real screen capture, clipboard, OLE drag-and-drop into a separate process, a real-wheel scrolling capture and toolbar layout at 900 and 1280 px |
+| Portable build on a runner with every .NET installation hidden | `--self-test` PASS (6 checks) |
+| Video self-test | PASS (14 checks). A/V error 0.07 ms max with no drift; constant frame rate 361 frames / 12.0 s; pause/resume A/V error 13.4 ms max (run 82: 2.3 ms); 60 FPS with 0 dropped frames; recording toolbar 100 % absent from the video; single session; cancel discards the file |
+| Feature self-test | PASS. OCR en-US: 3 lines in order; tall image: 160 of 160 lines. Video trim + cut: 6.0 s → 4.0 s, parts in order, audio kept. GIF export. Frame extraction. 4K image operations: 1,080 ms (target < 10 s). GIF encoder: 295 ms (target < 3 s). Transforms with undo restore the exact original |
+| Crash recovery (process killed while recording) | Recovered 8.7 s of the interrupted recording at the next start |
+| Screenshot tour at 1920×1080 | 15 full-resolution PNGs, SHA-256 verified; used on the website |
+| Installer (all .NET installations hidden) | Per-user silent install, self-test of the installed app, upgrade over itself, uninstall. User data kept |
+| Library scale benchmarks | Completed (artifact `benchmarks-748eedb…`); run 77 figures are summarised in BENCHMARKS-1.0.md |
+
+Defects found and fixed while getting CI green on this candidate: DEF-RC-07 (toolbar clipped at narrow widths), DEF-RC-08 (GIF timing test under coverage), DEF-RC-09 (access keys showed a literal underscore in every dialog). See DEFECT-REGISTER.md.
 
 All numbers are from a GitHub-hosted Windows Server 2025 runner (Windows 10.0.26100, 4 vCPU, **no GPU, no audio
-devices, one 1024×768 or 1920×1080 virtual display**). They are not physical-PC results.
+devices, one 1024×768 virtual display (1920×1080 for the screenshot tour)**). They are not physical-PC results.
 
 ## 3. Status by area (details and evidence per requirement in the traceability matrix)
 
