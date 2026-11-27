@@ -229,9 +229,13 @@ internal static partial class VideoSelfTest
         // 7. The toolbar and outline are not in the recording (owner rule), with a control run proving the check works.
         try
         {
-            (double excluded, double control) = (ToolbarAbsence(dir, exclude: true), ToolbarAbsence(dir, exclude: false));
-            report["toolbarExclusion"] = new { greenWhereToolbarIsWithExclusion = excluded, greenWhereToolbarIsWithoutExclusion = control };
-            Check("toolbar-not-recorded", excluded >= 0.98 && control < 0.6, $"toolbar area is {excluded:P1} background in the recording (control without exclusion: {control:P1})");
+            double excluded = ToolbarAbsence(dir, exclude: true);
+            string? coveredExcluded = LastToolbarCovered;
+            double control = ToolbarAbsence(dir, exclude: false);
+            string? coveredControl = LastToolbarCovered;
+            report["toolbarExclusion"] = new { greenWhereToolbarIsWithExclusion = excluded, greenWhereToolbarIsWithoutExclusion = control, coveredExcluded, coveredControl };
+            string precondition = coveredExcluded is null && coveredControl is null ? string.Empty : $" — PRECONDITION NOT MET: test area covered by {coveredExcluded ?? coveredControl}";
+            Check("toolbar-not-recorded", excluded >= 0.98 && control < 0.6, $"toolbar area is {excluded:P1} background in the recording (control without exclusion: {control:P1}){precondition}");
         }
 #pragma warning disable CA1031
         catch (Exception ex)
@@ -279,9 +283,13 @@ internal static partial class VideoSelfTest
     /// Windows.Graphics.Capture, decodes a frame and returns the fraction of the toolbar's rectangle that shows the
     /// green background (1.0 = toolbar absent from the recording).
     /// </summary>
+    /// <summary>Precondition result of the last <see cref="ToolbarAbsence"/> run (null = only our windows on the area).</summary>
+    private static string? LastToolbarCovered { get; set; }
+
     private static double ToolbarAbsence(string dir, bool exclude)
     {
         PixelRect? toolbarRect = null;
+        var ours = new List<nint>();
         PixelRect area = default;
         var ready = new ManualResetEventSlim();
         var close = new ManualResetEventSlim();
@@ -300,11 +308,14 @@ internal static partial class VideoSelfTest
                 ShowInTaskbar = false,
             };
             green.Show();
+            ours.Add(new System.Windows.Interop.WindowInteropHelper(green).Handle);
             area = SnapForge.App.Interop.PhysicalPlacement.GetBounds(green)!.Value;
             var outline = new RecordingOutline(new PixelRect(area.X + 40, area.Y + 40, area.Width - 80, area.Height - 80), exclude);
             outline.Show();
+            ours.Add(new System.Windows.Interop.WindowInteropHelper(outline).Handle);
             var bar = new RecordingToolbar("640×360 · 30 FPS", true, true, false, "Shift+F10", "Shift+F9", exclude);
             bar.Show();
+            ours.Add(new System.Windows.Interop.WindowInteropHelper(bar).Handle);
             SnapForge.App.Interop.PhysicalPlacement.SetBounds(bar, new PixelRect(area.X + 100, area.Y + 150, 0, 0), resize: false);
             bar.Update(TimeSpan.FromSeconds(83), false, 0.5f, 0);
             bar.UpdateLayout();
@@ -336,6 +347,7 @@ internal static partial class VideoSelfTest
         thread.Start();
         ready.Wait(TimeSpan.FromSeconds(10));
         Thread.Sleep(700);
+        LastToolbarCovered = ForeignWindowsOver(area, ours);
         string path = Path.Combine(dir, exclude ? "toolbar-excluded.mp4" : "toolbar-control.mp4");
         try
         {
@@ -376,6 +388,48 @@ internal static partial class VideoSelfTest
     }
 
     private static long PackPoint(int x, int y) => ((long)y << 32) | (uint)x;
+
+    /// <summary>
+    /// Precondition for the screen-based checks: the top-level windows Windows reports over a grid of points in
+    /// <paramref name="area"/> that are not <paramref name="ours"/> (e.g. a runner console or notification on top of
+    /// the test window). Null when only our windows are there. CI run 132 recorded 0 % of the test background with no
+    /// explanation; this names the cause instead.
+    /// </summary>
+    internal static unsafe string? ForeignWindowsOver(PixelRect area, IReadOnlyCollection<nint> ours)
+    {
+        var found = new SortedSet<string>(StringComparer.Ordinal);
+        char* cls = stackalloc char[128];
+        char* title = stackalloc char[128];
+        for (int i = 1; i <= 5; i++)
+        {
+            for (int j = 1; j <= 3; j++)
+            {
+                int x = area.X + (area.Width * i / 6), y = area.Y + (area.Height * j / 4);
+                nint root = GetAncestor(WindowFromPoint(PackPoint(x, y)), 2 /* GA_ROOT */);
+                if (root == 0 || ours.Contains(root))
+                {
+                    continue;
+                }
+
+                int nc = GetClassNameW(root, cls, 128), nt = GetWindowTextW(root, title, 128);
+                found.Add($"0x{root:X} '{new string(cls, 0, nc)}' \"{new string(title, 0, nt)}\" at {x},{y}");
+            }
+        }
+
+        return found.Count == 0 ? null : string.Join("; ", found);
+    }
+
+    [LibraryImport("user32.dll")]
+    private static partial nint WindowFromPoint(long point);
+
+    [LibraryImport("user32.dll")]
+    private static partial nint GetAncestor(nint hwnd, uint flags);
+
+    [LibraryImport("user32.dll")]
+    private static unsafe partial int GetClassNameW(nint hwnd, char* name, int max);
+
+    [LibraryImport("user32.dll")]
+    private static unsafe partial int GetWindowTextW(nint hwnd, char* text, int max);
 
     /// <summary>Records the synthetic flash/beep sources, optionally pausing, then measures sync from the file.</summary>
     /// <summary>Diagnostics of the last synthetic recording: where flash frames were produced and placed.</summary>

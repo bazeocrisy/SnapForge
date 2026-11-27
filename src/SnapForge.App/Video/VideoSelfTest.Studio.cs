@@ -20,14 +20,15 @@ internal static partial class VideoSelfTest
         // Screen + SYNTHETIC camera composited into a real screen recording; Studio on screen at the same time.
         try
         {
-            (StudioOverlayResult o, double studioGreen, string? studioError) = ScreenPlusSyntheticCamera(dir);
-            report["studioScreenPlusCamera"] = new { synthetic = true, o.InsideShare, o.OtherCorners, o.GreenElsewhere, o.Layout, result = Summary(o.Result), studioWindowGreen = studioGreen, studioError };
+            (StudioOverlayResult o, double studioGreen, string? studioError, string? covered) = ScreenPlusSyntheticCamera(dir);
+            report["studioScreenPlusCamera"] = new { synthetic = true, o.InsideShare, o.OtherCorners, o.GreenElsewhere, o.Layout, result = Summary(o.Result), studioWindowGreen = studioGreen, studioError, coveredBy = covered };
+            string precondition = covered is null ? string.Empty : $" — PRECONDITION NOT MET: the test area was covered by {covered}";
             double dropped = o.Result.FramesWritten == 0 ? 1 : o.Result.FramesDropped / (double)(o.Result.FramesWritten + o.Result.FramesDropped);
             check("studio-screen-plus-camera-synthetic",
                 o.Result.Finalized && o.InsideShare >= 0.9 && o.OtherCorners.All(c => c <= 0.02) && o.GreenElsewhere >= 0.9 && dropped < 0.01,
-                $"SYNTHETIC camera in the bottom-right {o.Layout}: {o.InsideShare:P1} of the overlay shows the synthetic pattern, other corners {string.Join(" / ", o.OtherCorners.Select(c => c.ToString("P1", System.Globalization.CultureInfo.InvariantCulture)))}, screen elsewhere {o.GreenElsewhere:P1} unchanged; {o.Result.FramesWritten} frames, {dropped:P2} dropped");
+                $"SYNTHETIC camera in the bottom-right {o.Layout}: {o.InsideShare:P1} of the overlay shows the synthetic pattern, other corners {string.Join(" / ", o.OtherCorners.Select(c => c.ToString("P1", System.Globalization.CultureInfo.InvariantCulture)))}, screen elsewhere {o.GreenElsewhere:P1} unchanged; {o.Result.FramesWritten} frames, {dropped:P2} dropped{precondition}");
             check("studio-window-not-recorded", studioError is null && studioGreen >= 0.98,
-                studioError ?? $"the Studio window's area is {studioGreen:P1} background in the recording (Studio is excluded from capture)");
+                studioError ?? $"the Studio window's area is {studioGreen:P1} background in the recording (Studio is excluded from capture){precondition}");
         }
 #pragma warning disable CA1031
         catch (Exception ex)
@@ -196,9 +197,11 @@ internal static partial class VideoSelfTest
     /// Shows a lime window and SnapForge Studio over part of it, records the lime area with the SYNTHETIC camera
     /// composited in the bottom-right corner, decodes a frame and measures where the synthetic pattern appears.
     /// </summary>
-    private static (StudioOverlayResult Overlay, double StudioGreen, string? StudioError) ScreenPlusSyntheticCamera(string dir)
+    private static (StudioOverlayResult Overlay, double StudioGreen, string? StudioError, string? Covered) ScreenPlusSyntheticCamera(string dir)
     {
         PixelRect area = default;
+        var ours = new List<nint>();
+        System.Windows.Window? limeWindow = null;
         PixelRect? studioRect = null;
         string? studioError = null;
         var ready = new ManualResetEventSlim();
@@ -218,6 +221,8 @@ internal static partial class VideoSelfTest
                 ShowInTaskbar = false,
             };
             lime.Show();
+            limeWindow = lime;
+            ours.Add(new System.Windows.Interop.WindowInteropHelper(lime).Handle);
             area = SnapForge.App.Interop.PhysicalPlacement.GetBounds(lime)!.Value;
             StudioWindow? studio = null;
             AppServices? services = null;
@@ -228,6 +233,7 @@ internal static partial class VideoSelfTest
                 services = AppServices.Create(settings, Path.Combine(dir, "studio-selftest", "library"));
                 studio = new StudioWindow(services) { Topmost = true, WindowStartupLocation = System.Windows.WindowStartupLocation.Manual };
                 studio.Show();
+                ours.Add(new System.Windows.Interop.WindowInteropHelper(studio).Handle);
                 // Over the left part of the lime area, away from the bottom-right camera overlay.
                 SnapForge.App.Interop.PhysicalPlacement.SetBounds(studio, new PixelRect(area.X + 20, area.Y + 20, 300, 250), resize: true);
                 studio.UpdateLayout();
@@ -264,6 +270,21 @@ internal static partial class VideoSelfTest
         thread.Start();
         ready.Wait(TimeSpan.FromSeconds(15));
         Thread.Sleep(700);
+        // Precondition: nothing else on top of the test area. One attempt to bring the test windows back on top.
+        string? covered = ForeignWindowsOver(area, ours);
+        if (covered is not null && limeWindow is { } lw0)
+        {
+            lw0.Dispatcher.Invoke(() =>
+            {
+                lw0.Topmost = false;
+                lw0.Topmost = true;
+                lw0.Activate();
+            });
+            Thread.Sleep(700);
+            string? still = ForeignWindowsOver(area, ours);
+            covered = still is null ? null : $"{still} (still on top after re-raising the test windows; first seen: {covered})";
+        }
+
         string path = Path.Combine(dir, "studio-screen-plus-camera-synthetic.mp4");
         RecordingResult result;
         OverlayLayout layout;
@@ -297,6 +318,8 @@ internal static partial class VideoSelfTest
         }
 
         PixelBuffer frame = VideoAnalysis.DecodeFrame(path, 1500) ?? throw new InvalidOperationException("No frame decoded.");
+        // Kept with the sample recordings (CI artifact) so a failure can be inspected as an image.
+        File.WriteAllBytes(Path.Combine(dir, "studio-screen-plus-camera-frame.png"), Rendering.ImageExporter.Encode(frame, Core.Export.ImageFileFormat.Png));
         int w = frame.Width, h = frame.Height, lw = layout.Width, lh = layout.Height;
         double inside = Share(frame, layout.X + (lw / 4), layout.Y + (lh / 4), lw / 2, lh / 2, Synthetic);
         double[] others =
@@ -313,7 +336,7 @@ internal static partial class VideoSelfTest
         }
 
         File.Delete(path);
-        return (new StudioOverlayResult(result, Math.Round(inside, 4), [.. others.Select(o => Math.Round(o, 4))], Math.Round(green, 4), $"{lw}x{lh} at {layout.X},{layout.Y} of {w}x{h}"), Math.Round(studioGreen, 4), studioError);
+        return (new StudioOverlayResult(result, Math.Round(inside, 4), [.. others.Select(o => Math.Round(o, 4))], Math.Round(green, 4), $"{lw}x{lh} at {layout.X},{layout.Y} of {w}x{h}"), Math.Round(studioGreen, 4), studioError, covered);
     }
 
     /// <summary>Smallest and largest step between consecutive decoded video timestamps (ms).</summary>
