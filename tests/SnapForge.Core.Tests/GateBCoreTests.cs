@@ -132,7 +132,8 @@ public class GateBCoreTests
 
         Assert.Equal(0, store.Sweep(Now.AddMinutes(1), TempExportStore.GracePeriod) - 1); // only the unknown folder
         Assert.True(Directory.Exists(a));
-        Assert.Equal(1, store.Sweep(Now.AddMinutes(3), TempExportStore.GracePeriod)); // a is older than 2 min
+        Assert.Equal(0, store.Sweep(Now.AddHours(23), TempExportStore.GracePeriod)); // kept for 24 h (lazy uploads)
+        Assert.Equal(1, store.Sweep(Now.AddHours(24).AddMinutes(1), TempExportStore.GracePeriod)); // a is older than 24 h
         Assert.False(Directory.Exists(a));
         Assert.True(Directory.Exists(b));
         Assert.True(TempExportStore.DeleteSession(b));
@@ -141,6 +142,27 @@ public class GateBCoreTests
         Assert.Equal(1, store.DeleteAll(Now));
         Assert.False(Directory.Exists(c));
         Assert.Equal(0, new TempExportStore(dir.Sub("missing")).Sweep(Now, TimeSpan.Zero));
+    }
+
+    [Fact]
+    public void Temp_export_size_cap_removes_oldest_sessions_but_never_recent_ones()
+    {
+        using var dir = new TestDirectory();
+        var store = new TempExportStore(dir.Sub("Drag"));
+        string old1 = store.NewSession(Now.AddHours(-3));
+        string old2 = store.NewSession(Now.AddHours(-2));
+        string recent = store.NewSession(Now.AddMinutes(-5));
+        foreach (string d in new[] { old1, old2, recent })
+        {
+            File.WriteAllBytes(Path.Combine(d, "v.mp4"), new byte[1000]);
+        }
+
+        Assert.Equal(3000, store.TotalBytes());
+        Assert.Equal(0, store.Enforce(Now, maxTotalBytes: 5000)); // under the cap: nothing removed
+        Assert.Equal(2, store.Enforce(Now, maxTotalBytes: 500));  // over the cap: old sessions go, oldest first
+        Assert.False(Directory.Exists(old1));
+        Assert.False(Directory.Exists(old2));
+        Assert.True(Directory.Exists(recent)); // younger than 15 min: kept even though still over the cap
     }
 
     [Fact]

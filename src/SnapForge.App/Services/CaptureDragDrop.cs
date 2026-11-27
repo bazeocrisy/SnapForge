@@ -65,7 +65,7 @@ internal static class CaptureDragDrop
         var data = new LazyCaptureFiles(items, settings ?? new DragDropSettings(), Store);
         LastDrag = data;
         BeforeDragHook?.Invoke(data);
-        DragDropEffects effect;
+        DragDropEffects effect = DragDropEffects.None;
         IsDragging = true;
         try
         {
@@ -75,7 +75,7 @@ internal static class CaptureDragDrop
         finally
         {
             IsDragging = false;
-            data.EndDrag();
+            data.EndDrag(effect != DragDropEffects.None);
         }
 
         return effect;
@@ -88,8 +88,8 @@ internal static class CaptureDragDrop
     public static IReadOnlyList<Guid> KeysOf(IDataObject data) =>
         data?.GetData(KeysFormat) is string s ? [.. s.Split(';', StringSplitOptions.RemoveEmptyEntries).Select(Guid.Parse)] : [];
 
-    /// <summary>Removes old drag folders (call at start-up and periodically).</summary>
-    public static void Sweep() => Store.Sweep(DateTime.UtcNow, TempExportStore.GracePeriod);
+    /// <summary>Applies the drag-copy retention policy (start-up and after each drag).</summary>
+    public static void Sweep() => Store.Enforce(DateTime.UtcNow, TempExportStore.MaxTotalBytes);
 
     /// <summary>
     /// A data object whose file list is produced on first request. WPF's DataObject wraps it and converts the
@@ -98,7 +98,6 @@ internal static class CaptureDragDrop
     internal sealed class LazyCaptureFiles(IReadOnlyList<DragCapture> items, DragDropSettings settings, TempExportStore store) : IDataObject
     {
         private string[]? _files;
-        private DispatcherTimer? _cleanup;
 
         public IReadOnlyList<DragCapture> Items { get; } = items;
 
@@ -204,23 +203,25 @@ internal static class CaptureDragDrop
         }
 
         /// <summary>
-        /// After the drag loop: nothing to do if no files were made; otherwise delete them once targets have had
-        /// time to copy (Office and mail clients may read after the drop returns). Exit and start-up sweep the rest.
+        /// After the drag loop. No drop: the files (if any were made) are deleted now. A drop: the files stay, because
+        /// the receiving app may read them later (lazy uploads, attachments); the retention policy removes them after
+        /// 24 hours or earlier under the size cap — see <see cref="TempExportStore"/>.
         /// </summary>
-        internal void EndDrag()
+        internal void EndDrag(bool dropped)
         {
             if (SessionDirectory is not { } dir)
             {
                 return;
             }
 
-            _cleanup = new DispatcherTimer { Interval = TempExportStore.GracePeriod };
-            _cleanup.Tick += (_, _) =>
+            if (!dropped)
             {
-                _cleanup.Stop();
                 TempExportStore.DeleteSession(dir);
-            };
-            _cleanup.Start();
+                SessionDirectory = null;
+                return;
+            }
+
+            _ = Task.Run(Sweep);
         }
 
         /// <summary>File drop list as a StringCollection (what WinForms/WPF targets read).</summary>

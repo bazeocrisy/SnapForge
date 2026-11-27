@@ -769,6 +769,40 @@ public partial class MainWindow : Window
 
     private void OnCaptureDisplay(object sender, RoutedEventArgs e) => _ = App.CaptureWithOptionsAsync(_services.Settings.Capture with { Mode = CaptureMode.SingleScreen });
 
+    private void OnCaptureActiveWindow(object sender, RoutedEventArgs e) => _ = App.CaptureWithOptionsAsync(_services.Settings.Capture with { Mode = CaptureMode.ActiveWindow });
+
+    private void OnRepeatLastCapture(object sender, RoutedEventArgs e) => _ = App.RepeatLastCaptureAsync();
+
+    /// <summary>Opens the clipboard's image as a new capture (saved to the Library like any capture).</summary>
+    private void OnNewFromClipboard(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            if (!Clipboard.ContainsImage())
+            {
+                SetStatus("The clipboard does not contain an image.");
+                return;
+            }
+
+            System.Windows.Media.Imaging.BitmapSource? bitmap = Clipboard.GetImage();
+            if (bitmap is null || bitmap.PixelWidth <= 0 || bitmap.PixelHeight <= 0)
+            {
+                SetStatus("The clipboard image could not be read.");
+                return;
+            }
+
+            PixelBuffer image = BitmapConversion.FromBitmapSource(bitmap);
+            image.ForceOpaque();
+            AcceptCapture(image, DateTime.Now, _services.Settings.Capture with { PreviewInEditor = true, CopyToClipboard = false });
+            ShowEditorWorkspace();
+            SetStatus($"Opened the clipboard image ({image.Width} × {image.Height}).");
+        }
+        catch (System.Runtime.InteropServices.ExternalException ex)
+        {
+            SetStatus($"The clipboard could not be read: {ex.Message}");
+        }
+    }
+
     private void OnCaptureAll(object sender, RoutedEventArgs e) => _ = App.CaptureWithOptionsAsync(_services.Settings.Capture with { Mode = CaptureMode.AllScreens });
 
     private void OnShowCaptureWindow(object sender, RoutedEventArgs e) => App.ShowCaptureWindow();
@@ -1459,6 +1493,9 @@ public partial class MainWindow : Window
                 case Key.D2 or Key.NumPad2: Handle(e, () => OnCaptureWindow(this, e)); return;
                 case Key.D3 or Key.NumPad3: Handle(e, () => OnCaptureDisplay(this, e)); return;
                 case Key.D4 or Key.NumPad4: Handle(e, () => OnCaptureAll(this, e)); return;
+                case Key.D5 or Key.NumPad5: Handle(e, () => OnCaptureActiveWindow(this, e)); return;
+                case Key.R when !shift: Handle(e, () => OnRepeatLastCapture(this, e)); return;
+                case Key.V when shift: Handle(e, () => OnNewFromClipboard(this, e)); return;
                 case Key.N: Handle(e, () => OnNewCapture(this, e)); return;
                 case Key.L: Handle(e, ShowLibraryWorkspace); return;
                 case Key.E: Handle(e, ShowEditorWorkspace); return;

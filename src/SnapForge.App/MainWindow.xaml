@@ -199,6 +199,9 @@
                         <MenuItem Header="_Window" InputGestureText="Ctrl+2" Click="OnCaptureWindow" />
                         <MenuItem Header="_Display" InputGestureText="Ctrl+3" Click="OnCaptureDisplay" />
                         <MenuItem Header="_Full screen" InputGestureText="Ctrl+4" Click="OnCaptureAll" />
+                        <MenuItem Header="_Active window" InputGestureText="Ctrl+5" Click="OnCaptureActiveWindow" ToolTip="Captures the window you were working in, without clicking" />
+                        <MenuItem Header="Re_peat last capture" InputGestureText="Ctrl+R" Click="OnRepeatLastCapture" ToolTip="Captures the same area again" />
+                        <MenuItem Header="New from _clipboard" InputGestureText="Ctrl+Shift+V" Click="OnNewFromClipboard" ToolTip="Opens the image on the clipboard as a new capture" />
                         <Separator />
                         <MenuItem x:Name="PresetsMenu" Header="_Presets" />
                         <MenuItem Header="Capture _window…" Click="OnShowCaptureWindow" />

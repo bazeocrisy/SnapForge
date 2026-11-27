@@ -13,4 +13,7 @@ public enum CaptureMode
 
     /// <summary>A top-level window chosen by clicking it.</summary>
     Window,
+
+    /// <summary>The window that was in front when the capture started (falls back to the topmost other window).</summary>
+    ActiveWindow,
 }

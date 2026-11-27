@@ -31,11 +31,18 @@ internal sealed class SelectionOverlayWindow : Window
     private readonly Border _sizeLabel;
     private readonly TextBlock _sizeText;
     private readonly Border _hint;
+    private readonly BitmapSource _monitorImage;
+    private readonly Border _loupe;
+    private readonly Image _loupeImage;
+    private readonly TextBlock _loupeText;
+    private const int LoupeSourcePixels = 15;
+    private const int LoupeZoom = 8;
 
     public SelectionOverlayWindow(OverlaySession session, PixelRect monitorBounds, BitmapSource monitorImage, string hint)
     {
         _session = session;
         _monitorBounds = monitorBounds;
+        _monitorImage = monitorImage;
 
         Title = "SnapForge capture";
         WindowStyle = WindowStyle.None;
@@ -83,11 +90,42 @@ internal sealed class SelectionOverlayWindow : Window
             Child = new TextBlock { Text = hint, Foreground = Brushes.White, FontSize = 14, FontFamily = new FontFamily("Segoe UI") },
         };
 
+        // Magnifier: 15×15 source pixels at 8× (nearest neighbour) with a centre marker, the cursor's exact pixel
+        // position in the capture and its colour — for pixel-accurate region edges.
+        _loupeImage = new Image { Width = LoupeSourcePixels * LoupeZoom, Height = LoupeSourcePixels * LoupeZoom, Stretch = Stretch.Fill };
+        RenderOptions.SetBitmapScalingMode(_loupeImage, BitmapScalingMode.NearestNeighbor);
+        var marker = new Rectangle
+        {
+            Width = LoupeZoom + 2,
+            Height = LoupeZoom + 2,
+            Stroke = AccentBrush,
+            StrokeThickness = 1,
+            HorizontalAlignment = HorizontalAlignment.Center,
+            VerticalAlignment = VerticalAlignment.Center,
+        };
+        var zoomed = new Grid { ClipToBounds = true };
+        zoomed.Children.Add(_loupeImage);
+        zoomed.Children.Add(marker);
+        _loupeText = new TextBlock { Foreground = Brushes.White, FontSize = 11, FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(4, 2, 4, 2) };
+        var loupeStack = new StackPanel();
+        loupeStack.Children.Add(zoomed);
+        loupeStack.Children.Add(_loupeText);
+        _loupe = new Border
+        {
+            Background = Freeze(new SolidColorBrush(Color.FromArgb(0xF0, 0x1E, 0x1F, 0x22))),
+            BorderBrush = AccentBrush,
+            BorderThickness = new Thickness(1),
+            Child = loupeStack,
+            Visibility = Visibility.Collapsed,
+            IsHitTestVisible = false,
+        };
+
         var canvas = new Canvas { IsHitTestVisible = false };
         canvas.Children.Add(_guideH);
         canvas.Children.Add(_guideV);
         canvas.Children.Add(_selectionBorder);
         canvas.Children.Add(_sizeLabel);
+        canvas.Children.Add(_loupe);
 
         var root = new Grid();
         root.Children.Add(image);
@@ -108,7 +146,7 @@ internal sealed class SelectionOverlayWindow : Window
     public PixelRect MonitorBounds => _monitorBounds;
 
     /// <summary>Redraws the dim mask, selection frame, guides and size label from session state (physical coordinates).</summary>
-    public void Refresh(PixelRect? highlight, (int X, int Y)? cursor, bool showGuides, bool showHint)
+    public void Refresh(PixelRect? highlight, (int X, int Y)? cursor, bool showGuides, bool showHint, bool showLoupe = false)
     {
         double w = ActualWidth, h = ActualHeight;
         if (w <= 0 || h <= 0)
@@ -161,6 +199,36 @@ internal sealed class SelectionOverlayWindow : Window
         {
             _guideH.Visibility = _guideV.Visibility = Visibility.Collapsed;
         }
+
+        UpdateLoupe(showLoupe ? cursor : null, w, h);
+    }
+
+    private void UpdateLoupe((int X, int Y)? cursor, double w, double h)
+    {
+        if (cursor is not { } c || !_monitorBounds.Contains(c.X, c.Y))
+        {
+            _loupe.Visibility = Visibility.Collapsed;
+            return;
+        }
+
+        int px = c.X - _monitorBounds.X, py = c.Y - _monitorBounds.Y;
+        int half = LoupeSourcePixels / 2;
+        int sx = Math.Clamp(px - half, 0, Math.Max(0, _monitorImage.PixelWidth - LoupeSourcePixels));
+        int sy = Math.Clamp(py - half, 0, Math.Max(0, _monitorImage.PixelHeight - LoupeSourcePixels));
+        int sw = Math.Min(LoupeSourcePixels, _monitorImage.PixelWidth), sh = Math.Min(LoupeSourcePixels, _monitorImage.PixelHeight);
+        _loupeImage.Source = new CroppedBitmap(_monitorImage, new Int32Rect(sx, sy, sw, sh));
+        var pixel = new byte[4];
+        _monitorImage.CopyPixels(new Int32Rect(Math.Clamp(px, 0, _monitorImage.PixelWidth - 1), Math.Clamp(py, 0, _monitorImage.PixelHeight - 1), 1, 1), pixel, 4, 0);
+        _loupeText.Text = $"X {c.X}  Y {c.Y}   #{pixel[2]:X2}{pixel[1]:X2}{pixel[0]:X2}";
+
+        _loupe.Visibility = Visibility.Visible;
+        _loupe.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+        Point p = ToLocal(c.X, c.Y);
+        double lw = _loupe.DesiredSize.Width, lh = _loupe.DesiredSize.Height;
+        double left = p.X + 24 + lw > w ? p.X - 24 - lw : p.X + 24;
+        double top = p.Y + 24 + lh > h ? p.Y - 24 - lh : p.Y + 24;
+        Canvas.SetLeft(_loupe, Math.Max(0, left));
+        Canvas.SetTop(_loupe, Math.Max(0, top));
     }
 
     protected override void OnDpiChanged(DpiScale oldDpi, DpiScale newDpi)
@@ -213,6 +281,24 @@ internal sealed class SelectionOverlayWindow : Window
         if (e.Key == Key.Escape)
         {
             _session.Cancel();
+            e.Handled = true;
+            return;
+        }
+
+        // Arrow keys move the pointer by one physical pixel (Shift: 10) for pixel-exact edges.
+        (int dx, int dy) = e.Key switch
+        {
+            Key.Left => (-1, 0),
+            Key.Right => (1, 0),
+            Key.Up => (0, -1),
+            Key.Down => (0, 1),
+            _ => (0, 0),
+        };
+        if ((dx, dy) != (0, 0) && NativeMethods.GetCursorPos(out NativeMethods.POINT pt))
+        {
+            int step = Keyboard.Modifiers.HasFlag(ModifierKeys.Shift) ? 10 : 1;
+            NativeMethods.SetCursorPos(pt.X + (dx * step), pt.Y + (dy * step));
+            _session.OnPointerMove();
             e.Handled = true;
         }
     }

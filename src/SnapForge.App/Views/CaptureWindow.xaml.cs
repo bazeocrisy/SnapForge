@@ -47,6 +47,7 @@ public partial class CaptureWindow : Window
     internal static string ModeLabel(CaptureMode mode) => mode switch
     {
         CaptureMode.Window => "Window",
+        CaptureMode.ActiveWindow => "Active window",
         CaptureMode.SingleScreen => "Display",
         CaptureMode.AllScreens => "Full screen",
         _ => "Region",
@@ -161,6 +162,7 @@ public partial class CaptureWindow : Window
         {
             (CaptureMode.Region, "Drag to select an area"),
             (CaptureMode.Window, "Click a window"),
+            (CaptureMode.ActiveWindow, "The window you were using (no clicking)"),
             (CaptureMode.SingleScreen, "Click a display"),
             (CaptureMode.AllScreens, "Every display"),
         })

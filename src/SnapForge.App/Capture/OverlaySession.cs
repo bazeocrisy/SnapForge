@@ -59,7 +59,7 @@ internal sealed class OverlaySession
         bool guides = _tracker.Mode == CaptureMode.Region && !_tracker.IsDragging;
         foreach (SelectionOverlayWindow w in _windows)
         {
-            w.Refresh(_tracker.Highlight, cursor, guides, showHint: !_tracker.IsDragging && w.MonitorBounds.Contains(cursor.X, cursor.Y));
+            w.Refresh(_tracker.Highlight, cursor, guides, showHint: !_tracker.IsDragging && w.MonitorBounds.Contains(cursor.X, cursor.Y), showLoupe: _tracker.Mode == CaptureMode.Region);
         }
     }
 

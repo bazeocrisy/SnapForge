@@ -223,7 +223,8 @@ public partial class App : Application
         _widget = null;
         try
         {
-            CaptureDragDrop.Store.DeleteAll(DateTime.UtcNow);
+            // Drag copies are kept across exit (a receiving app may still read them); apply retention only.
+            CaptureDragDrop.Store.Enforce(DateTime.UtcNow, Core.Export.TempExportStore.MaxTotalBytes);
         }
         catch (IOException)
         {
@@ -252,7 +253,19 @@ public partial class App : Application
     }
 
     /// <summary>Runs a capture with the given options and hands the result to the Editor / Library / clipboard.</summary>
-    internal static async Task CaptureWithOptionsAsync(CaptureOptions options)
+    /// <summary>Captures the same screen rectangle as the last capture, with the same options (no selection step).</summary>
+    internal static Task RepeatLastCaptureAsync()
+    {
+        if (CaptureController.LastSelection is not { } region || CaptureController.LastOptions is not { } options)
+        {
+            MainShell?.SetStatus("Nothing to repeat yet — take a capture first.");
+            return Task.CompletedTask;
+        }
+
+        return CaptureWithOptionsAsync(options with { DelaySeconds = 0 }, region);
+    }
+
+    internal static async Task CaptureWithOptionsAsync(CaptureOptions options, Core.Geometry.PixelRect? fixedRegion = null)
     {
         MainWindow? main = MainShell;
         if (main is null || CaptureController.IsBusy)
@@ -264,7 +277,7 @@ public partial class App : Application
         CaptureResult? result;
         try
         {
-            result = await CaptureController.CaptureAsync(options.Normalized()).ConfigureAwait(true);
+            result = await CaptureController.CaptureAsync(options.Normalized(), fixedRegion).ConfigureAwait(true);
         }
 #pragma warning disable CA1031 // Any capture failure must be reported, not crash the app.
         catch (Exception ex)
