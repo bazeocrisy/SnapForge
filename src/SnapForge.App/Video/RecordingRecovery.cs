@@ -66,7 +66,43 @@ internal static class RecordingRecovery
         return new RecoveryOutcome(r.Id, true, durationMs, r.Bytes, s.FileLength, s.CompleteFragments, $"Recovered {durationMs / 1000.0:0.0} s of an interrupted recording.");
     }
 
-    /// <summary>Duration (from the last decodable video sample), size, audio presence and video sample count.</summary>
+    /// <summary>
+    /// Video duration of a fragmented MP4 from its own boxes (sum of the stored sample durations), or null if the
+    /// file is not fragmented. Media Foundation's writer omits the fragments' start time (tfdt) and the Windows reader
+    /// then mis-times later fragments — decoded timestamps jump by 100–230 ms at a fragment boundary although every
+    /// stored duration is exact (CI runs 96–106; see Mp4Defragmenter). The stored durations are the truth.
+    /// </summary>
+    internal static long? StoredFragmentedDurationMs(string path)
+    {
+        try
+        {
+            if (!Mp4Inspector.Inspect(path).IsFragmented)
+            {
+                return null;
+            }
+
+            Mp4TimingReport t = Mp4Timing.Read(path);
+            foreach ((uint id, (string handler, uint timescale)) in t.Tracks)
+            {
+                if (handler == "vide" && timescale > 0)
+                {
+                    long total = t.Fragments.Where(f => f.TrackId == id).Sum(f => f.TotalDuration);
+                    return total > 0 ? total * 1000 / timescale : null;
+                }
+            }
+
+            return null;
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException)
+        {
+            return null;
+        }
+    }
+
+    /// <summary>
+    /// Duration, size, audio presence and video sample count. Duration: from the stored sample durations for a
+    /// fragmented file (see <see cref="StoredFragmentedDurationMs"/>), else from the last decodable video sample.
+    /// </summary>
     internal static (long DurationMs, int Width, int Height, bool Audio, int VideoSamples) Probe(string path)
     {
         nint reader = Mf.CreateSourceReader(path, 0);
@@ -99,7 +135,8 @@ internal static class RecordingRecovery
             }
 
             long frame = samples > 1 ? last / Math.Max(1, samples - 1) : 0;
-            return ((last + frame) / 10_000, (int)(size >> 32), (int)(size & 0xFFFFFFFF), audio, samples);
+            long durationMs = StoredFragmentedDurationMs(path) ?? ((last + frame) / 10_000);
+            return (durationMs, (int)(size >> 32), (int)(size & 0xFFFFFFFF), audio, samples);
         }
         finally
         {
