@@ -1089,6 +1089,18 @@ public partial class MainWindow : Window
 
     private void OnCopy(object sender, RoutedEventArgs e) => _ = CopyAsync();
 
+    /// <summary>Offline OCR of the open capture as it would be exported (redactions burned in).</summary>
+    private void OnExtractText(object sender, RoutedEventArgs e)
+    {
+        if (_current is null)
+        {
+            SetStatus("Open a capture first, then choose Image → Extract text.");
+            return;
+        }
+
+        Ocr.TextRecognitionWindow.Show(this, RenderFinalImage(), _current.Title);
+    }
+
     private void OnSave(object sender, RoutedEventArgs e) => _ = ExportAsync();
 
     internal PixelBuffer RenderFinalImage()
@@ -1453,6 +1465,7 @@ public partial class MainWindow : Window
                 case Key.OemComma: Handle(e, () => OnSettings(this, e)); return;
                 case Key.S when _current is not null: Handle(e, () => _ = ExportAsync()); return;
                 case Key.W when _current is not null && editorVisible: Handle(e, () => OnCloseCapture(this, e)); return;
+                case Key.T when shift && _current is not null: Handle(e, () => OnExtractText(this, e)); return;
                 case Key.P when shift && _current?.CaptureId is { } pinId:
                     Handle(e, () => _services.Tray.SetPinned(pinId, !_services.Tray.Items.Any(i => i.Id == pinId && i.Pinned)));
                     return;
@@ -1635,11 +1648,10 @@ public partial class MainWindow : Window
     private void OnPrivacyInfo(object sender, RoutedEventArgs e) => App.ShowPrivacyNotice(this);
 
     private void OnAbout(object sender, RoutedEventArgs e) => MessageBox.Show(this,
-        $"{ProductInfo.Name} {typeof(MainWindow).Assembly.GetName().Version}\nBuild: {SnapForge.App.Services.InstanceInfo.ShortBuild(SnapForge.App.Services.InstanceInfo.CurrentBuild)}\n" +
-        $"Commit: {SnapForge.App.Services.InstanceInfo.Commit}\n" +
-        (SnapForge.App.Services.InstanceInfo.Branch is { } branch ? $"Branch: {branch}\n" : string.Empty) +
-        $"{Environment.ProcessPath}\n\nScreen capture, annotation and capture library for Windows.\n\n" +
-        "MIT License — Copyright (c) 2026 bazeocrisy.\nNo network access, no telemetry. Development build.",
+        $"{ProductInfo.Name} — Capture. Create. Share.\n\n{SnapForge.App.Services.InstanceInfo.Describe()}\n\n" +
+        $"Program: {Environment.ProcessPath}\nLibrary: {_services.Library.Root}\n\n" +
+        "Free and open source under the MIT License — Copyright (c) 2026 bazeocrisy. Third-party notices: THIRD-PARTY-NOTICES.md.\n" +
+        "No network access, no telemetry, no account.",
         $"About {ProductInfo.Name}", MessageBoxButton.OK, MessageBoxImage.Information);
 
     private void DescribeDisplays()

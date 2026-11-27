@@ -173,6 +173,8 @@
                         <MenuItem Header="_Crop…" InputGestureText="C" Click="OnCropTool" />
                         <MenuItem Header="_Redact…" InputGestureText="X" Click="OnRedactTool" />
                         <MenuItem Header="_Sanitize capture…" Click="OnSanitize" />
+                        <Separator />
+                        <MenuItem x:Name="ExtractTextMenu" Header="E_xtract text (OCR)…" InputGestureText="Ctrl+Shift+T" Click="OnExtractText" />
                     </MenuItem>
                     <MenuItem Header="_View" SubmenuOpened="OnMenuOpened">
                         <MenuItem Header="_Editor" InputGestureText="Ctrl+E" Click="OnShowEditor" />

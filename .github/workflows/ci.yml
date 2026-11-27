@@ -190,6 +190,19 @@ jobs:
           Write-Output "Exit code: $($p.ExitCode)"
           if ($p.ExitCode -ne 0) { throw "Video self-test failed." }
 
+      - name: Feature self-test (OCR, image transforms, GIF export, scrolling capture, video editing)
+        if: always()
+        timeout-minutes: 10
+        shell: pwsh
+        working-directory: portable
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "feature-selftest"
+          $p = Start-Process -FilePath .\SnapForge.exe -ArgumentList '--feature-selftest', "`"$out`"" -Wait -PassThru
+          if (Test-Path "$out\report.txt") { Get-Content "$out\report.txt" } else { Write-Output "No report written." }
+          Get-ChildItem $out | Format-Table Name, Length -AutoSize | Out-String | Write-Output
+          Write-Output "Exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "Feature self-test failed." }
+
       - name: Crash recovery (kill the process while recording, then recover at start-up)
         if: always()
         timeout-minutes: 5

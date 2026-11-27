@@ -44,6 +44,13 @@ public partial class App : Application
             return;
         }
 
+        if (e.Args.Length >= 2 && e.Args[0] == "--feature-selftest")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(FeatureSelfTest.Run(e.Args[1]));
+            return;
+        }
+
         if (e.Args.Length >= 2 && e.Args[0] == "--drop-target")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;

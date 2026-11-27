@@ -14,7 +14,15 @@
     <RestoreLockedMode Condition="'$(CI)' == 'true'">true</RestoreLockedMode>
     <Company>bazeocrisy</Company>
     <Product>SnapForge</Product>
-    <Version>0.1.0-dev</Version>
+    <!-- Product version. Release candidates are 1.0.0-rc.N; the final release drops the suffix. -->
+    <Version>1.0.0-rc.1</Version>
+    <!-- Windows file version: 1.0.0.<CI run number> (0 for local builds) — shown in Explorer → Properties → Details. -->
+    <SnapForgeBuildNumber Condition="'$(GITHUB_RUN_NUMBER)' != ''">$(GITHUB_RUN_NUMBER)</SnapForgeBuildNumber>
+    <SnapForgeBuildNumber Condition="'$(SnapForgeBuildNumber)' == ''">0</SnapForgeBuildNumber>
+    <FileVersion>1.0.0.$(SnapForgeBuildNumber)</FileVersion>
+    <AssemblyVersion>1.0.0.0</AssemblyVersion>
+    <!-- Development | Release candidate | Release — shown in Help → About. Only an approved release build sets Release. -->
+    <SnapForgeChannel Condition="'$(SnapForgeChannel)' == ''">Release candidate (not approved for public release)</SnapForgeChannel>
     <!-- Build identity shown in About and used by the single-instance check: CI appends the commit (0.1.0-dev+<sha>). -->
     <SourceRevisionId Condition="'$(GITHUB_SHA)' != ''">$(GITHUB_SHA)</SourceRevisionId>
     <Copyright>Copyright (c) 2026 bazeocrisy</Copyright>
@@ -22,6 +30,10 @@
     <SnapForgeSourceBranch Condition="'$(GITHUB_HEAD_REF)' != ''">$(GITHUB_HEAD_REF)</SnapForgeSourceBranch>
     <SnapForgeSourceBranch Condition="'$(SnapForgeSourceBranch)' == '' and '$(GITHUB_REF_NAME)' != ''">$(GITHUB_REF_NAME)</SnapForgeSourceBranch>
   </PropertyGroup>
+  <ItemGroup>
+    <AssemblyMetadata Include="BuildNumber" Value="$(SnapForgeBuildNumber)" />
+    <AssemblyMetadata Include="Channel" Value="$(SnapForgeChannel)" />
+  </ItemGroup>
   <ItemGroup Condition="'$(SnapForgeSourceBranch)' != ''">
     <AssemblyMetadata Include="SourceBranch" Value="$(SnapForgeSourceBranch)" />
   </ItemGroup>

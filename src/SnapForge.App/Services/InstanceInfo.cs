@@ -31,6 +31,33 @@ internal sealed record InstanceInfo(string Build, string ExePath)
         }
     }
 
+    /// <summary>Product version without build metadata, e.g. "1.0.0-rc.1".</summary>
+    public static string ProductVersion
+    {
+        get
+        {
+            int plus = CurrentBuild.IndexOf('+', StringComparison.Ordinal);
+            return plus < 0 ? CurrentBuild : CurrentBuild[..plus];
+        }
+    }
+
+    /// <summary>CI run number of this build ("0" for a local build) — the 4th part of the Windows file version.</summary>
+    public static string BuildNumber { get; } = Metadata("BuildNumber") ?? "0";
+
+    /// <summary>Development / Release candidate / Release.</summary>
+    public static string Channel { get; } = Metadata("Channel") ?? "Development";
+
+    /// <summary>Process architecture, e.g. "x64".</summary>
+    public static string Architecture => System.Runtime.InteropServices.RuntimeInformation.ProcessArchitecture.ToString().ToLowerInvariant();
+
+    /// <summary>All identity lines for Help → About and diagnostics.</summary>
+    public static string Describe() =>
+        $"Version: {ProductVersion}\nBuild: {BuildNumber} ({Architecture})\nCommit: {Commit}\n" +
+        (Branch is { } b ? $"Branch: {b}\n" : string.Empty) + $"Status: {Channel}";
+
+    private static string? Metadata(string key) =>
+        typeof(InstanceInfo).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(a => a.Key == key)?.Value;
+
     /// <summary>The Git branch this build came from, when CI recorded it.</summary>
     public static string? Branch { get; } =
         typeof(InstanceInfo).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(a => a.Key == "SourceBranch")?.Value;
