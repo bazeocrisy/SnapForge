@@ -861,6 +861,8 @@ public partial class MainWindow : Window
         AnnotationTool.StepMarker => "Click to place the next numbered step.",
         AnnotationTool.Highlight => "Drag over content to highlight it.",
         AnnotationTool.Crop => "Drag the area to keep. The rest is removed (Undo restores it while editing).",
+        AnnotationTool.Blur => "Drag over an area to blur it. Blur is not redaction — use Redact (X) for passwords and personal data.",
+        AnnotationTool.Pixelate => "Drag over an area to pixelate it. Pixelation is not redaction — use Redact (X) for sensitive data.",
         AnnotationTool.Redact => "Drag over sensitive content. Exports contain only the black box; the editable Library copy keeps originals until you sanitize.",
         _ => "Drag to draw. Hold Shift to constrain.",
     };
@@ -964,6 +966,60 @@ public partial class MainWindow : Window
     private void OnCropTool(object sender, RoutedEventArgs e) => CropTool.IsChecked = true;
 
     private void OnRedactTool(object sender, RoutedEventArgs e) => RedactTool.IsChecked = true;
+
+    private void OnBlurTool(object sender, RoutedEventArgs e) => BlurTool.IsChecked = true;
+
+    private void OnPixelateTool(object sender, RoutedEventArgs e) => PixelateTool.IsChecked = true;
+
+    /// <summary>Runs an undoable whole-image command on the open capture and reports it.</summary>
+    private void ApplyImageCommand(Func<EditorDocument, IEditCommand?> create, string done)
+    {
+        if (_current?.Document is not { } doc)
+        {
+            SetStatus("Open a capture first.");
+            return;
+        }
+
+        Editor.CommitTextEdit();
+        try
+        {
+            if (create(doc) is { } command)
+            {
+                doc.Execute(command);
+                SetStatus($"{done} — {doc.Image.Width} × {doc.Image.Height} px. Undo (Ctrl+Z) reverses it.");
+            }
+        }
+        catch (ArgumentException ex)
+        {
+            MessageBox.Show(this, ex.Message, ProductInfo.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private void OnRotateRight(object sender, RoutedEventArgs e) => ApplyImageCommand(_ => new TransformImageCommand(ImageTransform.Rotate90), "Rotated right");
+
+    private void OnRotateLeft(object sender, RoutedEventArgs e) => ApplyImageCommand(_ => new TransformImageCommand(ImageTransform.Rotate270), "Rotated left");
+
+    private void OnRotate180(object sender, RoutedEventArgs e) => ApplyImageCommand(_ => new TransformImageCommand(ImageTransform.Rotate180), "Rotated 180°");
+
+    private void OnFlipHorizontal(object sender, RoutedEventArgs e) => ApplyImageCommand(_ => new TransformImageCommand(ImageTransform.FlipHorizontal), "Flipped horizontally");
+
+    private void OnFlipVertical(object sender, RoutedEventArgs e) => ApplyImageCommand(_ => new TransformImageCommand(ImageTransform.FlipVertical), "Flipped vertically");
+
+    private void OnResizeImage(object sender, RoutedEventArgs e) => ApplyImageCommand(
+        doc => Dialogs.ResizeImageDialog.Ask(this, doc.Image.Width, doc.Image.Height) is { } size ? new ResizeImageCommand(size.Width, size.Height) : null,
+        "Resized");
+
+    private void OnCanvasSize(object sender, RoutedEventArgs e) => ApplyImageCommand(
+        doc => Dialogs.CanvasSizeDialog.Ask(this, doc.Image.Width, doc.Image.Height) is { } c ? new ResizeCanvasCommand(c.Width, c.Height, c.Anchor, ArgbColor.White) : null,
+        "Canvas resized");
+
+    private void OnAddBorder(object sender, RoutedEventArgs e) => ApplyImageCommand(
+        _ => Dialogs.BorderDialog.Ask(this) is { } t ? new AddBorderCommand(t, Editor.CurrentColor) : null,
+        "Border added");
+
+    private void OnAddShadow(object sender, RoutedEventArgs e) => ApplyImageCommand(
+        _ => new AddDropShadowCommand(8, 8, 10, new ArgbColor(110, 0, 0, 0), ArgbColor.White),
+        "Drop shadow added");
 
     private void Undo()
     {
@@ -1494,6 +1550,10 @@ public partial class MainWindow : Window
                 case Key.D3 or Key.NumPad3: Handle(e, () => OnCaptureDisplay(this, e)); return;
                 case Key.D4 or Key.NumPad4: Handle(e, () => OnCaptureAll(this, e)); return;
                 case Key.D5 or Key.NumPad5: Handle(e, () => OnCaptureActiveWindow(this, e)); return;
+                case Key.OemCloseBrackets when _current is not null: Handle(e, () => OnRotateRight(this, e)); return;
+                case Key.OemOpenBrackets when _current is not null: Handle(e, () => OnRotateLeft(this, e)); return;
+                case Key.I when alt && _current is not null: Handle(e, () => OnResizeImage(this, e)); return;
+                case Key.C when alt && _current is not null: Handle(e, () => OnCanvasSize(this, e)); return;
                 case Key.R when !shift: Handle(e, () => OnRepeatLastCapture(this, e)); return;
                 case Key.V when shift: Handle(e, () => OnNewFromClipboard(this, e)); return;
                 case Key.N: Handle(e, () => OnNewCapture(this, e)); return;
@@ -1548,6 +1608,8 @@ public partial class MainWindow : Window
             case Key.N: Handle(e, () => StepTool.IsChecked = true); return;
             case Key.X: Handle(e, () => RedactTool.IsChecked = true); return;
             case Key.C: Handle(e, () => CropTool.IsChecked = true); return;
+            case Key.B: Handle(e, () => BlurTool.IsChecked = true); return;
+            case Key.P: Handle(e, () => PixelateTool.IsChecked = true); return;
         }
     }
 

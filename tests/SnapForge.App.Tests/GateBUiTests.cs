@@ -106,7 +106,7 @@ public class GateBUiTests
             // Selection dropdown: every item maps to a working capture mode.
             panel.SelectionButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
             ContextMenu menu = panel.SelectionButton.ContextMenu!;
-            Assert.Equal(["Region", "Window", "Display", "Full screen"], menu.Items.OfType<MenuItem>().Select(i => (string)i.Header));
+            Assert.Equal(["Region", "Window", "Active window", "Display", "Full screen"], menu.Items.OfType<MenuItem>().Select(i => (string)i.Header));
             menu.Items.OfType<MenuItem>().Single(i => (string)i.Header == "Window").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
             menu.IsOpen = false;
             await Task.Delay(100);

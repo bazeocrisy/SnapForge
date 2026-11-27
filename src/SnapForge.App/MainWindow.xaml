@@ -172,6 +172,19 @@
                         <MenuItem Header="_Redact…" InputGestureText="X" Click="OnRedactTool" />
                         <MenuItem Header="_Sanitize capture…" Click="OnSanitize" />
                         <Separator />
+                        <MenuItem Header="Rotate _right 90°" InputGestureText="Ctrl+]" Click="OnRotateRight" />
+                        <MenuItem Header="Rotate _left 90°" InputGestureText="Ctrl+[" Click="OnRotateLeft" />
+                        <MenuItem Header="Rotate 1_80°" Click="OnRotate180" />
+                        <MenuItem Header="Flip _horizontal" Click="OnFlipHorizontal" />
+                        <MenuItem Header="Flip _vertical" Click="OnFlipVertical" />
+                        <Separator />
+                        <MenuItem Header="Resize _image…" InputGestureText="Ctrl+Alt+I" Click="OnResizeImage" />
+                        <MenuItem Header="Canvas si_ze…" InputGestureText="Ctrl+Alt+C" Click="OnCanvasSize" />
+                        <MenuItem Header="Add _border…" Click="OnAddBorder" />
+                        <MenuItem Header="Add drop s_hadow" Click="OnAddShadow" />
+                        <MenuItem Header="_Blur area" InputGestureText="B" Click="OnBlurTool" />
+                        <MenuItem Header="_Pixelate area" InputGestureText="P" Click="OnPixelateTool" />
+                        <Separator />
                         <MenuItem x:Name="ExtractTextMenu" Header="E_xtract text (OCR)…" InputGestureText="Ctrl+Shift+T" Click="OnExtractText" />
                     </MenuItem>
                     <MenuItem Header="_View" SubmenuOpened="OnMenuOpened">
@@ -289,6 +302,12 @@
                             <Rectangle Style="{StaticResource Separator}" Height="32" />
                             <RadioButton x:Name="RedactTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Redact" Checked="OnToolChecked" ToolTip="Redact (X) — blacks out pixels in every export" AutomationProperties.Name="Redact tool">
                                 <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconRedact}" /><TextBlock Text="Redact" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="BlurTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Blur" Checked="OnToolChecked" ToolTip="Blur (B) — softens an area. Not redaction: use Redact for sensitive data" AutomationProperties.Name="Blur tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconBlur}" /><TextBlock Text="Blur" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="PixelateTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Pixelate" Checked="OnToolChecked" ToolTip="Pixelate (P) — coarse blocks. Not redaction: use Redact for sensitive data" AutomationProperties.Name="Pixelate tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconPixelate}" /><TextBlock Text="Pixelate" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="CropTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Crop" Checked="OnToolChecked" ToolTip="Crop (C) — drag the area to keep" AutomationProperties.Name="Crop tool">
                                 <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconCrop}" /><TextBlock Text="Crop" FontSize="10" HorizontalAlignment="Center" /></StackPanel>

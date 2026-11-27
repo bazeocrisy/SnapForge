@@ -64,6 +64,12 @@ internal sealed class AnnotationCanvas : Canvas
 
     public ArgbColor RedactionColor { get; set; } = ArgbColor.Black;
 
+    /// <summary>Blur tool strength (box-blur radius in pixels).</summary>
+    public int BlurRadius { get; set; } = 8;
+
+    /// <summary>Pixelate tool block size in pixels.</summary>
+    public int PixelateBlockSize { get; set; } = 12;
+
     /// <summary>The selected annotation, if any (for the Tool Properties panel).</summary>
     public Annotation? Selected => SelectedAnnotation();
 
@@ -433,7 +439,7 @@ internal sealed class AnnotationCanvas : Canvas
             return;
         }
 
-        if (Tool is AnnotationTool.Redact or AnnotationTool.Crop)
+        if (Tool is AnnotationTool.Redact or AnnotationTool.Crop or AnnotationTool.Blur or AnnotationTool.Pixelate)
         {
             _redactPreview = RectD.FromPoints(start, p).ToCoveringPixelRect().Intersect(_document.Image.Bounds);
         }
@@ -493,6 +499,16 @@ internal sealed class AnnotationCanvas : Canvas
             if (region.Width >= 4 && region.Height >= 4)
             {
                 _document.Execute(new CropCommand(region));
+            }
+        }
+        else if (Tool is AnnotationTool.Blur or AnnotationTool.Pixelate)
+        {
+            PixelRect region = RectD.FromPoints(start, p).ToCoveringPixelRect().Intersect(_document.Image.Bounds);
+            if (region.Width >= 2 && region.Height >= 2)
+            {
+                _document.Execute(Tool == AnnotationTool.Blur
+                    ? new ApplyRegionEffectCommand(region, RegionEffect.Blur, BlurRadius)
+                    : new ApplyRegionEffectCommand(region, RegionEffect.Pixelate, PixelateBlockSize));
             }
         }
         else if (BuildShape(Tool, start, p, constrain) is { } shape && !IsDegenerate(shape))

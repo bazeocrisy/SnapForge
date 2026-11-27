@@ -12,4 +12,10 @@ public enum AnnotationTool
     StepMarker,
     Redact,
     Crop,
+
+    /// <summary>Blurs a region of the image (not redaction: shapes and large text may stay recognisable).</summary>
+    Blur,
+
+    /// <summary>Pixelates a region of the image (not redaction).</summary>
+    Pixelate,
 }
