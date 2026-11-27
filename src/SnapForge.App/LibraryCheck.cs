@@ -36,22 +36,16 @@ internal static class LibraryCheck
                 lines.Add($"INFO damaged item {r.Id}: {r.Damage}");
             }
 
-            int verified = 0;
-            foreach (CaptureRecord r in all.Where(r => !r.IsVideo && r.Damage is null))
+            // Full integrity scan (FA-008/015): every image generation and every video against its recorded SHA-256.
+            LibraryIntegrityReport integrity = library.VerifyLibrary();
+            var damagedAtIndex = all.Where(r => r.Damage is not null).Select(r => r.Id).ToHashSet();
+            foreach (ItemIntegrityReport item in integrity.Items.Where(i => i.Status == IntegrityStatus.Damaged && !damagedAtIndex.Contains(i.Id)))
             {
-                try
-                {
-                    library.Load(r.Id);
-                    verified++;
-                }
-                catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
-                {
-                    ok = false;
-                    lines.Add($"FAIL image {r.Id}: {ex.Message}");
-                }
+                ok = false;
+                lines.Add($"FAIL {item.Kind} {item.Id}: {item.Message}");
             }
 
-            lines.Add($"{(verified == images ? "PASS" : "FAIL")} image integrity: {verified}/{images} loaded with valid hashes");
+            lines.Add($"{(ok ? "PASS" : "FAIL")} integrity: {integrity.VerifiedCount} verified, {integrity.HashRecordedNowCount} legacy video hash(es) recorded now, {integrity.DamagedCount} damaged ({damagedAtIndex.Count} already reported as damaged)");
             if (expectImages is int ei)
             {
                 ok &= Expect(lines, "image count", images, ei);

@@ -178,7 +178,7 @@ internal sealed class ResizeImageDialog : ImageDialogBase
 
         if ((long)w * h > ImageOps.MaxPixelCount)
         {
-            Error.Text = "That image would be too large (over 400 million pixels).";
+            Error.Text = $"That image would be too large (over {ImageOps.MaxPixelCount:N0} pixels).";
             return false;
         }
 

@@ -209,7 +209,7 @@ public class LibraryWorkflowTests
     });
 
     [Fact]
-    public void Storage_location_change_moves_all_captures() => UiThread.Run(async () =>
+    public void FA007_storage_location_change_copies_verifies_and_deletes_old_files_only_after_confirmation() => UiThread.Run(async () =>
     {
         AppServices services = TestServices.Create();
         MainWindow w = NewWindow(services);
@@ -218,14 +218,43 @@ public class LibraryWorkflowTests
         await w.FlushAllAsync();
         string oldRoot = services.Library.Root;
         string newRoot = Path.Combine(Path.GetTempPath(), "snapforge-apptests", Guid.NewGuid().ToString("N"), "moved");
+        bool asked = false;
 
-        await services.MoveLibraryAsync(newRoot);
+        LibraryRelocationOutcome outcome = await services.RelocateLibraryAsync(newRoot, copy =>
+        {
+            asked = true;
+            // When asked, the new location is already saved durably and in use.
+            Assert.Equal(Path.GetFullPath(newRoot), AppSettings.Load(services.SettingsPath).LibraryPath);
+            return true;
+        });
+        Assert.True(asked);
+        Assert.Null(outcome.SettingsError);
         Assert.Equal(Path.GetFullPath(newRoot), services.Library.Root);
-        Assert.Equal(services.Library.Root, AppSettings.Load(services.SettingsPath).LibraryPath);
         Assert.Single(services.Library.Records);
-        Assert.Empty(Directory.GetDirectories(Path.Combine(oldRoot, "captures")));
+        Assert.NotNull(outcome.Cleanup);
+        Assert.Empty(Directory.GetFiles(Path.Combine(oldRoot, "captures"), "*", SearchOption.AllDirectories));
         services.Library.Load(s.CaptureId!.Value);
         Assert.Contains(services.Tray.Items, i => i.Id == s.CaptureId);
+        await Close(w);
+    });
+
+    [Fact]
+    public void FA007_declining_cleanup_keeps_the_complete_old_library() => UiThread.Run(async () =>
+    {
+        AppServices services = TestServices.Create();
+        MainWindow w = NewWindow(services);
+        EditorSession s = w.LoadImage(TestImages.Gradient(40, 40), DateTime.Now);
+        await WaitFor(() => s.InLibrary);
+        await w.FlushAllAsync();
+        string oldRoot = services.Library.Root;
+        int oldFiles = Directory.GetFiles(oldRoot, "*", SearchOption.AllDirectories).Length;
+        string newRoot = Path.Combine(Path.GetTempPath(), "snapforge-apptests", Guid.NewGuid().ToString("N"), "moved");
+
+        LibraryRelocationOutcome outcome = await services.RelocateLibraryAsync(newRoot, _ => false);
+        Assert.Null(outcome.Cleanup);
+        Assert.Equal(Path.GetFullPath(newRoot), services.Library.Root);
+        Assert.Equal(oldFiles, Directory.GetFiles(oldRoot, "*", SearchOption.AllDirectories).Length);
+        Assert.NotNull(Core.Library.CaptureLibrary.Open(oldRoot).Find(s.CaptureId!.Value));
         await Close(w);
     });
 

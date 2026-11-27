@@ -771,7 +771,8 @@ public partial class LibraryView : UserControl
             }
 
             string target = dialog.FileName;
-            await RunAsync(() => File.Copy(_services!.Library.VideoPath(videos[0].Id), target, overwrite: true), $"Exported {target}").ConfigureAwait(true);
+            // FA-008: streamed, hash-verified export (temp + flush + rename); a damaged video is not exported.
+            await RunAsync(() => _services!.Library.ExportVideo(videos[0].Id, target), $"Exported {target}").ConfigureAwait(true);
             return;
         }
 
@@ -791,7 +792,7 @@ public partial class LibraryView : UserControl
         {
             foreach (CaptureRecord v in videos)
             {
-                File.Copy(_services!.Library.VideoPath(v.Id), Path.Combine(folder, SnapForge.Core.Export.ExportFileNames.For(v.Title, v.CreatedUtc.ToLocalTime(), ".mp4", used)));
+                _services!.Library.ExportVideo(v.Id, Path.Combine(folder, SnapForge.Core.Export.ExportFileNames.For(v.Title, v.CreatedUtc.ToLocalTime(), ".mp4", used)));
             }
         }, $"Exported {videos.Count} videos to {folder}").ConfigureAwait(true);
     }

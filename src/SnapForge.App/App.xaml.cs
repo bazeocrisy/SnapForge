@@ -165,6 +165,9 @@ public partial class App : Application
         }
 
         AppServices.Current = services;
+        bool startedHidden = args.Contains(StartupRegistration.BackgroundArgument);
+        ReportSettingsLoad(services, startedHidden);
+        services.SettingsSaveFailed += (_, message) => Current.Dispatcher.BeginInvoke(() => ReportSettingsSaveFailure(message));
         ThemeManager.Apply(services.Settings.Theme);
 
         // Leftover drag-and-drop copies from a previous session (e.g. after a crash) are removed in the background.
@@ -275,6 +278,46 @@ public partial class App : Application
         }
 
         return error is null ? 0 : 2;
+    }
+
+    /// <summary>FA-019: tell the user when settings were damaged, written by a newer version or unreadable.</summary>
+    private static void ReportSettingsLoad(AppServices services, bool background)
+    {
+        if (services.SettingsLoad is not { } load || load.Status is SettingsLoadStatus.Loaded or SettingsLoadStatus.Missing)
+        {
+            return;
+        }
+
+        string text = load.Status switch
+        {
+            SettingsLoadStatus.NewerVersion => "Your settings were saved by a newer version of SnapForge. This version uses default settings for now and will NOT change that file, so the newer version keeps your settings.",
+            SettingsLoadStatus.Damaged => $"Your settings file was damaged, so default settings are used. A copy of the damaged file was kept:\n{load.DamagedCopyPath}",
+            _ => $"Your settings file could not be read ({load.Message}). Default settings are used and the file is left unchanged.",
+        };
+        if (background)
+        {
+            NotifyBalloon(ProductInfo.Name, text, warning: true);
+        }
+        else
+        {
+            MessageBox.Show(text + "\n\nYour captures are not affected.", ProductInfo.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private static bool _settingsFailureShown;
+
+    /// <summary>FA-020: settings that could not be saved are reported once per session (they stay in effect until exit).</summary>
+    private static void ReportSettingsSaveFailure(string message)
+    {
+        MainShell?.SetStatus($"Settings could not be saved: {message}");
+        if (_settingsFailureShown)
+        {
+            return;
+        }
+
+        _settingsFailureShown = true;
+        MessageBox.Show($"Your SnapForge settings could not be saved:\n{message}\n\nThe change applies until you exit SnapForge. Check that there is free disk space and that you can write to:\n{AppSettings.DefaultPath()}",
+            ProductInfo.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
     }
 
     /// <summary>True when this process was started by Windows at sign-in (tests and diagnostics).</summary>

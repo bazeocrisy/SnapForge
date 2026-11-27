@@ -275,8 +275,16 @@ public partial class SettingsWindow : Window
         }
 
         string target = dialog.FolderName;
+        if (Video.RecordingController.IsActive)
+        {
+            MessageBox.Show(this, "Stop the recording first. The Library cannot be moved while recording.", "Move Capture Library", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
         if (MessageBox.Show(this,
-                $"Move all captures to:\n{target}\n\nThe captures are copied and verified, then the old copies are overwritten and removed. Avoid cloud-synced folders (OneDrive, Dropbox) unless you want your captures uploaded by that service.",
+                $"Move the Capture Library to:\n{target}\n\nEvery file is copied and verified byte for byte first. SnapForge then switches to the new location. " +
+                "The old copy is only deleted if you confirm afterwards — and only files that were verified at the new location.\n\n" +
+                "Avoid cloud-synced folders (OneDrive, Dropbox) unless you want your captures uploaded by that service. Keep a backup until you have checked the new location.",
                 "Move Capture Library", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
         {
             return;
@@ -290,12 +298,32 @@ public partial class SettingsWindow : Window
                 await main.FlushAllAsync().ConfigureAwait(true);
             }
 
-            await _services.MoveLibraryAsync(target).ConfigureAwait(true);
-            MessageBox.Show(this, $"The Capture Library is now in:\n{_services.Library.Root}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+            LibraryRelocationOutcome outcome = await _services.RelocateLibraryAsync(target, copy => MessageBox.Show(this,
+                    $"All {copy.Files.Count} file(s) ({copy.ItemCount} item(s), {copy.DamagedCount} damaged, {copy.InterruptedRecordingCount} interrupted recording(s)) were copied to\n{copy.TargetRoot}\nand verified. SnapForge now uses the new location." +
+                    (copy.Warnings.Count > 0 ? "\n\nNote:\n• " + string.Join("\n• ", copy.Warnings) : string.Empty) +
+                    $"\n\nDelete the old copy in\n{copy.SourceRoot}\nnow? Choose No to keep it (you can delete it yourself later).",
+                    "Move Capture Library", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes).ConfigureAwait(true);
+            if (outcome.SettingsError is { } error)
+            {
+                MessageBox.Show(this, $"The captures were copied and verified to\n{outcome.Copy.TargetRoot}\nbut the new location could not be saved:\n{error}\n\nSnapForge keeps using the old Library; nothing was deleted.",
+                    "Move Capture Library", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else if (outcome.Cleanup is { } cleanup)
+            {
+                string left = cleanup.LeftInPlace.Count + cleanup.Changed.Count > 0
+                    ? $"\n\n{cleanup.LeftInPlace.Count + cleanup.Changed.Count} file(s) were left in the old location because they were not part of the verified copy or changed since:\n{outcome.Copy.SourceRoot}"
+                    : string.Empty;
+                MessageBox.Show(this, $"The Capture Library is now in:\n{_services.Library.Root}\n\n{cleanup.Deleted.Count} verified file(s) were removed from the old location.{left}",
+                    "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show(this, $"The Capture Library is now in:\n{_services.Library.Root}\n\nThe old copy was kept in:\n{outcome.Copy.SourceRoot}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException)
         {
-            MessageBox.Show(this, $"The library was not moved:\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, $"The library was not moved (the current Library is unchanged):\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
         }
         finally
         {
@@ -358,12 +386,26 @@ public partial class SettingsWindow : Window
                 await main.FlushAllAsync().ConfigureAwait(true);
             }
 
-            int n = await _services.Writer.RunAsync(() => _services.Library.Backup(dialog.FileName)).ConfigureAwait(true);
-            MessageBox.Show(this, $"Backed up {n} capture(s) to:\n{dialog.FileName}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+            IsEnabled = false;
+            BackupResult r = await _services.Writer.RunAsync(() => _services.Library.CreateBackup(dialog.FileName)).ConfigureAwait(true);
+            string excluded = r.Excluded.Count == 0
+                ? "Nothing was left out."
+                : $"{r.Excluded.Count} item(s) could not be included:\n• " + string.Join("\n• ", r.Excluded.Take(10).Select(x => $"{x.Path}: {x.Reason}")) + (r.Excluded.Count > 10 ? "\n• …" : string.Empty);
+            string warnings = r.Warnings.Count == 0 ? string.Empty : "\n\nNotes:\n• " + string.Join("\n• ", r.Warnings.Take(10));
+            MessageBox.Show(this,
+                $"Backed up to:\n{r.Path}\n\n{r.ImageCount} image(s), {r.VideoCount} recording(s), {r.TrashCount} in the Trash, {r.DamagedOrIncompleteCount} damaged or incomplete item(s) (copied as they are, for recovery); {r.TotalBytes / (1024.0 * 1024.0):0.#} MB. Every file is listed with its SHA-256 checksum.\n\n{excluded}{warnings}\n\nKeep the backup on another drive.",
+                "SnapForge", MessageBoxButton.OK, r.Excluded.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, $"The backup failed:\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, $"The backup failed (any partial file was removed):\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            IsEnabled = true;
         }
     }
 
@@ -377,12 +419,24 @@ public partial class SettingsWindow : Window
 
         try
         {
-            int n = await _services.Writer.RunAsync(() => _services.Library.RestoreBackup(dialog.FileName)).ConfigureAwait(true);
-            MessageBox.Show(this, n == 0 ? "Nothing to restore: every capture in the backup is already in the Library." : $"Restored {n} capture(s).", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+            IsEnabled = false;
+            RestoreResult r = await _services.Writer.RunAsync(() => _services.Library.RestoreFromBackup(dialog.FileName)).ConfigureAwait(true);
+            string legacy = r.IsLegacyImageOnlyBackup ? "This is an older image-only backup (format 1): it never contained recordings.\n\n" : string.Empty;
+            string excludedAtBackup = r.ExcludedAtBackup.Count == 0 ? string.Empty : $"\n{r.ExcludedAtBackup.Count} item(s) had been left out when the backup was made.";
+            MessageBox.Show(this,
+                $"{legacy}Restored {r.Restored.Count} item(s). {r.SkippedExisting.Count} item(s) were already in the Library and were not changed.{excludedAtBackup}",
+                "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (OperationCanceledException)
+        {
         }
         catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
         {
-            MessageBox.Show(this, $"The backup could not be restored:\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show(this, $"The backup could not be restored. Nothing was added to or changed in your Library.\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            IsEnabled = true;
         }
 
         Load();

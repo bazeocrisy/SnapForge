@@ -563,11 +563,9 @@ jobs:
           # 2. Representative user data: the legacy library fixture written by the rc.1 storage code (captures with
           #    annotations and redactions, Trash, tags/folders, a video, a damaged item) plus settings and a marker.
           New-Item -ItemType Directory -Force "$data\Library" | Out-Null
-          if (Test-Path tests\fixtures\legacy-v1-library) {
-            Copy-Item tests\fixtures\legacy-v1-library\* "$data\Library" -Recurse -Force
-            if (Test-Path tests\fixtures\legacy-settings.json) { Copy-Item tests\fixtures\legacy-settings.json "$data\settings.json" }
-            Write-Output "INFO seeded the legacy library fixture"
-          } else { Write-Output "WARN tests/fixtures/legacy-v1-library missing; seeding a marker only" }
+          # (The fixture's settings.json points the Library at D:\Shots, so only the Library folder is used here.)
+          Copy-Item tests\fixtures\legacy-v1-library\library\* "$data\Library" -Recurse -Force
+          Write-Output "INFO seeded the legacy (rc.1-format) library fixture: 3 images incl. 1 in Trash, 1 video, 1 damaged"
           New-Item -ItemType Directory -Force "$data\Library\keep-me" | Out-Null
           Set-Content "$data\Library\keep-me\marker.txt" "user data"
           $before = DataHash
@@ -604,7 +602,7 @@ jobs:
           $p = Start-Process -FilePath "$machine\SnapForge.exe" -ArgumentList '--self-test', "`"$env:RUNNER_TEMP\installed-self-test.txt`"" -Wait -PassThru
           Get-Content "$env:RUNNER_TEMP\installed-self-test.txt"
           if ($p.ExitCode -ne 0) { throw "installed app self-test failed" }
-          $p = Start-Process -FilePath "$machine\SnapForge.exe" -ArgumentList '--library-check', "`"$env:RUNNER_TEMP\library-check.txt`"" -Wait -PassThru
+          $p = Start-Process -FilePath "$machine\SnapForge.exe" -ArgumentList '--library-check', "`"$env:RUNNER_TEMP\library-check.txt`"", '--expect-images', '3', '--expect-videos', '1' -Wait -PassThru
           Get-Content "$env:RUNNER_TEMP\library-check.txt"
           if ($p.ExitCode -ne 0) { throw "library check after upgrade failed" }
           Write-Output "PASS rc.2 opened the rc.1 user library (see report above)"
