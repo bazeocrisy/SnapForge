@@ -536,6 +536,7 @@ public class GateBUiTests
             Topmost = true;
             Background = Brushes.LightSteelBlue;
             DragEnter += (_, _) => Log("target: drag enter");
+            DragLeave += (_, _) => Log("target: drag leave");
             DragOver += (_, e) =>
             {
                 e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
@@ -621,6 +622,11 @@ public class GateBUiTests
             Thread.Sleep(Step);
         }
 
+        // Hover at the destination as a person does: a small move there makes OLE send a DragOver at the final
+        // position, so the target's answer (copy / none) is current when the button is released.
+        NativeInput.MoveTo(x2 + 1, y2 + 1);
+        Thread.Sleep(Step);
+        NativeInput.MoveTo(x2, y2);
         Thread.Sleep(Step * 4);
         if (cancelWithRightClick)
         {
@@ -658,9 +664,10 @@ public class GateBUiTests
             target.Show();
             await Task.Delay(300);
             (int dx, int dy) = Centre(target);
+            PixelRect targetBounds = PhysicalPlacement.GetBounds(target)!.Value;
 
             await SlowDrag(tx, ty, dx, dy);
-            await WaitFor(() => target.Files is not null, 10, TraceText);
+            await WaitFor(() => target.Files is not null, 10, () => $"{TraceText()} | target bounds {targetBounds.X},{targetBounds.Y} {targetBounds.Width}x{targetBounds.Height}");
             string file = Assert.Single(target.Files!);
             Assert.True(File.Exists(file));
             Assert.EndsWith(".png", file, StringComparison.Ordinal);
@@ -946,9 +953,10 @@ public class GateBUiTests
             target.Show();
             await Task.Delay(300);
             (int dx, int dy) = Centre(target);
+            PixelRect targetBounds = PhysicalPlacement.GetBounds(target)!.Value;
 
             await SlowDrag(tx, ty, dx, dy);
-            await WaitFor(() => target.Files is not null, 10, TraceText);
+            await WaitFor(() => target.Files is not null, 10, () => $"{TraceText()} | target bounds {targetBounds.X},{targetBounds.Y} {targetBounds.Width}x{targetBounds.Height}");
             Assert.Equal(3, target.Files!.Length);
             Assert.Equal(3, target.Files.Select(Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
             Assert.All(target.Files, f => Assert.Equal((80, 60), (Decode(f).Width, Decode(f).Height)));
