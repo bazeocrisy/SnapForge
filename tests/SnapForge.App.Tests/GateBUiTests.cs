@@ -51,7 +51,7 @@ public class GateBUiTests
         {
             // SF-005: small (about 520 × 360 DIP at most), tabs on top, a full-width rectangular primary action.
             var content = (FrameworkElement)panel.Content;
-            Assert.InRange(content.ActualWidth, 440, 520);
+            Assert.InRange(content.ActualWidth, 440, 560); // 540-DIP window since rc.2 ("Active window" was cut off at 500)
             Assert.InRange(content.ActualHeight, 200, 420); // compact: measured 384 DIP on CI (run 90)
             Assert.True(content.ActualWidth > content.ActualHeight, "panel should be wider than tall");
             Assert.True(panel.CaptureButton.ActualWidth > content.ActualWidth * 0.55, "the primary action spans the panel");
@@ -59,6 +59,16 @@ public class GateBUiTests
             Point tabs = panel.ModeTabs.TranslatePoint(new Point(0, 0), content);
             Point action = panel.CaptureButton.TranslatePoint(new Point(0, 0), content);
             Assert.True(tabs.Y < action.Y, "tabs at the top, action at the bottom");
+
+            // Every capture-type label fits its chip (the rc.2 screenshot showed "Active windo").
+            foreach (RadioButton chip in panel.TargetChips.Children.OfType<RadioButton>())
+            {
+                double shown = chip.ActualWidth;
+                chip.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
+                Assert.True(chip.DesiredSize.Width <= shown + 0.5, $"\"{chip.Content}\" needs {chip.DesiredSize.Width:0.#} DIP but has {shown:0.#}");
+            }
+
+            panel.UpdateLayout();
 
             Assert.True(panel.ImageMode.IsChecked);
             Assert.True(panel.ImageMode.IsEnabled);
