@@ -564,6 +564,29 @@ public class GateBUiTests
     /// <summary>Events seen during the current drag test (included in failure messages).</summary>
     private static readonly List<string> Trace = [];
 
+    static GateBUiTests()
+    {
+        // Diagnostics for the drag tests: any tooltip or popup that opens during a drag, and where it is.
+        EventManager.RegisterClassHandler(typeof(ToolTip), ToolTip.OpenedEvent, new RoutedEventHandler((o, _) =>
+        {
+            if (o is ToolTip t && CaptureDragDrop.IsDragging)
+            {
+                string where;
+                try
+                {
+                    Point p = t.PointToScreen(new Point(0, 0));
+                    where = $"{p.X:0},{p.Y:0} {t.ActualWidth:0}x{t.ActualHeight:0}";
+                }
+                catch (InvalidOperationException)
+                {
+                    where = "(not placed)";
+                }
+
+                Log($"tooltip opened during the drag: '{t.Content}' at {where}");
+            }
+        }));
+    }
+
     private static void Log(string message)
     {
         lock (Trace)
@@ -625,10 +648,18 @@ public class GateBUiTests
         Thread.Sleep(Step * 2);
         NativeInput.LeftDown();
         Thread.Sleep(Step * 2);
+        string under = string.Empty;
         for (int i = 1; i <= 16; i++)
         {
-            NativeInput.MoveTo(x1 + ((x2 - x1) * i / 16), y1 + ((y2 - y1) * i / 16));
+            int x = x1 + ((x2 - x1) * i / 16), y = y1 + ((y2 - y1) * i / 16);
+            NativeInput.MoveTo(x, y);
             Thread.Sleep(Step);
+            string now = NativeInput.WindowAt(x, y);
+            if (now != under)
+            {
+                under = now;
+                Log($"window under {x},{y}: {now}");
+            }
         }
 
         // Hover at the destination as a person does: a small move there makes OLE send a DragOver at the final
@@ -643,7 +674,7 @@ public class GateBUiTests
             Thread.Sleep(Step * 2);
         }
 
-        Log($"up at {x2},{y2}; dragging={CaptureDragDrop.IsDragging}");
+        Log($"up at {x2},{y2}; dragging={CaptureDragDrop.IsDragging}; window under: {NativeInput.WindowAt(x2, y2)}");
         NativeInput.LeftUp();
         Thread.Sleep(Step * 6);
         Log($"after up; dragging={CaptureDragDrop.IsDragging}");
@@ -676,7 +707,7 @@ public class GateBUiTests
             PixelRect targetBounds = PhysicalPlacement.GetBounds(target)!.Value;
 
             await SlowDrag(tx, ty, dx, dy);
-            await WaitFor(() => target.Files is not null, 10, () => $"{TraceText()} | target bounds {targetBounds.X},{targetBounds.Y} {targetBounds.Width}x{targetBounds.Height}");
+            await WaitFor(() => target.Files is not null, 10, () => $"{TraceText()} | target 0x{new WindowInteropHelper(target).Handle:X} bounds {targetBounds.X},{targetBounds.Y} {targetBounds.Width}x{targetBounds.Height}");
             string file = Assert.Single(target.Files!);
             Assert.True(File.Exists(file));
             Assert.EndsWith(".png", file, StringComparison.Ordinal);
@@ -965,7 +996,7 @@ public class GateBUiTests
             PixelRect targetBounds = PhysicalPlacement.GetBounds(target)!.Value;
 
             await SlowDrag(tx, ty, dx, dy);
-            await WaitFor(() => target.Files is not null, 10, () => $"{TraceText()} | target bounds {targetBounds.X},{targetBounds.Y} {targetBounds.Width}x{targetBounds.Height}");
+            await WaitFor(() => target.Files is not null, 10, () => $"{TraceText()} | target 0x{new WindowInteropHelper(target).Handle:X} bounds {targetBounds.X},{targetBounds.Y} {targetBounds.Width}x{targetBounds.Height}");
             Assert.Equal(3, target.Files!.Length);
             Assert.Equal(3, target.Files.Select(Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
             Assert.All(target.Files, f => Assert.Equal((80, 60), (Decode(f).Width, Decode(f).Height)));

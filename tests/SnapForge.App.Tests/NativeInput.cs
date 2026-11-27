@@ -107,6 +107,45 @@ internal static unsafe partial class NativeInput
         public nint dwExtraInfo;
     }
 
+    /// <summary>
+    /// Describes the top-level window Windows finds at a screen point (what OLE uses to pick the drop target):
+    /// class name, title, owning process id and the window's own handle.
+    /// </summary>
+    public static string WindowAt(int x, int y)
+    {
+        nint h = WindowFromPoint(new POINT { X = x, Y = y });
+        if (h == 0)
+        {
+            return "none";
+        }
+
+        nint root = GetAncestor(h, 2 /* GA_ROOT */);
+        char* cls = stackalloc char[128];
+        char* title = stackalloc char[128];
+        int nc = GetClassNameW(root, cls, 128);
+        int nt = GetWindowTextW(root, title, 128);
+        _ = GetWindowThreadProcessId(root, out uint pid);
+        return $"0x{root:X} class '{new string(cls, 0, nc)}' title '{new string(title, 0, nt)}' pid {pid}";
+    }
+
+    /// <summary>Root window handle at a screen point.</summary>
+    public static nint RootWindowAt(int x, int y) => GetAncestor(WindowFromPoint(new POINT { X = x, Y = y }), 2);
+
+    [LibraryImport("user32.dll")]
+    private static partial nint WindowFromPoint(POINT p);
+
+    [LibraryImport("user32.dll")]
+    private static partial nint GetAncestor(nint hwnd, uint flags);
+
+    [LibraryImport("user32.dll")]
+    private static partial int GetClassNameW(nint hwnd, char* name, int max);
+
+    [LibraryImport("user32.dll")]
+    private static partial int GetWindowTextW(nint hwnd, char* text, int max);
+
+    [LibraryImport("user32.dll")]
+    private static partial uint GetWindowThreadProcessId(nint hwnd, out uint pid);
+
     [LibraryImport("user32.dll", SetLastError = true)]
     [return: MarshalAs(UnmanagedType.Bool)]
     private static partial bool SetCursorPos(int x, int y);
