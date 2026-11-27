@@ -18,17 +18,17 @@ stated). Evidence links: [RELEASE-CANDIDATE-HANDOFF.md](RELEASE-CANDIDATE-HANDOF
 
 | Priority | Count |
 |---|---|
-| P0 | 63 |
-| P1 | 48 |
+| P0 | 85 |
+| P1 | 58 |
 | P2 | 2 |
 
 | Status | Count |
 |---|---|
-| Manual verification pending | 53 |
-| Automated test passed | 43 |
-| Implemented | 8 |
+| Automated test passed | 57 |
+| Manual verification pending | 54 |
+| Implemented | 23 |
+| Blocked | 5 |
 | Verified | 4 |
-| Blocked | 3 |
 | Deferred with justification | 2 |
 
 P0 = release blocker · P1 = required professional functionality (implemented or presented for owner disposition) ·
@@ -203,7 +203,7 @@ P2 = enhancement.
 | ID | P | Requirement | Status | Source | Acceptance criteria | Automated tests | Manual test still required | Env | Evidence | Limitations |
 |---|---|---|---|---|---|---|---|---|---|---|
 | PKG-01 | P0 | Self-contained portable ZIP with checksums, license, notices | Automated test passed | .github/workflows/ci.yml | Runs with .NET removed; checksums verify | portable-without-dotnet job | PC: clean Windows 11 | WCI | CI | — |
-| PKG-02 | P0 | Per-user installer: shortcuts, upgrade, uninstall keeps data, explicit data removal | Automated test passed | installer/SnapForge.iss | Install/upgrade/uninstall; data kept | installer job | PC: interactive install/uninstall, interrupted install | WCI | CI installer job | Interrupted-install test manual |
+| PKG-02 | P0 | System-wide installer (Program Files, UAC for setup only): shortcuts, upgrade, uninstall keeps data, explicit standard-user data removal | Implemented | installer/SnapForge.iss | Install/upgrade/uninstall; data kept | installer job | PC: interactive install/uninstall, interrupted install | WCI | CI installer job | Interrupted-install test manual |
 | PKG-03 | P0 | SBOM + dependency inventory | Automated test passed | tools/sbom/generate_sbom.py | CycloneDX JSON in packages | CI packages step | — | WCI | Package artifact | — |
 | PKG-04 | P0 | Trusted code signing | Blocked | docs/SIGNING.md | Signed with publicly trusted certificate | — | Owner: SignPath Foundation application or certificate | — | — | Unsigned until owner action |
 
@@ -234,3 +234,45 @@ P2 = enhancement.
 |---|---|---|---|---|---|---|---|---|---|---|
 | REL-01 | P0 | Release process, verification, rollback, maintenance | Implemented | docs/RELEASE-PROCESS.md, ROLLBACK.md, MAINTENANCE.md | Documented and dry-run where possible | website verifier tests | Owner approval | — | Docs | — |
 | REL-02 | P0 | Legal/licensing review (H.264/AAC, name) | Blocked | docs/LICENSING-REVIEW.md | Qualified review | — | Owner: legal review | — | — | Research only; no legal conclusions |
+
+### FA
+
+| ID | P | Requirement | Status | Source | Acceptance criteria | Automated tests | Manual test still required | Env | Evidence | Limitations |
+|---|---|---|---|---|---|---|---|---|---|---|
+| FA-001 | P0 | One compact window on launch; Windows start-up = tray + dock only | Implemented | App.xaml.cs (OnStartup, ShowPrimaryWindow) | 0 windows with --background; exactly 1 on first/normal/second launch | CI portable job 'Startup windows' (real process, captioned windows counted) | PC: sign-out/in with launch at startup | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| FA-002 | P0 | System-wide Program Files install, UAC only for setup, standard-user app, data never deleted by elevated uninstaller | Implemented | installer/SnapForge.iss, Services/LegacyInstallMigration.cs, Interop/RunningMarker.cs | HKLM entry, all-users shortcut, ACL not user-writable, running copy blocks setup, second user own data | CI installer job; FA002_* unit tests | PC: UAC with separate admin credentials, fast user switching | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | Interactive UAC not testable on CI |
+| FA-003 | P0 | Window frame always inside the monitor work area (DPI/taskbar/monitor changes) | Implemented | Interop/WorkAreaGuard.cs, Core/Geometry/WindowFit.cs | Oversized/off-screen windows fitted; caption visible | WindowFitTests (7); WindowingTests FA003_* (3) | PC: owner's 1920×1080 at 125–200 %, multi-monitor | SIM+WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| FA-004 | P0 | QuickDock keyboard path with focus visuals, names, Esc returns focus | Implemented | Views/CaptureWidget.xaml(.cs) | Tab/arrows/Enter/Esc with real keys; hover does not steal focus | QuickDock_keyboard_mode_* (GateBUiTests) | PC: Narrator/NVDA, high contrast | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| FA-005 | P0 | Complete versioned Library backup (videos, Trash, metadata, damaged items, hashes, exclusions) | Automated test passed | Core/Library/CaptureLibrary.Backup.cs | Round trip of every item kind; exclusions listed | BackupRestoreTests FA005_* (7) | PC: large real library | SIM | Core tests on Linux + Windows CI (449 in run 96) | — |
+| FA-006 | P0 | Relocation copies all files incl. incomplete/damaged/unknown; never deletes | Automated test passed | Core/Library/CaptureLibrary.Relocation.cs | Seeded interrupted recording, damaged item, unknown file arrive verified | RelocationTests FA006_* (6) | — | SIM | Core tests on Linux + Windows CI (449 in run 96) | — |
+| FA-007 | P0 | Two-phase relocation: durable pointer before switch; source deleted only after verification + consent | Implemented | Services/AppServices.cs (RelocateLibraryAsync), Views/SettingsWindow.xaml.cs | Pointer saved before switch; declined cleanup keeps everything | Core FA007_* (4); App FA007_* (2) | PC: USB drive, read-only target | SIM+WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| FA-008 | P0 | Video SHA-256; verified on backup/restore/move/export; integrity scan | Automated test passed | Core/Library/CaptureLibrary.Integrity.cs | Same-length modification detected | VideoIntegrityTests FA008_* (8); --library-check in installer job | — | SIM | Core tests on Linux + Windows CI (449 in run 96) | — |
+| FA-009 | P1 | Drag in progress never evicted; finite retention explained; persistent export offered | Automated test passed | Core/Export/TempExportStore.cs, Services/CaptureDragDrop.cs | Active session survives cap/sweep/delete-now | GateBCoreTests FA009_* (3) | PC: slow browser upload, Outlook attach (MA-DRG) | SIM | Core tests on Linux + Windows CI (449 in run 96) | — |
+| FA-010 | P0 | Real upgrade test from the previous release candidate with representative data | Implemented | .github/workflows/ci.yml (rc1-baseline, installer) | rc.1 per-user + legacy fixture → rc.2 system-wide; data byte-identical; library check 3 images + 1 video | CI installer job | PC: upgrade on owner's machine | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | M2/M3 had no installer; their data format = rc.1 fixture |
+| FA-011 | P1 | Separate verified installer and portable asset records | Automated test passed | website/config.json, build.py | Each asset needs its own verification record | test_fa011_* (7) | — | SIM | Website unit tests | — |
+| FA-012 | P0 | Release verifier: complete checksum coverage, exact signer, chain, timestamp, embedded exe, pinned asset | Automated test passed | website/tools/verify-release.py | Negative cases rejected | test_fa012_* (23) | Owner: run on Windows with the real signed release | SIM | Website unit tests | Signature checks need a real signed release |
+| FA-013 | P1 | Canonical website source; stale-publish guard; plain gh-pages | Automated test passed | website/tools/publish-gh-pages.sh | Wrong/behind/dirty/older sources refused | test_fa013_* (7) | — | SIM | Website unit tests | — |
+| FA-014 | P1 | Download page: public (disabled) vs invited-tester artifacts; installer vs portable; UAC; uninstall | Automated test passed | website/src/pages/download.html | Honest tester flow; no binaries on Pages | test_fa014_*, test_sf012_* | Owner: fill testBuild.runUrl | SIM | Website unit tests | — |
+| FA-015 | P0 | Generation-based multi-file commit; crash at any boundary yields a coherent generation | Automated test passed | Core/Library/CaptureLibrary.cs, Storage/CaptureManifest.cs, DurabilityFaults.cs | Fault at every durable boundary → previous or new generation | CaptureCommitCrashTests FA015_* (9) | PC: power-cut test optional | SIM | Core tests on Linux + Windows CI (449 in run 96) | Directory entries not flushed (no portable API) |
+| FA-016 | P0 | Crash-safe sanitize; no secret bytes in any file after sanitize/recovery | Automated test passed | Core/Library/CaptureLibrary.cs (Sanitize) | Byte scan for fictional secret colour | FA016_* (4) | — | SIM | Core tests on Linux + Windows CI (449 in run 96) | — |
+| FA-017 | P0 | Archive limits: versions, duplicates, traversal, counts, sizes, free space, lying headers | Automated test passed | Core/Library/CaptureLibrary.Backup.cs, BackupTypes.cs | Every malformed archive rejected, nothing added | FA017_* (11) | — | SIM | Core tests on Linux + Windows CI (449 in run 96) | Central directory read before entry-count check |
+| FA-018 | P0 | Image memory budget before allocation | Automated test passed | Core/Imaging/ImageBudget.cs, PixelCodec.cs, ImageOps.cs | 1 GiB BGRA budget; malformed headers rejected | ImageBudgetTests FA018_* (8) | — | SIM | Core tests on Linux + Windows CI (449 in run 96) | — |
+| FA-019 | P0 | Newer settings never overwritten; unique damaged copies; downgrade warning | Automated test passed | Core/Settings/AppSettings.cs, SettingsResults.cs | Read-only mode; unique copies | SettingsIntegrityTests FA019_* (6) | — | SIM | Core tests on Linux + Windows CI (449 in run 96) | — |
+| FA-020 | P0 | Settings save failures surfaced; pointer never switched unless saved | Implemented | Services/AppServices.cs, App.xaml.cs | Failure message; old pointer kept | FA019 save-failure tests; FA007 App tests | PC: read-only profile | SIM+WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| FA-021 | P0 | Idempotent recording lifecycle; bounded waits; no disposal while in use | Implemented | Video/RecordingLifecycle.cs, ScreenRecorder.cs, RecordingController.cs | Double stop, stop/cancel race, stall, disk full | RecordingLifecycleTests, RecordingFaultTests; self-test lifecycle-* | PC: lock/sleep/unplug during recording | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| FA-022 | P0 | Verified save outside Library; originals kept on failure | Implemented | Video/VerifiedFileCopy.cs | Temp + flush + hash verify + atomic replace | RecordingSaveOutsideTests; self-test save-outside-library-atomic | — | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| FA-023 | P0 | Prevalidated, journaled restore; accurate partial result; no overwrite | Automated test passed | Core/Library/CaptureLibrary.Backup.cs | Interruption completed/cleaned at next open | FA023_* (2) + interruption tests | — | SIM | Core tests on Linux + Windows CI (449 in run 96) | — |
+
+### SF
+
+| ID | P | Requirement | Status | Source | Acceptance criteria | Automated tests | Manual test still required | Env | Evidence | Limitations |
+|---|---|---|---|---|---|---|---|---|---|---|
+| SF-001 | P0 | Trusted signing prepared; no bypass advice | Blocked | docs/SIGNING.md, website code-signing draft | Signed final bytes verified | — | Owner: SignPath Foundation application and approvals | — | Plan + policy draft | — |
+| SF-004 | P1 | Original QuickDock design | Implemented | Views/CaptureWidget.xaml | Small navy pill with aperture mark | QuickDock_is_a_small_pill_* | Owner visual review | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| SF-005 | P1 | Original capture panel design (no large round button) | Implemented | Views/CaptureWindow.xaml | Tabs, cards, full-width action | Capture_panel_is_compact_* | Owner visual review | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| SF-006 | P0 | SnapForge Studio: screen / screen+camera / camera only; camera & mic off by default | Implemented | Video/StudioWindow.cs, Camera.cs, CameraComposition.cs | Overlay composited at chosen corner; camera-only size; device released | StudioCompositionTests, StudioWindowTests, RecordingFaultTests (synthetic camera) | PC: integrated + USB camera, privacy denied, unplug, LED | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | Synthetic camera only on CI |
+| SF-008 | P1 | Close window vs Exit SnapForge; exit asks while recording | Implemented | MainWindow.xaml, App.xaml.cs | Separate commands with explanations | SF008_file_menu_separates_close_window_from_exit | — | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| SF-009 | P0 | Drag-and-drop into real external apps | Manual verification pending | Services/CaptureDragDrop.cs | Files accepted by Explorer/Outlook/Word/Teams/browsers | OLE separate-process drag tests | PC: MA-DRG-01…05 | PC | Pending manual | — |
+| SF-011 | P1 | Crisp native-size website screenshots with full-size links | Automated test passed | website/build.py, static/assets/screenshots | Build fails on mismatch/JPEG/upscale | test_sf011_* (6) | Owner: check live site | SIM | Website unit tests | — |
+| SF-014 | P1 | Build/installation/profile shown in About; safe hand-over | Implemented | Services/InstanceInfo.cs | Installation kind and data folder shown | SF014_about_reports_installation_kind_and_profile | — | WCI | App tests + self-tests on the final rc.2 CI run (see handoff) | — |
+| SF-015 | P1 | Original interface; provenance; qualified clearance pending | Blocked | docs/IP-AND-DESIGN-REVIEW.md | Qualified review | — | Owner: trademark/trade-dress review | — | Checklist | — |

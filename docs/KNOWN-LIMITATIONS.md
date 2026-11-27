@@ -1,4 +1,4 @@
-# Known limitations — SnapForge 1.0.0-rc.1
+# Known limitations — SnapForge 1.0.0-rc.2
 
 Honest list of what does not work, is not verified, or is deliberately out of scope. Recording-specific limitations
 KL-V01…KL-V13 are detailed in [VIDEO-ACCEPTANCE.md](VIDEO-ACCEPTANCE.md).
@@ -9,7 +9,11 @@ KL-V01…KL-V13 are detailed in [VIDEO-ACCEPTANCE.md](VIDEO-ACCEPTANCE.md).
 - Audio devices, hardware encoders, GPUs, displays above 1080p, multi-monitor/mixed-DPI, HDR, Remote Desktop, sleep,
   lock, power loss — CI has no audio, GPU or second monitor.
 - Accessibility with Narrator/NVDA — not claimed compliant from automated checks.
-- Code signing — packages are **unsigned** (SmartScreen may warn); see SIGNING.md.
+- Code signing — packages are **unsigned** (SmartScreen may warn); see SIGNING.md. No bypass advice is given.
+- Camera recording (SnapForge Studio) — tested on CI only with a synthetic camera; real drivers, formats, privacy
+  error codes and the camera light need a physical PC.
+- Interactive UAC with separate administrator credentials, fast user switching and Remote Desktop with the
+  system-wide installer — scripted on CI, interactive check pending.
 - Legal review of H.264/AAC distribution and the SnapForge name — see LICENSING-REVIEW.md.
 
 ## Functional limitations
@@ -29,10 +33,17 @@ KL-V01…KL-V13 are detailed in [VIDEO-ACCEPTANCE.md](VIDEO-ACCEPTANCE.md).
 - Video editing: trim and removed sections re-encode the video (quality setting applies); combining clips, webcam
   overlay, recording annotations and cursor highlight are not included (deferred).
 - GIF export: at most 256 colours, no sound; long ranges make large files.
-- Library backups (.zip) contain images only; back up the `videos` folder separately.
-- Older SnapForge builds show captures that use the new annotation types (pen, callout, stamp) as damaged and leave them
-  unchanged; they cannot open them.
+- Library backups (format 2, from rc.2) include recordings, the Trash, metadata and damaged items. Backups made with
+  rc.1 contain images only (they still restore, labelled as such). A backup with any corrupt entry is refused as a
+  whole (nothing is restored partially).
+- Older SnapForge builds (rc.1 and earlier) show captures saved by rc.2 (capture format 2) — and captures with the new
+  annotation types — as damaged and leave them unchanged; they cannot open them. Downgrading is not supported; keep a
+  backup if you might go back.
 - Repeat last capture is remembered only while SnapForge runs.
-- Development builds and installed builds share the same data folder (`%LOCALAPPDATA%\SnapForge`); back it up before
-  testing another build.
+- Without `--profile`, development builds and installed builds share the same data folder
+  (`%LOCALAPPDATA%\SnapForge`); use `SnapForge.exe --profile <name>` (rc.2) to test with separate data.
+- The system-wide uninstaller never deletes user data; each user deletes their own data in Settings (or by hand).
+- Drag-and-drop copies are temporary (up to 24 hours, 2 GB): for a permanent file use Export.
+- Directory entries are not flushed after a rename (no portable API); after a power cut at the exact moment of a save,
+  some file systems may keep the previous version of that capture (never a mixed or corrupt one).
 - Windows 10, Windows on Arm and other operating systems are not supported in 1.0.
