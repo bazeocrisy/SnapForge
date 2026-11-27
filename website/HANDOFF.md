@@ -1,4 +1,14 @@
-# Website PR #2 — handoff for the independent review gate
+# Website PR #2 — handoff
+
+## Publishing (simplified, 27 November 2026)
+
+At the owner's request, publishing no longer uses GitHub Actions. The built site is on the **`gh-pages`** branch
+(website files at the branch root, plus `.nojekyll`). GitHub Pages serves it once the owner selects
+**Settings → Pages → Deploy from a branch → `gh-pages` / (root)**. The deploy job, the `WEBSITE_DEPLOY_APPROVED`
+variable and the manual release-verification workflow have been removed. The remaining Website workflow only runs
+automatic checks. Updates: `bash website/tools/publish-gh-pages.sh` then `git push origin gh-pages`.
+No software branch is merged; the website sources stay on `claude/website`.
+
 
 Branch `claude/website` → `main`, **draft PR #2**. Not merged, not deployed, no release published, no software
 branch modified. Commit and CI evidence: see [Test evidence](#test-evidence).
@@ -10,8 +20,8 @@ branch modified. Commit and CI evidence: see [Test evidence](#test-evidence).
 | SnapForge is the official product name | Site-wide; About → "Name and trademarks"; [BRANDING.md](BRANDING.md) (no trademark registration or clearance claimed; clearance checks unresolved) |
 | Orange aperture logo is the official branding | Site logo, favicon, Open Graph image; [BRANDING.md](BRANDING.md) — app-icon migration kept separate, not in this PR |
 | Windows 11 x64 is the initial supported platform | Download → System requirements; Support FAQ; About; structured data `operatingSystem: Windows 11` |
-| GitHub Pages hosting | `.github/workflows/website.yml` (manual, owner-gated deploy only) |
-| No deployment or release authorised | Deploy needs merge + Pages enabled + `WEBSITE_DEPLOY_APPROVED=true` + manual run; nothing publishes releases |
+| GitHub Pages hosting | `gh-pages` branch, served by GitHub Pages' standard "Deploy from a branch" (no Actions) |
+| No release authorised | Download button disabled; nothing in this repository publishes releases. The site goes live only when the owner selects `gh-pages` in Settings → Pages |
 | Donations optional, hidden until verified | `config.json → donations` (all unset) |
 
 ## Review corrections (owner's list)
@@ -20,7 +30,7 @@ branch modified. Commit and CI evidence: see [Test evidence](#test-evidence).
 |---|---|---|
 | 1 | Remove `__pycache__`/`.pyc`; ignore rules | Removed `website/__pycache__/build.cpython-313.pyc`; `website/.gitignore` ignores `__pycache__/`, `*.py[cod]`, `tests/node_modules/`, `test-output/`. CI runs Python with `-B`. (Kept inside `website/` so this PR adds no root `.gitignore` that would collide with the software branches' own.) |
 | 2 | Generated vs source; CI detects stale output | Sources moved to `src/` + `static/`; `public/` is generated **entirely** (deleted and rebuilt). README table lists each path as source / generated / tool / tests / evidence. `build.py --check` fails on any differing, missing or extra file; unit test edits a generated page and adds a stray file and checks both are caught; build refuses to delete an unrelated folder |
-| 3 | `ownerApproved` is not proof; verify the real release | `tools/verify-release.py` (read-only) checks the GitHub Release (published, not draft/pre-release, page and date), **exact asset name**, upload state, download URL, size, GitHub digest, the **downloaded bytes** (count + SHA-256), ZIP integrity, inner `SHA256SUMS.txt`, package file list, and the **signing claim** (unsigned → no Authenticode signature present; signed → signature present and `Get-AuthenticodeSignature` = Valid with matching signer, Windows only). Writes `release-verification.json`; the build refuses a release unless that record matches `config.json` field for field. Workflow `website-release-verify.yml` runs it on Windows and uploads the record (no commits, no publishing). 13 verifier tests against a fake GitHub |
+| 3 | `ownerApproved` is not proof; verify the real release | `tools/verify-release.py` (read-only) checks the GitHub Release (published, not draft/pre-release, page and date), **exact asset name**, upload state, download URL, size, GitHub digest, the **downloaded bytes** (count + SHA-256), ZIP integrity, inner `SHA256SUMS.txt`, package file list, and the **signing claim** (unsigned → no Authenticode signature present; signed → signature present and `Get-AuthenticodeSignature` = Valid with matching signer, Windows only). Writes `release-verification.json`; the build refuses a release unless that record matches `config.json` field for field. Run it on a PC (Windows for signed releases); it writes the record and publishes nothing. (The earlier Windows workflow for it was removed when publishing was simplified.) 13 verifier tests against a fake GitHub |
 | 4 | Security reporting; operational private channel before launch | `config.json → security.privateReporting`; Support page shows real private-reporting instructions only when verified, otherwise says it is not set up and asks for no public details; the build refuses to show a release while unverified; [LAUNCH-CHECKLIST.md §C](LAUNCH-CHECKLIST.md#c-private-vulnerability-reporting-required-before-launch) has the enable-and-test procedure |
 | 5 | Name documentation vs trademark clearance | [BRANDING.md](BRANDING.md); About page: "official name … not a registered trademark, and no trademark registration or clearance is claimed" |
 | 6 | Windows 10/11 discrepancy | Site: Windows 11 x64 only; Windows 10/Arm "not supported at launch". The development branches' README still says "Windows 10 and 11" — **not changed here** (software branches untouched); listed as launch step A4 |

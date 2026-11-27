@@ -25,7 +25,7 @@ fi
 src_commit="$(git rev-parse --short HEAD)"
 src_branch="$(git rev-parse --abbrev-ref HEAD)"
 work="$(mktemp -d)"
-trap 'git worktree remove --force "$work" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
+trap 'cd "$repo"; git worktree remove --force "$work" >/dev/null 2>&1 || true; rm -rf "$work"' EXIT
 if git show-ref --verify --quiet refs/heads/gh-pages || git fetch -q origin gh-pages:gh-pages 2>/dev/null; then
   git worktree add -q "$work" gh-pages
   (cd "$work" && git rm -q -r --ignore-unmatch . )
