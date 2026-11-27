@@ -490,7 +490,9 @@ public class GateBUiTests
             string ascii = Encoding.ASCII.GetString(File.ReadAllBytes(file));
             Assert.DoesNotContain("tEXt", ascii, StringComparison.Ordinal);
             Assert.DoesNotContain("eXIf", ascii, StringComparison.Ordinal);
-            Assert.Single(Directory.GetFiles(Path.GetDirectoryName(file)!)); // no .sfcap, no base image
+            // No .sfcap, no base image — only the export (plus SnapForge's own retention marker, which is never offered).
+            Assert.Single(Directory.GetFiles(Path.GetDirectoryName(file)!), f => !Path.GetFileName(f).StartsWith(".snapforge-drag", StringComparison.Ordinal));
+            Assert.DoesNotContain(files, f => Path.GetFileName(f).StartsWith(".snapforge-drag", StringComparison.Ordinal));
             Assert.Equal([rec.Id], CaptureDragDrop.KeysOf(new DataObject(data)));
 
             // JPEG option.

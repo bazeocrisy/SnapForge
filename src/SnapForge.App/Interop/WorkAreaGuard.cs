@@ -28,7 +28,7 @@ internal static class WorkAreaGuard
         {
             if (sender is Window w && Applies(w))
             {
-                Fit(w);
+                FitSoon(w);
                 w.StateChanged -= OnStateChanged;
                 w.StateChanged += OnStateChanged;
             }
@@ -65,27 +65,57 @@ internal static class WorkAreaGuard
             return;
         }
 
-        // WPF enforces MinWidth/MinHeight (in DIPs); lower them when the screen is smaller, so the frame can fit.
-        double scale = monitor.DpiScale > 0 ? monitor.DpiScale : 1.0;
-        double maxW = Math.Floor(fitted.Width / scale), maxH = Math.Floor(fitted.Height / scale);
-        if (w.MinWidth > maxW)
+        // Drive WPF's own properties (in DIPs of the window's DPI) so WPF does not re-apply the old size or position
+        // later; MinWidth/MinHeight are lowered when the screen is smaller than them.
+        double scale = System.Windows.Media.VisualTreeHelper.GetDpi(w).DpiScaleX;
+        if (scale <= 0)
         {
-            w.MinWidth = maxW;
+            scale = 1.0;
         }
 
-        if (w.MinHeight > maxH)
+        double width = fitted.Width / scale, height = fitted.Height / scale;
+        if (w.MinWidth > width)
         {
-            w.MinHeight = maxH;
+            w.MinWidth = Math.Floor(width);
         }
 
-        PhysicalPlacement.SetBounds(w, fitted, resize: fitted.Width != bounds.Width || fitted.Height != bounds.Height);
+        if (w.MinHeight > height)
+        {
+            w.MinHeight = Math.Floor(height);
+        }
+
+        if (fitted.Width != bounds.Width)
+        {
+            w.Width = width;
+        }
+
+        if (fitted.Height != bounds.Height)
+        {
+            w.Height = height;
+        }
+
+        w.Left = fitted.X / scale;
+        w.Top = fitted.Y / scale;
+
+        // Mixed-DPI setups can leave WPF's DIP conversion off by a few pixels: finish in physical pixels.
+        if (PhysicalPlacement.GetBounds(w) is { } now && now != fitted)
+        {
+            PhysicalPlacement.SetBounds(w, fitted, resize: now.Width != fitted.Width || now.Height != fitted.Height);
+        }
+    }
+
+    /// <summary>Fits now and again once WPF has finished its own placement (restore animations, size-to-content).</summary>
+    private static void FitSoon(Window w)
+    {
+        w.Dispatcher.BeginInvoke(() => Fit(w), System.Windows.Threading.DispatcherPriority.Loaded);
+        w.Dispatcher.BeginInvoke(() => Fit(w), System.Windows.Threading.DispatcherPriority.ContextIdle);
     }
 
     private static void OnStateChanged(object? sender, EventArgs e)
     {
         if (sender is Window { WindowState: WindowState.Normal } w)
         {
-            w.Dispatcher.BeginInvoke(() => Fit(w));
+            FitSoon(w);
         }
     }
 
