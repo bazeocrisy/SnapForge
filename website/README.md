@@ -15,7 +15,7 @@ domain, or from any local web server.
 |---|---|---|
 | `src/layout.html` | **source** | Shared page shell: header, navigation, footer, meta tags, Content-Security-Policy |
 | `src/pages/*.html` | **source** | Page content with `{{tokens}}` filled by the build (Home, Features, Download, User Guide, What's New, Roadmap, Support/FAQ, Donate, Privacy, About/License, 404) |
-| `static/**` | **source** | Copied verbatim into the site: `.nojekyll`, `assets/css/site.css`, `assets/js/site.js`, `assets/icons/*.svg`, `assets/img/` (logo, Open Graph image), `assets/screenshots/*.jpg`, `favicon.ico` |
+| `static/**` | **source** | Copied verbatim into the site: `.nojekyll`, `assets/css/site.css`, `assets/js/site.js`, `assets/icons/*.svg`, `assets/img/` (logo, Open Graph image), `assets/screenshots/*.png` (full-resolution PNGs printed by CI from the packaged build), `favicon.ico` |
 | `static/assets/img/og-image.png` | **source** (rendered once) | Made by `node tools/make-og-image.js` from `tools/og-image.html`; re-render after changing the logo or slogan |
 | `config.json` | **source** | Release, donation and security-contact settings — see below |
 | `release-verification.json` | **source** (tool output, reviewed) | Written only by `tools/verify-release.py` after it has checked the real GitHub Release. Absent until a release exists |

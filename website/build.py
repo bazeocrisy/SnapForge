@@ -484,16 +484,16 @@ class PageParser(HTMLParser):
                 self.ext_without_rel.append(href)
             self._in_a = a
             self._a_text = a.get("aria-label", "")
+        if tag == "img" and self._in_a is not None:
+            # An image inside a link names the link by its alt text (both <img> and <img/>).
+            self._a_text += dict(attrs).get("alt", "") or ""
 
     def handle_data(self, data):
         if self._in_a is not None:
             self._a_text += data
 
     def handle_startendtag(self, tag, attrs):
-        self.handle_starttag(tag, attrs)
-        if tag == "img" and self._in_a is not None:
-            alt = dict(attrs).get("alt", "")
-            self._a_text += alt
+        self.handle_starttag(tag, attrs)  # <img .../>: alt text is counted in handle_starttag
 
     def handle_endtag(self, tag):
         if tag == "a" and self._in_a is not None:

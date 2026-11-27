@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Features — SnapForge</title>
-<meta name="description" content="SnapForge features: screenshot capture, annotations, flattened image redaction, a local Library, a desktop widget, native drag-and-drop and experimental screen recording — with the development status of each.">
+<meta name="description" content="SnapForge features: screenshot and scrolling capture, annotations, flattened image redaction, offline text extraction, a local Library, a desktop widget, native drag-and-drop, screen recording and video editing — with the status of each.">
 
 <link rel="canonical" href="https://bazeocrisy.github.io/SnapForge/features.html">
 <meta name="theme-color" content="#0b1220">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SnapForge">
 <meta property="og:title" content="Features">
-<meta property="og:description" content="SnapForge features: screenshot capture, annotations, flattened image redaction, a local Library, a desktop widget, native drag-and-drop and experimental screen recording — with the development status of each.">
+<meta property="og:description" content="SnapForge features: screenshot and scrolling capture, annotations, flattened image redaction, offline text extraction, a local Library, a desktop widget, native drag-and-drop, screen recording and video editing — with the status of each.">
 <meta property="og:url" content="https://bazeocrisy.github.io/SnapForge/features.html">
 <meta property="og:image" content="https://bazeocrisy.github.io/SnapForge/assets/img/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -55,53 +55,72 @@
   <div class="container">
     <p class="eyebrow">Features</p>
     <h1>Everything between the screenshot and the send button</h1>
-    <p class="lead">Each feature shows its status. Nothing is in a public release yet; screenshots are from
-    development builds with fictional demo data.</p>
+    <p class="lead">SnapForge 1.0 is a <strong>release candidate under review</strong>: nothing is in a public release
+    yet. Screenshots are full-size images from the release-candidate build, taken automatically on a Windows test
+    machine with fictional demo data. Select a screenshot to open it at full resolution.</p>
   </div>
 </section>
 
 <div class="container">
   <section class="feature-row" id="capture" aria-labelledby="capture-title">
     <div>
-      <h2 id="capture-title"><img class="icon-sm" src="assets/icons/capture.svg" alt="" width="36" height="36"> Capture <span class="badge badge-dev">Development build</span></h2>
+      <h2 id="capture-title"><img class="icon-sm" src="assets/icons/capture.svg" alt="" width="36" height="36"> Capture <span class="badge badge-dev">Release candidate</span></h2>
       <ul class="checklist">
-        <li>Region (it can span monitors), window, a single display or the full screen</li>
+        <li>Region (it can span monitors), window, active window, a single display or the full screen</li>
+        <li>Magnifier with pixel position and colour; arrow keys move the selection by one pixel</li>
         <li>The screen freezes while you select, so menus and tooltips stay put</li>
-        <li>Multi-monitor and mixed-DPI aware</li>
-        <li>Delay countdown and mouse pointer on or off</li>
+        <li>Repeat the last capture, or start from an image on the clipboard</li>
+        <li>Multi-monitor and mixed-DPI aware; delay countdown; mouse pointer on or off</li>
         <li>Presets with their own global hotkeys; Print Screen by default (configurable, conflicts reported)</li>
-        <li>Copy to the clipboard, preview in the Editor, or capture without keeping a history</li>
       </ul>
     </div>
     <figure class="shot">
-      <img src="assets/screenshots/capture-panel-dark.jpg" width="720" height="248" loading="lazy"
-           alt="The SnapForge capture panel: Image mode selected, a Selection list set to Region, switches for Preview in Editor, Copy to Clipboard, Save to Library, Cursor and Time Delay, and a large orange Capture button labelled Print Screen.">
-      <figcaption>Capture panel, development build.</figcaption>
+      <a href="assets/screenshots/capture-panel-dark.png"><img src="assets/screenshots/capture-panel-dark.png" width="746" height="257" loading="lazy"
+           alt="The SnapForge capture panel in Image mode: a Selection list set to Region, switches for Preview in Editor, Copy to Clipboard, Save to Library, Cursor and Time Delay, and a large orange Capture button."></a>
+      <figcaption>Capture panel. Release-candidate build, 746×257.</figcaption>
     </figure>
   </section>
 
-  <section class="feature-row flip" id="annotate" aria-labelledby="annotate-title">
+  <section class="feature-row flip" id="scrolling" aria-labelledby="scrolling-title">
     <div>
-      <h2 id="annotate-title"><img class="icon-sm" src="assets/icons/editor.svg" alt="" width="36" height="36"> Annotate <span class="badge badge-dev">Development build</span></h2>
+      <h2 id="scrolling-title"><img class="icon-sm" src="assets/icons/capture.svg" alt="" width="36" height="36"> Scrolling capture and text extraction <span class="badge badge-dev">Release candidate</span></h2>
       <ul class="checklist">
-        <li>Arrow, line, rectangle, ellipse, highlight, text and numbered step markers</li>
-        <li>Quick Styles: save colour and thickness combinations, mark favourites</li>
-        <li>Select, move, resize, recolour and edit annotations at any time</li>
-        <li>Crop, zoom and fit; light and dark themes</li>
-        <li>Undo and redo for every edit</li>
-        <li>Save as PNG or JPEG, or copy to the clipboard</li>
+        <li>Capture a long page or list: select the scrolling area, then let SnapForge scroll or scroll yourself</li>
+        <li>Frames are joined only where they match exactly; sticky headers and footers appear once. If an app
+        redraws while scrolling, SnapForge stops instead of guessing</li>
+        <li>Extract text from any capture with the text recognition built into Windows — offline, nothing uploaded</li>
+        <li>Review and edit the recognised text, then copy it; the text is not saved</li>
       </ul>
+      <p class="small muted">Text recognition uses the OCR languages installed in Windows; accuracy depends on the image.</p>
     </div>
     <figure class="shot">
-      <img src="assets/screenshots/editor-light.jpg" width="720" height="508" loading="lazy"
-           alt="The SnapForge Editor in light theme with an annotated screenshot of an order dialog, the annotation toolbar along the top and Quick Styles on the right.">
-      <figcaption>Editor in light theme, development build.</figcaption>
+      <a href="assets/screenshots/ocr-dark.png"><img src="assets/screenshots/ocr-dark.png" width="626" height="513" loading="lazy"
+           alt="The SnapForge Extract text window showing recognised lines of text from a capture, a language list and Copy button."></a>
+      <figcaption>Extract text (OCR). Release-candidate build, 626×513.</figcaption>
     </figure>
   </section>
 
-  <section class="feature-row" id="redaction" aria-labelledby="redaction-title">
+  <section class="feature-row" id="annotate" aria-labelledby="annotate-title">
     <div>
-      <h2 id="redaction-title"><img class="icon-sm" src="assets/icons/redact.svg" alt="" width="36" height="36"> Redaction <span class="badge badge-dev">Development build</span></h2>
+      <h2 id="annotate-title"><img class="icon-sm" src="assets/icons/editor.svg" alt="" width="36" height="36"> Annotate and edit <span class="badge badge-dev">Release candidate</span></h2>
+      <ul class="checklist">
+        <li>Arrow, line, rectangle, ellipse, highlight, text, numbered steps, pen, callouts and stamps</li>
+        <li>Blur and pixelate areas; crop, rotate, flip, resize, canvas size, border, drop shadow and watermark</li>
+        <li>Quick Styles; select, move, recolour, copy, paste and duplicate annotations at any time</li>
+        <li>Undo and redo for every edit; light, dark and high-contrast themes</li>
+        <li>Save as PNG, JPEG, BMP or TIFF, copy to the clipboard, or print</li>
+      </ul>
+    </div>
+    <figure class="shot">
+      <a href="assets/screenshots/editor-dark.png"><img src="assets/screenshots/editor-dark.png" width="1906" height="1025" loading="lazy"
+           alt="The SnapForge Editor in dark theme with an annotated screenshot showing an arrow, a callout, a stamp, freehand pen marks and a black redaction bar, with the annotation toolbar along the top and Quick Styles on the right."></a>
+      <figcaption>Editor. Release-candidate build, 1906×1025.</figcaption>
+    </figure>
+  </section>
+
+  <section class="feature-row flip" id="redaction" aria-labelledby="redaction-title">
+    <div>
+      <h2 id="redaction-title"><img class="icon-sm" src="assets/icons/redact.svg" alt="" width="36" height="36"> Redaction <span class="badge badge-dev">Release candidate</span></h2>
       <p>The Redact tool replaces the selected pixels with solid black and covers any annotations underneath.
       It does not blur or pixelate, so there is nothing to un-blur.</p>
       <ul class="checklist">
@@ -109,91 +128,85 @@
         with no hidden layer and no metadata.</li>
         <li><strong>Your editable Library copy keeps the original pixels</strong> so you can still undo a redaction
         later. The Editor says so in a banner. Use <em>Sanitize</em> to remove the originals permanently.</li>
+        <li><strong>Blur and pixelate are not redaction</strong> — use Redact for anything secret.</li>
         <li>Redaction covers images only. <strong>Videos cannot be redacted.</strong></li>
       </ul>
       <p class="small muted">Black boxes hide what is under them in the image itself; they cannot remove
       information that is visible elsewhere, such as in a file name you type or text outside the box.</p>
     </div>
     <figure class="shot">
-      <img src="assets/screenshots/editor-dark.jpg" width="720" height="508" loading="lazy"
-           alt="A capture in the SnapForge Editor with a solid black redaction bar over part of an error message, and a banner explaining that exports are redacted while the Library copy keeps the original pixels until sanitized.">
-      <figcaption>The banner explains what the Library keeps. Development build, fictional data.</figcaption>
+      <a href="assets/screenshots/welcome-dark.png"><img src="assets/screenshots/welcome-dark.png" width="626" height="633" loading="lazy"
+           alt="The SnapForge welcome window shown at first start, explaining how to capture, the desktop widget, where the Library is stored, recording, redaction and where to find help."></a>
+      <figcaption>First-start welcome: what SnapForge keeps and where. Release-candidate build, 626×633.</figcaption>
     </figure>
   </section>
 
-  <section class="feature-row flip" id="library" aria-labelledby="library-title">
+  <section class="feature-row" id="library" aria-labelledby="library-title">
     <div>
-      <h2 id="library-title"><img class="icon-sm" src="assets/icons/library.svg" alt="" width="36" height="36"> Library <span class="badge badge-dev">Development build</span></h2>
+      <h2 id="library-title"><img class="icon-sm" src="assets/icons/library.svg" alt="" width="36" height="36"> Library <span class="badge badge-dev">Release candidate</span></h2>
       <ul class="checklist">
         <li>Every capture is saved automatically and stays editable (or turn the Library off)</li>
-        <li>All, Recent, Favourites, Tags, Folders and Trash</li>
-        <li>Search, sort, date groups and adjustable thumbnails</li>
-        <li>Rename, duplicate, export several at once, sanitize</li>
+        <li>All, Recent, Favourites, Videos, Tags, Folders and Trash; search, sort and date groups</li>
+        <li>Rename, duplicate, export several at once, combine images, sanitize</li>
+        <li>Import PNG, JPEG, BMP and MP4 files</li>
         <li>Backup and restore, retention rules, storage usage, movable location</li>
         <li>Recent captures tray in the Editor: pin, reorder, persists across restarts</li>
-        <li>Import PNG, JPEG and BMP files</li>
       </ul>
       <p class="small muted">The Library is stored in your Windows profile and is not encrypted by SnapForge;
       Windows device encryption or BitLocker protects it.</p>
     </div>
     <figure class="shot">
-      <img src="assets/screenshots/library-dark.jpg" width="720" height="508" loading="lazy"
-           alt="The SnapForge Library: a sidebar with All Captures, Recent, Favorites, Videos, Trash, tags and folders, and capture thumbnails grouped by Today, Yesterday and Earlier this week, one of them a video with a play badge.">
-      <figcaption>Library, development build with fictional captures (the video tile comes from the experimental recording build).</figcaption>
+      <a href="assets/screenshots/library-dark.png"><img src="assets/screenshots/library-dark.png" width="1906" height="1025" loading="lazy"
+           alt="The SnapForge Library: a sidebar with All Captures, Recent, Favorites, Videos, Trash, tags and folders, and capture thumbnails grouped by date."></a>
+      <figcaption>Library with fictional captures. Release-candidate build, 1906×1025.</figcaption>
     </figure>
   </section>
 
-  <section class="feature-row" id="widget" aria-labelledby="widget-title">
+  <section class="feature-row flip" id="widget" aria-labelledby="widget-title">
     <div>
-      <h2 id="widget-title"><img class="icon-sm" src="assets/icons/widget.svg" alt="" width="36" height="36"> Desktop widget <span class="badge badge-dev">Development build</span></h2>
+      <h2 id="widget-title"><img class="icon-sm" src="assets/icons/widget.svg" alt="" width="36" height="36"> Desktop widget <span class="badge badge-dev">Release candidate</span></h2>
       <ul class="checklist">
         <li>A small tab at the top of the screen; hover or click to open it</li>
-        <li>Capture, Editor, Library and your presets in one place</li>
+        <li>Capture, Record, Editor, Library and your presets in one place</li>
         <li>Drag it to the top, left or right edge of any monitor; it remembers where</li>
         <li>Never takes keyboard focus from the app you are working in and hides itself during capture</li>
         <li>Optional auto-hide and launch with Windows</li>
       </ul>
     </div>
-    <div class="shot-pair">
-      <figure class="shot">
-        <img src="assets/screenshots/widget-expanded-dark.jpg" width="405" height="94" loading="lazy"
-             alt="The expanded SnapForge widget with buttons for Capture, Record, Editor, Library and Presets.">
-        <figcaption>Expanded widget. The Record button belongs to the experimental screen recording build.</figcaption>
-      </figure>
-      <figure class="shot">
-        <img src="assets/screenshots/widget-left-dark.jpg" width="138" height="302" loading="lazy"
-             alt="The SnapForge widget docked vertically to the left edge of the screen.">
-        <figcaption>Docked to the left edge.</figcaption>
-      </figure>
-    </div>
+    <figure class="shot">
+      <a href="assets/screenshots/widget-expanded-dark.png"><img src="assets/screenshots/widget-expanded-dark.png" width="405" height="94" loading="lazy"
+           alt="The expanded SnapForge widget with buttons for Capture, Record, Editor, Library and Presets."></a>
+      <figcaption>Expanded widget. Release-candidate build, 405×94.</figcaption>
+    </figure>
   </section>
 
-  <section class="feature-row flip" id="drag-drop" aria-labelledby="dnd-title">
+  <section class="feature-row" id="drag-drop" aria-labelledby="dnd-title">
     <div>
-      <h2 id="dnd-title"><img class="icon-sm" src="assets/icons/drag-drop.svg" alt="" width="36" height="36"> Drag and drop <span class="badge badge-dev">Development build</span></h2>
+      <h2 id="dnd-title"><img class="icon-sm" src="assets/icons/drag-drop.svg" alt="" width="36" height="36"> Drag and drop <span class="badge badge-dev">Release candidate</span></h2>
       <ul class="checklist">
-        <li>Drag from the Editor's Drag button, the recent captures tray or the Library — one capture or several</li>
-        <li>Arrives as an ordinary PNG (or JPEG) file named after the capture and the time</li>
+        <li>Drag from the Editor's Drag button, the recent captures tray or the Library — one capture or several, images or videos</li>
+        <li>Arrives as an ordinary PNG (or JPEG) or MP4 file named after the capture and the time</li>
         <li>Only flattened, redacted images without metadata ever leave SnapForge</li>
-        <li>Temporary files are created only when the other app asks for them and are removed afterwards</li>
-        <li>Drop PNG, JPEG or BMP files onto SnapForge to import them</li>
+        <li>Temporary copies are made only when the other app asks for them; cancelled drags leave nothing, and
+        copies kept for slow uploads can be deleted in Settings at any time</li>
+        <li>Drop PNG, JPEG, BMP or MP4 files onto SnapForge to import them</li>
       </ul>
       <p class="small muted">Tested automatically with Windows drag-and-drop. Compatibility with specific apps
       (File Explorer, browsers, Office, Teams) is still being checked on real PCs.</p>
     </div>
     <figure class="shot">
-      <img src="assets/screenshots/settings-widget-dragdrop-dark.jpg" width="626" height="713" loading="lazy"
-           alt="SnapForge settings for the desktop widget and for drag and drop, including the file format used when dragging captures to other apps.">
-      <figcaption>Widget and drag-and-drop settings, development build.</figcaption>
+      <a href="assets/screenshots/settings-widget-dragdrop-dark.png"><img src="assets/screenshots/settings-widget-dragdrop-dark.png" width="626" height="713" loading="lazy"
+           alt="SnapForge settings for the desktop widget and for drag and drop, including the file format used when dragging captures to other apps."></a>
+      <figcaption>Widget and drag-and-drop settings. Release-candidate build, 626×713.</figcaption>
     </figure>
   </section>
 
-  <section class="feature-row" id="recording" aria-labelledby="recording-title">
+  <section class="feature-row flip" id="recording" aria-labelledby="recording-title">
     <div>
-      <h2 id="recording-title"><img class="icon-sm" src="assets/icons/recording.svg" alt="" width="36" height="36"> Screen recording <span class="badge badge-exp">Experimental</span></h2>
-      <div class="note note-info" role="note"><p><strong>Not approved for release.</strong> Screen recording is
-      being reviewed on a separate development branch. It has been tested automatically on a cloud Windows
-      machine without sound devices or a graphics card; testing on real PCs is pending.</p></div>
+      <h2 id="recording-title"><img class="icon-sm" src="assets/icons/recording.svg" alt="" width="36" height="36"> Screen recording <span class="badge badge-dev">Release candidate</span></h2>
+      <div class="note note-info" role="note"><p><strong>Real-PC testing pending.</strong> Recording has been tested
+      automatically on a cloud Windows machine without sound devices or a graphics card. Sound, graphics-card
+      encoders and high resolutions still need checking on real PCs.</p></div>
       <ul class="checklist">
         <li>Video mode in the capture panel and a Record button on the widget</li>
         <li>Region, window or display to MP4 (H.264 video, AAC audio) using the encoders built into Windows</li>
@@ -202,24 +215,35 @@
         <li>Floating toolbar with elapsed time, Pause/Resume, Stop and Cancel; the toolbar and outline are kept
         out of the video</li>
         <li>Countdown, cursor on or off, hotkeys <kbd>Shift</kbd>+<kbd>F9</kbd> and <kbd>Shift</kbd>+<kbd>F10</kbd></li>
-        <li>Videos in the Library with a player; recordings interrupted by a crash are recovered at the next start
-        (the last second or two can be lost)</li>
+        <li>Recordings interrupted by a crash are recovered at the next start (the last second or two can be lost)</li>
       </ul>
       <p class="small muted">Windows shows its own capture border while recording, and its microphone indicator
       while the microphone is on. Videos cannot be redacted.</p>
     </div>
-    <div class="shot-pair">
-      <figure class="shot">
-        <img src="assets/screenshots/recording-toolbar-dark.jpg" width="719" height="72" loading="lazy"
-             alt="The SnapForge recording toolbar showing a red recording indicator, elapsed time, the recorded size and frame rate, Pause, Stop and Cancel buttons, and System audio and Microphone toggles with level meters.">
-        <figcaption>Recording toolbar (shown here for illustration; in real use it is excluded from the recording).</figcaption>
-      </figure>
-      <figure class="shot">
-        <img src="assets/screenshots/player-dark.jpg" width="720" height="494" loading="lazy"
-             alt="The SnapForge video player playing a recorded test pattern, with a seek bar, time, mute and volume controls.">
-        <figcaption>Player with a recorded test pattern. Experimental build.</figcaption>
-      </figure>
+    <figure class="shot">
+      <a href="assets/screenshots/capture-panel-video-dark.png"><img src="assets/screenshots/capture-panel-video-dark.png" width="746" height="257" loading="lazy"
+           alt="The SnapForge capture panel in Video mode with system audio and microphone switches, frame rate and quality settings and a Record button."></a>
+      <figcaption>Capture panel in Video mode. Release-candidate build, 746×257.</figcaption>
+    </figure>
+  </section>
+
+  <section class="feature-row" id="video-editing" aria-labelledby="video-editing-title">
+    <div>
+      <h2 id="video-editing-title"><img class="icon-sm" src="assets/icons/recording.svg" alt="" width="36" height="36"> Video editing <span class="badge badge-dev">Release candidate</span></h2>
+      <ul class="checklist">
+        <li>Trim the start and end, and remove sections from the middle</li>
+        <li>Step frame by frame and save any frame to the Library as an image</li>
+        <li>Save the edited video to the Library or export it as MP4</li>
+        <li>Export an animated GIF with your choice of frame rate, width and looping</li>
+        <li>Play videos in the built-in player</li>
+      </ul>
+      <p class="small muted">Edited videos are re-encoded. GIFs have at most 256 colours and no sound.</p>
     </div>
+    <figure class="shot">
+      <a href="assets/screenshots/video-editor-dark.png"><img src="assets/screenshots/video-editor-dark.png" width="986" height="673" loading="lazy"
+           alt="The SnapForge video editor with a video preview, a timeline with trim handles and a removed section, frame step buttons and Export MP4 and Export GIF buttons."></a>
+      <figcaption>Video editor. Release-candidate build, 986×673.</figcaption>
+    </figure>
   </section>
 
   <section class="feature-row flip" id="privacy" aria-labelledby="privacy-title">
@@ -227,25 +251,95 @@
       <h2 id="privacy-title"><img class="icon-sm" src="assets/icons/privacy.svg" alt="" width="36" height="36"> Private by design</h2>
       <ul class="checklist">
         <li>No network code: no uploads, sync, accounts, update checks or telemetry</li>
-        <li>No administrator rights needed</li>
+        <li>No administrator rights needed — the installer installs for your Windows account only</li>
         <li>Captures stay in your Windows profile (or a folder you choose)</li>
         <li>Global hotkeys use the standard Windows mechanism — no keyboard hooks</li>
       </ul>
       <p><a href="privacy.html">Read the privacy page</a></p>
     </div>
     <figure class="shot">
-      <img src="assets/screenshots/tray-dark.jpg" width="720" height="129" loading="lazy"
-           alt="The recent captures tray in SnapForge showing thumbnails of recent screenshots and a recording.">
-      <figcaption>Recent captures tray, development build.</figcaption>
+      <a href="assets/screenshots/tray-dark.png"><img src="assets/screenshots/tray-dark.png" width="1906" height="171" loading="lazy"
+           alt="The recent captures tray in SnapForge showing thumbnails of recent screenshots and a recording."></a>
+      <figcaption>Recent captures tray. Release-candidate build, 1906×171.</figcaption>
     </figure>
   </section>
 </div>
 
-<section class="section section-alt" aria-labelledby="next-title">
+<section class="section section-alt" aria-labelledby="gallery-title" id="gallery">
+  <div class="container">
+    <h2 id="gallery-title">Screenshot gallery</h2>
+    <p>Every screen, full size. Taken automatically from the release-candidate build at 1920×1080 on a Windows test
+    machine (dark theme, fictional demo data). Select an image to open it at full resolution.</p>
+    <div class="gallery">
+      <figure class="shot">
+        <a href="assets/screenshots/editor-dark.png"><img src="assets/screenshots/editor-dark.png" width="1906" height="1025" loading="lazy" alt="The SnapForge Editor in dark theme with an annotated screenshot showing an arrow, a callout, a stamp, freehand pen marks and a black redaction bar, with the annotation toolbar along the top and Quick Styles on the right."></a>
+        <figcaption>Editor (1906×1025)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/capture-panel-dark.png"><img src="assets/screenshots/capture-panel-dark.png" width="746" height="257" loading="lazy" alt="The SnapForge capture panel in Image mode: a Selection list set to Region, switches for Preview in Editor, Copy to Clipboard, Save to Library, Cursor and Time Delay, and a large orange Capture button."></a>
+        <figcaption>Capture panel (746×257)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/capture-panel-video-dark.png"><img src="assets/screenshots/capture-panel-video-dark.png" width="746" height="257" loading="lazy" alt="The SnapForge capture panel in Video mode with system audio and microphone switches, frame rate and quality settings and a Record button."></a>
+        <figcaption>Capture panel, Video mode (746×257)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/widget-expanded-dark.png"><img src="assets/screenshots/widget-expanded-dark.png" width="405" height="94" loading="lazy" alt="The expanded SnapForge widget with buttons for Capture, Record, Editor, Library and Presets."></a>
+        <figcaption>Desktop widget (405×94)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/library-dark.png"><img src="assets/screenshots/library-dark.png" width="1906" height="1025" loading="lazy" alt="The SnapForge Library: a sidebar with All Captures, Recent, Favorites, Videos, Trash, tags and folders, and capture thumbnails grouped by date."></a>
+        <figcaption>Library (1906×1025)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/library-videos-dark.png"><img src="assets/screenshots/library-videos-dark.png" width="1906" height="1025" loading="lazy" alt="SnapForge library, videos view, release-candidate build."></a>
+        <figcaption>Library, Videos view (1906×1025)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/ocr-dark.png"><img src="assets/screenshots/ocr-dark.png" width="626" height="513" loading="lazy" alt="The SnapForge Extract text window showing recognised lines of text from a capture, a language list and Copy button."></a>
+        <figcaption>Extract text (626×513)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/recording-dark.png"><img src="assets/screenshots/recording-dark.png" width="695" height="430" loading="lazy" alt="SnapForge recording in progress, release-candidate build."></a>
+        <figcaption>Recording in progress (695×430)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/recording-toolbar-dark.png"><img src="assets/screenshots/recording-toolbar-dark.png" width="719" height="72" loading="lazy" alt="SnapForge recording toolbar, release-candidate build."></a>
+        <figcaption>Recording toolbar (719×72)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/video-editor-dark.png"><img src="assets/screenshots/video-editor-dark.png" width="986" height="673" loading="lazy" alt="The SnapForge video editor with a video preview, a timeline with trim handles and a removed section, frame step buttons and Export MP4 and Export GIF buttons."></a>
+        <figcaption>Video editor (986×673)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/player-dark.png"><img src="assets/screenshots/player-dark.png" width="806" height="553" loading="lazy" alt="SnapForge video player, release-candidate build."></a>
+        <figcaption>Video player (806×553)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/settings-widget-dragdrop-dark.png"><img src="assets/screenshots/settings-widget-dragdrop-dark.png" width="626" height="713" loading="lazy" alt="SnapForge settings for the desktop widget and for drag and drop, including the file format used when dragging captures to other apps."></a>
+        <figcaption>Widget and drag-and-drop settings (626×713)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/settings-recording-dark.png"><img src="assets/screenshots/settings-recording-dark.png" width="626" height="713" loading="lazy" alt="SnapForge recording settings, release-candidate build."></a>
+        <figcaption>Recording settings (626×713)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/welcome-dark.png"><img src="assets/screenshots/welcome-dark.png" width="626" height="633" loading="lazy" alt="The SnapForge welcome window shown at first start, explaining how to capture, the desktop widget, where the Library is stored, recording, redaction and where to find help."></a>
+        <figcaption>First-start welcome (626×633)</figcaption>
+      </figure>
+      <figure class="shot">
+        <a href="assets/screenshots/tray-dark.png"><img src="assets/screenshots/tray-dark.png" width="1906" height="171" loading="lazy" alt="The recent captures tray in SnapForge showing thumbnails of recent screenshots and a recording."></a>
+        <figcaption>Recent captures tray (1906×171)</figcaption>
+      </figure>
+    </div>
+  </div>
+</section>
+
+<section class="section" aria-labelledby="next-title">
   <div class="container">
     <h2 id="next-title">Coming later <span class="badge badge-plan">Planned</span></h2>
-    <p>Proposed for later versions and not started: trimming videos, saving a video frame as an image, animated GIF
-    export, webcam picture-in-picture, drawing on screen while recording and cursor highlights.
+    <p>Proposed for later versions and not started: webcam picture-in-picture, drawing on screen while recording,
+    cursor highlights, joining several clips, and redaction for videos.
     <a href="roadmap.html">See the roadmap</a>.</p>
   </div>
 </section>

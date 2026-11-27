@@ -205,6 +205,23 @@ class VerifierTests(unittest.TestCase):
         self.assertFails("not a GitHub Release asset URL", cfg, gh_release(asset), asset)
 
 
+class LinkNameTests(unittest.TestCase):
+    """An image link is named by its alt text, whether written <img> or <img/>; an empty link is reported."""
+
+    def count(self, html: str) -> int:
+        p = build.PageParser()
+        p.feed(html)
+        return p.empty_links
+
+    def test_image_alt_names_the_link(self):
+        self.assertEqual(self.count('<a href="x.png"><img src="x.png" alt="Editor"></a>'), 0)
+        self.assertEqual(self.count('<a href="x.png"><img src="x.png" alt="Editor"/></a>'), 0)
+
+    def test_empty_links_are_reported(self):
+        self.assertEqual(self.count('<a href="x.png"><img src="x.png" alt=""></a>'), 1)
+        self.assertEqual(self.count('<a href="x.html"></a>'), 1)
+
+
 class BuildGateTests(unittest.TestCase):
     def setUp(self):
         self.tmp = Path(tempfile.mkdtemp())
