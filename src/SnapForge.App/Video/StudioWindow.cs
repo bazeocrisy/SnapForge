@@ -212,7 +212,7 @@ internal sealed class StudioWindow : Window
         SourceInitialized += (_, _) =>
         {
             WindowChrome.UseDarkTitleBar(this, ThemeManager.IsDark);
-            Excluded = CaptureExclusion.Apply(this); // never part of a recording
+            Excluded = ExcludeFromCapture && CaptureExclusion.Apply(this); // never part of a recording
         };
         Loaded += (_, _) =>
         {
@@ -243,6 +243,9 @@ internal sealed class StudioWindow : Window
 
     /// <summary>True if Windows confirmed the window is excluded from screen capture.</summary>
     public bool Excluded { get; private set; }
+
+    /// <summary>False only for the documentation screenshot tour (so the window can be photographed).</summary>
+    internal bool ExcludeFromCapture { get; init; } = true;
 
     /// <summary>Completes when the preview camera has been released (the recorder may then open it).</summary>
     public Task CameraReleased => _cameraReleased;

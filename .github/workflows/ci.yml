@@ -352,7 +352,7 @@ jobs:
         shell: pwsh
         run: |
           $out = Join-Path $env:RUNNER_TEMP "screenshots"
-          $names = "editor-dark","library-dark","library-videos-dark","capture-panel-dark","capture-panel-video-dark","widget-expanded-dark","recording-dark","recording-toolbar-dark","video-editor-dark","player-dark","settings-widget-dragdrop-dark","settings-recording-dark","ocr-dark","welcome-dark","tray-dark","quickdock-collapsed-dark","quickdock-keyboard-dark"
+          $names = "editor-dark","library-dark","library-videos-dark","capture-panel-dark","capture-panel-video-dark","widget-expanded-dark","recording-dark","recording-toolbar-dark","video-editor-dark","player-dark","settings-widget-dragdrop-dark","settings-recording-dark","ocr-dark","welcome-dark","tray-dark","quickdock-collapsed-dark","quickdock-keyboard-dark","studio-dark"
           foreach ($n in $names) {
             $f = Join-Path $out "$n.png"
             if (-not (Test-Path $f)) { Write-Output "WEBPNG-MISSING $n"; continue }

@@ -111,6 +111,13 @@ internal static class ScreenshotTour
                     log.Add("OCR screenshot skipped: no OCR language installed on this machine.");
                 }
 
+                // SnapForge Studio (recording set-up), screen-only default: no camera is opened for the tour.
+                var studio = new Video.StudioWindow(services, listCameras: () => []) { ExcludeFromCapture = false };
+                studio.Show();
+                Pump(700);
+                SaveScreen(studio, null, Path.Combine(outputFolder, $"studio-{suffix}.png"), log);
+                studio.Close();
+
                 main.ShowLibraryWorkspace();
                 main.LibraryPane.SelectIds(services.Library.Records.OrderByDescending(r => r.CreatedUtc).Take(2).Select(r => r.Id));
                 Pump(900);
