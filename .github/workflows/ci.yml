@@ -388,8 +388,7 @@ jobs:
     name: Library scale benchmarks (production durability)
     needs: windows
     # Long-running (up to ~2 h): once per pushed commit, not again for the pull-request merge build.
-    if: github.event_name != 'pull_request'
-    if: ${{ !cancelled() && needs.windows.outputs.packaged == 'true' }}
+    if: ${{ !cancelled() && needs.windows.outputs.packaged == 'true' && github.event_name != 'pull_request' }}
     runs-on: windows-latest
     timeout-minutes: 150
     steps:
