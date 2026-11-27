@@ -30,8 +30,13 @@ KL-V01…KL-V13 are detailed in [VIDEO-ACCEPTANCE.md](VIDEO-ACCEPTANCE.md).
 - Printing prints the flattened image fitted to the page (no print preview or layout options).
 - Annotation copy/paste uses an in-app clipboard (not shared with other programs).
 - Alignment guides, grouping, snapping and templates are not included (deferred).
-- Video editing: trim and removed sections re-encode the video (quality setting applies); combining clips, webcam
-  overlay, recording annotations and cursor highlight are not included (deferred).
+- Video editing: trim and removed sections re-encode the video (quality setting applies); combining clips, adding a
+  camera overlay to an existing recording (the camera is recorded live in SnapForge Studio), recording annotations and
+  cursor highlight are not included (deferred).
+- Recordings use a constant frame rate (30 or 60 FPS) while sound is sample-accurate: after **pause/resume** the
+  picture can be up to half a frame (≤ 17 ms at 30 FPS) away from the sound — measured 1.8 ms on CI (run 119); the
+  self-test limit is 20 ms. A moment exactly at the resume instant can be cut by the pause in one stream and not the
+  other.
 - GIF export: at most 256 colours, no sound; long ranges make large files.
 - Library backups (format 2, from rc.2) include recordings, the Trash, metadata and damaged items. Backups made with
   rc.1 contain images only (they still restore, labelled as such). A backup with any corrupt entry is refused as a
