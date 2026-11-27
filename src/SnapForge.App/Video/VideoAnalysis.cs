@@ -192,11 +192,10 @@ internal static unsafe class VideoAnalysis
                     nint buffer = Mf.ConvertToContiguousBuffer(sample);
                     try
                     {
-                        byte* data = Mf.LockBuffer(buffer, out _, out int length);
+                        byte* data = LockDecodedRows(buffer, h, out int stride, out bool locked2D);
                         try
                         {
                             var pixels = new byte[w * h * 4];
-                            int stride = length / h;
                             for (int y = 0; y < h; y++)
                             {
                                 new ReadOnlySpan<byte>(data + ((long)y * stride), w * 4).CopyTo(pixels.AsSpan(y * w * 4));
@@ -211,7 +210,7 @@ internal static unsafe class VideoAnalysis
                         }
                         finally
                         {
-                            Mf.UnlockBuffer(buffer);
+                            Mf.UnlockRows(buffer, locked2D);
                         }
                     }
                     finally
@@ -231,6 +230,24 @@ internal static unsafe class VideoAnalysis
         {
             Com.Release(ref reader);
         }
+    }
+
+    /// <summary>
+    /// Locks a decoded RGB32 frame for reading top row first. The reader's colour converter may deliver RGB32
+    /// bottom-up (a negative pitch); a plain <c>IMFMediaBuffer::Lock</c> then returns the rows bottom row first, so the
+    /// picture read row by row was upside down (positions were never checked before: only solid colours and luma).
+    /// IMF2DBuffer::Lock2D gives scanline 0 = top row and the signed pitch; buffers without it are read as before
+    /// (contiguous, top-down, length / height bytes per row). Unlock with <see cref="Mf.UnlockRows"/>.
+    /// </summary>
+    internal static byte* LockDecodedRows(nint buffer, int height, out int pitch, out bool locked2D)
+    {
+        byte* scan0 = Mf.LockRows(buffer, 1, height, out pitch, out locked2D);
+        if (!locked2D)
+        {
+            pitch = Mf.GetBufferLength(buffer) / Math.Max(1, height);
+        }
+
+        return scan0;
     }
 
     /// <summary>Opens a file with decoding to RGB32 video / 16-bit PCM audio.</summary>
