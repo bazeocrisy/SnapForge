@@ -61,11 +61,14 @@ public partial class ReleaseCandidateUiTests
             Assert.True(controls.Count >= 18);
             if (width >= 1280)
             {
-                // At the default window size the toolbar must stay one row (a second row costs canvas height).
-                double row = w.UndoButton.ActualHeight + 12;
-                Assert.True(w.ToolButtonsPanel.ActualHeight <= row,
-                    $"toolbar wraps at {width} px: tools {w.ToolButtonsPanel.DesiredSize.Width:0}x{w.ToolButtonsPanel.ActualHeight:0}, " +
-                    $"edit {((FrameworkElement)w.UndoButton.Parent).ActualWidth:0}, output {((FrameworkElement)w.SaveButton.Parent).ActualWidth:0}, content {content.ActualWidth:0}");
+                // A 1280-px window (default size) must fit the toolbar on one row: a second row costs canvas height.
+                // Measured from the controls' desired widths because the CI display may be narrower than 1280 px.
+                double tools = w.ToolButtonsPanel.Children.OfType<UIElement>().Where(e => e.Visibility == Visibility.Visible).Sum(e => e.DesiredSize.Width);
+                double edit = ((FrameworkElement)w.UndoButton.Parent).DesiredSize.Width;
+                double output = ((FrameworkElement)w.SaveButton.Parent).DesiredSize.Width;
+                double available = 1280 - (w.ActualWidth - content.ActualWidth) - 16; // window frame, toolbar padding
+                Assert.True(tools + edit + output <= available,
+                    $"one toolbar row needs {tools + edit + output:0} px (tools {tools:0}, edit {edit:0}, output {output:0}) but a 1280-px window offers {available:0}");
             }
 
             foreach (FrameworkElement c in controls)
