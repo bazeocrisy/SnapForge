@@ -136,7 +136,7 @@
             <!-- Image options -->
             <Grid x:Name="ImageOptions">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="236" />
+                    <ColumnDefinition Width="272" />
                     <ColumnDefinition Width="8" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>
@@ -213,7 +213,7 @@
             <!-- Video options (milestone V1) -->
             <Grid x:Name="VideoOptions" Visibility="Collapsed">
                 <Grid.ColumnDefinitions>
-                    <ColumnDefinition Width="236" />
+                    <ColumnDefinition Width="272" />
                     <ColumnDefinition Width="8" />
                     <ColumnDefinition Width="*" />
                 </Grid.ColumnDefinitions>

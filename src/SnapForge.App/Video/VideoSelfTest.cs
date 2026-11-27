@@ -309,7 +309,14 @@ internal static partial class VideoSelfTest
             bar.Update(TimeSpan.FromSeconds(83), false, 0.5f, 0);
             bar.UpdateLayout();
             toolbarRect = SnapForge.App.Interop.PhysicalPlacement.GetBounds(bar);
-            ready.Set();
+            // Ready only once the toolbar has been drawn: the control run once recorded the area before the toolbar's
+            // first frame reached the screen (CI run 119: 99.8 % background without exclusion).
+            bar.Activate();
+            _ = bar.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, () =>
+            {
+                toolbarRect = SnapForge.App.Interop.PhysicalPlacement.GetBounds(bar);
+                ready.Set();
+            });
             var timer = new System.Windows.Threading.DispatcherTimer { Interval = TimeSpan.FromMilliseconds(50) };
             timer.Tick += (_, _) =>
             {
