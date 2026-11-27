@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>User Guide — SnapForge</title>
-<meta name="description" content="How to capture, annotate, redact, organise and share screenshots with SnapForge, plus the experimental screen recorder and keyboard shortcuts.">
+<meta name="description" content="How to capture, annotate, redact, organise and share screenshots with SnapForge, plus scrolling capture, text extraction, screen recording, video editing and keyboard shortcuts.">
 
 <link rel="canonical" href="https://bazeocrisy.github.io/SnapForge/guide.html">
 <meta name="theme-color" content="#0b1220">
@@ -13,7 +13,7 @@
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="SnapForge">
 <meta property="og:title" content="User Guide">
-<meta property="og:description" content="How to capture, annotate, redact, organise and share screenshots with SnapForge, plus the experimental screen recorder and keyboard shortcuts.">
+<meta property="og:description" content="How to capture, annotate, redact, organise and share screenshots with SnapForge, plus scrolling capture, text extraction, screen recording, video editing and keyboard shortcuts.">
 <meta property="og:url" content="https://bazeocrisy.github.io/SnapForge/guide.html">
 <meta property="og:image" content="https://bazeocrisy.github.io/SnapForge/assets/img/og-image.png">
 <meta property="og:image:width" content="1200">
@@ -70,7 +70,9 @@
       <li><a href="#share">Saving and sharing</a></li>
       <li><a href="#library">The Library</a></li>
       <li><a href="#widget">The desktop widget</a></li>
+      <li><a href="#text">Scrolling capture and text</a></li>
       <li><a href="#record">Screen recording</a></li>
+      <li><a href="#video-edit">Editing videos</a></li>
       <li><a href="#shortcuts">Keyboard shortcuts</a></li>
       <li><a href="#data">Where your data lives</a></li>
     </ol>
@@ -78,20 +80,24 @@
 
   <article class="prose">
     <h2 id="start">Getting started</h2>
-    <p>Run <code>SnapForge.exe</code>. The <strong>capture panel</strong> opens, and a small <strong>widget</strong>
+    <p>Start SnapForge from the Start menu (installer) or run <code>SnapForge.exe</code> (portable ZIP). On the first
+    start a short welcome explains the basics; reopen it with <em>Help → Getting started</em>. The <strong>capture panel</strong> opens, and a small <strong>widget</strong>
     tab appears at the top centre of your screen. SnapForge also puts an icon in the notification area (next to
-    the clock); right-click it for the app's menu, including Exit.</p>
+    the clock); click it to open the capture panel, or right-click it for the app's menu, including Exit.</p>
     <p>SnapForge has three workspaces: <strong>Capture</strong> (the panel), the <strong>Editor</strong> and the
     <strong>Library</strong>. Switch with the buttons in the top-right corner or with <kbd>Ctrl</kbd>+<kbd>E</kbd>
     and <kbd>Ctrl</kbd>+<kbd>L</kbd>.</p>
 
     <h2 id="capture">Taking a capture</h2>
     <ol>
-      <li>In the capture panel, pick a <strong>Selection</strong>: Region, Window, Display or Full screen.</li>
+      <li>In the capture panel, pick a <strong>Selection</strong>: Region, Window, Active window, Display or Full screen.</li>
       <li>Click the big <strong>Capture</strong> button or press <kbd>Print Screen</kbd> from any app.</li>
       <li>For a region, drag a rectangle over the frozen screen. For a window or display, click it.
+      The magnifier shows the exact pixel; arrow keys move the selection by one pixel (<kbd>Shift</kbd> for ten).
       Press <kbd>Esc</kbd> or right-click to cancel.</li>
     </ol>
+    <p><em>Capture → Repeat last capture</em> (<kbd>Ctrl</kbd>+<kbd>R</kbd>) captures the same area again;
+    <em>New from clipboard</em> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd>) opens a copied image as a capture.</p>
     <p>Options in the panel: <em>Preview in Editor</em>, <em>Copy to Clipboard</em>, <em>Save to Library</em>
     (turn off to capture without keeping a copy), <em>Cursor</em> and <em>Time Delay</em>. Save combinations as
     <strong>Presets</strong>, each with its own hotkey.</p>
@@ -99,13 +105,17 @@
     <h2 id="annotate">Annotating</h2>
     <p>The Editor toolbar has Select (<kbd>V</kbd>), Arrow (<kbd>A</kbd>), Line (<kbd>L</kbd>), Shape/Rectangle
     (<kbd>R</kbd>), Ellipse (<kbd>E</kbd>), Highlight (<kbd>H</kbd>), Text (<kbd>T</kbd>), Step (<kbd>N</kbd>),
-    Redact (<kbd>X</kbd>) and Crop (<kbd>C</kbd>).</p>
+    Pen (<kbd>D</kbd>), Callout (<kbd>K</kbd>), Stamp (<kbd>S</kbd>), Redact (<kbd>X</kbd>), Blur (<kbd>B</kbd>),
+    Pixelate (<kbd>P</kbd>) and Crop (<kbd>C</kbd>). The <em>Image</em> menu rotates, flips, resizes and changes
+    the canvas size, and adds a border, drop shadow or watermark.</p>
     <ul>
       <li>Hold <kbd>Shift</kbd> while drawing to keep lines straight and shapes square.</li>
-      <li>Click an annotation to select it; drag to move, use the handles to resize, double-click text to edit,
+      <li>Click an annotation to select it; drag to move, change its size with the thickness slider, double-click text to edit,
       <kbd>Del</kbd> to remove.</li>
       <li>Pick colour and thickness from <strong>Quick Styles</strong>; <em>Save current</em> adds your own, and
       right-click marks a favourite.</li>
+      <li>Copy, paste and duplicate annotations with <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>C</kbd>,
+      <kbd>Ctrl</kbd>+<kbd>V</kbd> and <kbd>Ctrl</kbd>+<kbd>D</kbd>.</li>
       <li>Undo with <kbd>Ctrl</kbd>+<kbd>Z</kbd>, redo with <kbd>Ctrl</kbd>+<kbd>Y</kbd>.</li>
     </ul>
 
@@ -115,34 +125,49 @@
       <p><strong>What is removed, and where.</strong> Images you export, copy or drag out contain only the black
       box. The editable copy in your Library still keeps the original pixels so you can undo the redaction later;
       the Editor shows a banner while that is the case. Choose <strong>Sanitize</strong> (in the banner, or in the
-      Library) to remove the originals for good. Videos cannot be redacted.</p>
+      Library) to remove the originals for good. Blur and pixelate are not redaction. Videos cannot be redacted.</p>
     </div>
 
     <h2 id="share">Saving and sharing</h2>
     <ul>
       <li><strong>Copy</strong> (<kbd>Ctrl</kbd>+<kbd>C</kbd>) puts the finished image on the clipboard.</li>
-      <li><strong>Export</strong> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) saves PNG or JPEG.</li>
+      <li><strong>Export</strong> (<kbd>Ctrl</kbd>+<kbd>S</kbd>) saves PNG, JPEG, BMP or TIFF; <strong>Print</strong> is <kbd>Ctrl</kbd>+<kbd>P</kbd>.</li>
       <li><strong>Drag</strong>: use the Drag button in the Editor, or drag a thumbnail from the recent captures
       tray or the Library, into an email, chat, document or folder. Settings → Drag and drop chooses PNG or JPEG.</li>
     </ul>
 
     <h2 id="library">The Library</h2>
-    <p>Every capture is saved to the Library and stays editable. Use the sidebar for All Captures, Recent,
-    Favorites, Tags, Folders and Trash; search and sort above the thumbnails. Double-click or press
+    <p>Every capture is saved to the Library and stays editable. Use the sidebar for All Captures, Recent (7 days),
+    Favorites, Videos, Tags, Folders and Trash; search and sort above the thumbnails. Double-click or press
     <kbd>Enter</kbd> to open a capture, <kbd>F2</kbd> to rename, <kbd>Del</kbd> to move it to the Trash, and
     right-click for more. Settings has backup and restore, retention, storage usage and the Library location.</p>
 
     <h2 id="widget">The desktop widget</h2>
-    <p>Hover over (or click, depending on Settings) the tab at the top of the screen to open Capture, Editor,
+    <p>Hover over (or click, depending on Settings) the tab at the top of the screen to open Capture, Record, Editor,
     Library and Presets. Drag it by its grip to the top, left or right edge of any display. If you lose it, choose
     <em>View → Show capture widget</em>. It never takes keyboard focus and hides itself during a capture.</p>
 
-    <h2 id="record">Screen recording <span class="badge badge-exp">Experimental</span></h2>
-    <p>Only in experimental builds, which are not released. In the capture panel choose <strong>Video</strong>,
+    <h2 id="text">Scrolling capture and text</h2>
+    <p><em>Capture → Scrolling capture</em> (<kbd>Ctrl</kbd>+<kbd>6</kbd>): select the part of the window that
+    scrolls, then choose <strong>Auto-scroll</strong> or scroll yourself and choose <strong>Add frame</strong> after each step, then <strong>Finish</strong>. If the
+    app redraws while scrolling and the pieces cannot be matched exactly, SnapForge tells you instead of guessing —
+    scroll a little less at a time.</p>
+    <p><em>Image → Extract text</em> (<kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd>) reads the text in a capture
+    with Windows' built-in, offline text recognition. Check and edit the text, then copy it. If no recognition
+    language is installed, add one in Windows Settings → Time &amp; language → Language &amp; region.</p>
+
+    <h2 id="record">Screen recording</h2>
+    <p>In the capture panel choose <strong>Video</strong>,
     pick region, window or display, then <strong>Record</strong> (or <kbd>Shift</kbd>+<kbd>F9</kbd>). After a
     3-second countdown, a floating toolbar shows the elapsed time with Pause/Resume, Stop and Cancel, and switches
     for system sound and microphone. <kbd>Shift</kbd>+<kbd>F9</kbd> pauses and resumes; <kbd>Shift</kbd>+<kbd>F10</kbd>
     stops and saves an MP4 to the Library. Windows shows a border around what is being recorded.</p>
+
+    <h2 id="video-edit">Editing videos</h2>
+    <p>In the Library, right-click a video and choose <em>Edit video</em>. Set the start and end with
+    <kbd>[</kbd> and <kbd>]</kbd>, mark sections to remove with <kbd>M</kbd>, and step frame by frame with
+    <kbd>,</kbd> and <kbd>.</kbd>. Save a frame to the Library as an image, save the edited video to the Library,
+    or export it as MP4 or as an animated GIF. Edited videos are re-encoded; GIFs have no sound.</p>
 
     <h2 id="shortcuts">Keyboard shortcuts</h2>
     <div class="table-wrap">
@@ -159,8 +184,10 @@
           <tr><td>Delete selected annotation</td><td><kbd>Del</kbd></td></tr>
           <tr><td>Zoom in / out / fit / 1:1</td><td><kbd>Ctrl</kbd>+<kbd>=</kbd> / <kbd>Ctrl</kbd>+<kbd>−</kbd> / <kbd>Ctrl</kbd>+<kbd>0</kbd> / <kbd>Ctrl</kbd>+<kbd>Alt</kbd>+<kbd>0</kbd>, or <kbd>Ctrl</kbd>+wheel</td></tr>
           <tr><td>Pin the current capture in the tray / Close capture</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>P</kbd> / <kbd>Ctrl</kbd>+<kbd>W</kbd></td></tr>
-          <tr><td>Start recording / pause / resume (experimental)</td><td><kbd>Shift</kbd>+<kbd>F9</kbd></td></tr>
-          <tr><td>Stop and save recording (experimental)</td><td><kbd>Shift</kbd>+<kbd>F10</kbd></td></tr>
+          <tr><td>Active window / Scrolling capture / Repeat last capture</td><td><kbd>Ctrl</kbd>+<kbd>5</kbd> / <kbd>Ctrl</kbd>+<kbd>6</kbd> / <kbd>Ctrl</kbd>+<kbd>R</kbd></td></tr>
+          <tr><td>New from clipboard / Extract text</td><td><kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>V</kbd> / <kbd>Ctrl</kbd>+<kbd>Shift</kbd>+<kbd>T</kbd></td></tr>
+          <tr><td>Start recording / pause / resume</td><td><kbd>Shift</kbd>+<kbd>F9</kbd></td></tr>
+          <tr><td>Stop and save recording</td><td><kbd>Shift</kbd>+<kbd>F10</kbd></td></tr>
         </tbody>
       </table>
     </div>
@@ -170,7 +197,8 @@
       <li>Library: <code>%LOCALAPPDATA%\SnapForge\Library</code>, unless you choose another folder in Settings.</li>
       <li>Settings: <code>%LOCALAPPDATA%\SnapForge\settings.json</code>.</li>
       <li>Error logs (text only, never images): <code>%LOCALAPPDATA%\SnapForge\logs</code>.</li>
-      <li>Temporary copies for drag-and-drop are deleted automatically.</li>
+      <li>Temporary copies for drag-and-drop: removed at once when a drag is cancelled; after a drop they are kept
+      up to 24 hours so slow uploads finish. <em>Settings → Delete drag-and-drop copies now</em> removes them.</li>
     </ul>
     <p>Library backups (.zip) contain images only; back up the Library's <code>videos</code> folder separately.</p>
   </article>
