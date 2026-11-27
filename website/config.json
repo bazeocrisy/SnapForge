@@ -1,0 +1,23 @@
+{
+  "_comment": "Central website configuration. Edit, then run `python3 website/build.py`. See website/README.md. Leave values null/empty until the owner has approved and verified them; unconfigured items are hidden or shown as 'not available yet'.",
+  "siteUrl": "https://bazeocrisy.github.io/SnapForge/",
+  "repositoryUrl": "https://github.com/bazeocrisy/SnapForge",
+  "release": {
+    "ownerApproved": false,
+    "version": null,
+    "date": null,
+    "downloadUrl": null,
+    "fileName": null,
+    "sizeBytes": null,
+    "sha256": null,
+    "signed": false,
+    "signer": null,
+    "releaseNotesUrl": null,
+    "packageType": "portable"
+  },
+  "donations": {
+    "githubSponsors": { "url": null, "verified": false },
+    "buyMeACoffee": { "url": null, "verified": false },
+    "paypal": { "url": null, "verified": false }
+  }
+}

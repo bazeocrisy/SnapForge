@@ -1,0 +1,138 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>About and License — SnapForge</title>
+<meta name="description" content="About the SnapForge project, its MIT License, third-party components, video codec notes and trademarks.">
+
+<link rel="canonical" href="https://bazeocrisy.github.io/SnapForge/about.html">
+<meta name="theme-color" content="#0b1220">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SnapForge">
+<meta property="og:title" content="About and License">
+<meta property="og:description" content="About the SnapForge project, its MIT License, third-party components, video codec notes and trademarks.">
+<meta property="og:url" content="https://bazeocrisy.github.io/SnapForge/about.html">
+<meta property="og:image" content="https://bazeocrisy.github.io/SnapForge/assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SnapForge logo with the slogan Capture. Create. Share.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="assets/img/logo-mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/logo-mark.png">
+<link rel="stylesheet" href="assets/css/site.css">
+<script src="assets/js/site.js" defer></script>
+
+</head>
+<body class="">
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html"><img src="assets/img/logo-mark.svg" alt="" width="32" height="32"><span>Snap<span class="brand-accent">Forge</span></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" hidden>
+      <span class="nav-toggle-bars" aria-hidden="true"></span><span class="nav-toggle-label">Menu</span>
+    </button>
+    <nav id="site-nav" class="site-nav" aria-label="Main">
+      <ul>
+<li><a href="index.html">Home</a></li>
+<li><a href="features.html">Features</a></li>
+<li><a href="download.html">Download</a></li>
+<li><a href="guide.html">User Guide</a></li>
+<li><a href="whats-new.html">What's New</a></li>
+<li><a href="roadmap.html">Roadmap</a></li>
+<li><a href="support.html">Support</a></li>
+<li><a href="donate.html">Donate</a></li>
+      </ul>
+    </nav>
+  </div>
+  <p class="status-strip"><span class="container">In development — no public release yet. <a href="roadmap.html">Project status</a></span></p>
+</header>
+<main id="main" tabindex="-1">
+<section class="page-hero">
+  <div class="container">
+    <p class="eyebrow">About</p>
+    <h1>About SnapForge</h1>
+    <p class="lead">An independent, open-source screenshot tool for Windows, built in the open.</p>
+  </div>
+</section>
+
+<div class="container narrow section prose">
+  <h2 id="project">The project</h2>
+  <p>SnapForge is written in C# with .NET 10 and WPF and uses only APIs that ship with Windows for capture, video
+  and audio. Development happens in public on
+  <a href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">GitHub<span class="visually-hidden"> (external site)</span></a>,
+  where every change is built and tested automatically on Windows before review.</p>
+  <p>Principles: free for everyone, local by default, no subscriptions, accounts, ads or telemetry, and honest
+  status for every feature.</p>
+
+  <h2 id="license">License</h2>
+  <p>SnapForge is released under the MIT License. You may use, copy, modify and distribute it, including
+  commercially, provided the copyright notice and license text are kept. It is provided “as is”, without warranty
+  of any kind. The full text:</p>
+  <pre class="license"><code>MIT License
+
+Copyright (c) 2026 bazeocrisy
+
+Permission is hereby granted, free of charge, to any person obtaining a copy
+of this software and associated documentation files (the &quot;Software&quot;), to deal
+in the Software without restriction, including without limitation the rights
+to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+copies of the Software, and to permit persons to whom the Software is
+furnished to do so, subject to the following conditions:
+
+The above copyright notice and this permission notice shall be included in all
+copies or substantial portions of the Software.
+
+THE SOFTWARE IS PROVIDED &quot;AS IS&quot;, WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+SOFTWARE.</code></pre>
+
+  <h2 id="third-party">Third-party components</h2>
+  <p>The Windows build includes the .NET runtime and WPF from Microsoft under the MIT License and related
+  permissive licenses. The full list is in <code>THIRD-PARTY-NOTICES.md</code>, included in every download and in
+  the source code.</p>
+
+  <h2 id="codecs">Video formats</h2>
+  <p>Screen recording (experimental) writes MP4 files using the H.264 and AAC encoders built into Windows; SnapForge
+  does not include its own codecs. H.264 and AAC are patent-licensed formats; the licensing position for
+  distributing an app that uses Windows' built-in encoders will be confirmed before screen recording is released.</p>
+
+  <h2 id="trademarks">Name and trademarks</h2>
+  <p>“SnapForge” is the project's name. Windows, Microsoft Defender and SmartScreen are trademarks of Microsoft.
+  Other names belong to their owners. SnapForge is an independent project and is not affiliated with or endorsed
+  by Microsoft or any screenshot software company.</p>
+
+  <h2 id="site">This website</h2>
+  <p>Plain HTML and CSS with one small local script; no third-party resources. Screenshots are real captures of
+  development builds made by the project's automated tests, with fictional demo data. The logo and icons are
+  original artwork for the project.</p>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a class="brand" href="index.html"><img src="assets/img/logo-mark.svg" alt="" width="28" height="28"><span>Snap<span class="brand-accent">Forge</span></span></a>
+      <p class="slogan">Capture. Create. Share.</p>
+      <p class="small">Free and open source under the MIT License. No subscriptions, accounts, ads or telemetry.</p>
+    </div>
+    <nav aria-label="Footer">
+      <ul>
+<li><a href="privacy.html">Privacy</a></li>
+<li><a href="about.html" aria-current="page">About & License</a></li>
+<li><a href="support.html">Report a problem</a></li>
+<li><a href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">Source code on GitHub<span class="visually-hidden"> (external site)</span></a></li>
+      </ul>
+    </nav>
+  </div>
+  <p class="container small footer-legal">© 2026 bazeocrisy and SnapForge contributors. Screenshots on this site show development builds with fictional demo data.</p>
+</footer>
+</body>
+</html>

@@ -1,0 +1,90 @@
+<!--meta {"title": "Support and FAQ", "description": "Get help with SnapForge, report bugs and security problems, and read answers to common questions."} -->
+<section class="page-hero">
+  <div class="container">
+    <p class="eyebrow">Support</p>
+    <h1>Support and FAQ</h1>
+    <p class="lead">SnapForge is a free, open-source project. Help is provided on GitHub on a best-effort basis.</p>
+  </div>
+</section>
+
+<div class="container narrow section prose">
+  <h2 id="report">Report a bug or suggest a feature</h2>
+  <p>Open an issue on
+  <a href="https://github.com/bazeocrisy/SnapForge/issues" rel="noopener noreferrer">GitHub Issues<span class="visually-hidden"> (external site)</span></a>
+  (a free GitHub account is needed). Please include:</p>
+  <ul>
+    <li>The SnapForge version and commit from <em>Help → About</em>.</li>
+    <li>Your Windows version (<em>Settings → System → About</em>) and your display setup (number of monitors,
+    scaling).</li>
+    <li>What you did, what you expected and what happened instead.</li>
+    <li>Error logs from <code>%LOCALAPPDATA%\SnapForge\logs</code> if there are any (they contain text, never
+    images).</li>
+  </ul>
+  <div class="note" role="note"><p><strong>Check before you attach.</strong> Issues are public. Do not attach
+  screenshots or recordings that show private information — redact images first, and remember that videos
+  cannot be redacted.</p></div>
+
+  <h2 id="security">Report a security problem</h2>
+  <p>Please do not describe security vulnerabilities in a public issue. Use the repository's
+  <a href="https://github.com/bazeocrisy/SnapForge/security" rel="noopener noreferrer">Security page<span class="visually-hidden"> (external site)</span></a>
+  to report privately if it is available; otherwise open an issue that only asks the maintainer for a private
+  contact, without technical details.</p>
+
+  <h2 id="faq">Frequently asked questions</h2>
+  <details class="faq">
+    <summary>Is SnapForge really free?</summary>
+    <p>Yes. It is open source under the MIT License, with no subscriptions, paid tiers, accounts or ads.
+    Donations are optional and never unlock features.</p>
+  </details>
+  <details class="faq">
+    <summary>When can I download it?</summary>
+    <p>When the first release has been reviewed and approved. The <a href="download.html">Download page</a> will
+    show it, with its checksum.</p>
+  </details>
+  <details class="faq">
+    <summary>Does SnapForge upload my screenshots or collect data?</summary>
+    <p>No. The app has no network code: no uploads, sync, accounts, update checks or telemetry. Captures are stored
+    on your PC. See <a href="privacy.html">Privacy</a>.</p>
+  </details>
+  <details class="faq">
+    <summary>Are my captures encrypted?</summary>
+    <p>No. SnapForge stores them as files in your Windows profile, protected by your Windows account. Turn on
+    Windows device encryption or BitLocker to protect the disk.</p>
+  </details>
+  <details class="faq">
+    <summary>Can someone undo a redaction in an image I sent?</summary>
+    <p>Exported, copied and dragged images contain only the black box, so the hidden pixels are not in the file.
+    Your own Library copy keeps the original until you choose <em>Sanitize</em>. See
+    <a href="features.html#redaction">how redaction works</a>.</p>
+  </details>
+  <details class="faq">
+    <summary>Can I redact a video?</summary>
+    <p>No. Anything visible or audible while recording is in the video. Check your screen before recording.</p>
+  </details>
+  <details class="faq">
+    <summary>Why does Windows warn me before running it?</summary>
+    <p>Development builds are not code-signed, so SmartScreen may show a warning. Only run a copy you downloaded
+    from this site or the project's GitHub Releases whose checksum matches. See
+    <a href="download.html#smartscreen">Windows security prompts</a>.</p>
+  </details>
+  <details class="faq">
+    <summary>Does it work on Windows 10, Mac or phones?</summary>
+    <p>SnapForge targets Windows 11 (x64). Windows 10 is not tested. There is no Mac or phone version and none is
+    planned.</p>
+  </details>
+  <details class="faq">
+    <summary>Print Screen opens the Windows Snipping Tool instead.</summary>
+    <p>Windows can reserve <kbd>Print Screen</kbd> for the Snipping Tool. Turn off <em>Use the Print screen key to
+    open screen capture</em> in Windows Settings → Accessibility → Keyboard, or choose another hotkey in
+    SnapForge's Settings. SnapForge reports hotkeys it cannot register.</p>
+  </details>
+  <details class="faq">
+    <summary>I can't find the widget.</summary>
+    <p>Choose <em>View → Show capture widget</em> in SnapForge; it moves the widget to the top centre of the screen
+    and opens it briefly.</p>
+  </details>
+  <details class="faq">
+    <summary>How do I remove SnapForge completely?</summary>
+    <p>See <a href="download.html#uninstall">Uninstalling</a>.</p>
+  </details>
+</div>

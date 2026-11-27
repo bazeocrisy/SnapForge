@@ -1,0 +1,67 @@
+<!--meta {"title": "Download", "description": "Download status, system requirements, installation, checksum verification and uninstall instructions for SnapForge for Windows."} -->
+<section class="page-hero">
+  <div class="container">
+    <p class="eyebrow">Download</p>
+    <h1>Download SnapForge for Windows</h1>
+    <p class="lead">Free, with no account, subscription or installer required.</p>
+  </div>
+</section>
+
+<div class="container narrow section prose">
+  {{release_panel}}
+
+  <h2 id="requirements">System requirements</h2>
+  <ul>
+    <li><strong>Windows 11, 64-bit (x64)</strong> — the supported target (version 24H2 or later).</li>
+    <li>Windows 11 on Arm runs the x64 build through Windows' built-in emulation; this is not tested yet.</li>
+    <li>Windows 10 is not a supported target (Microsoft ended Windows 10 support on 14 October 2025). Screenshot
+    features may work there but are not tested.</li>
+    <li>No .NET installation and no administrator rights are needed; the app is self-contained.</li>
+    <li>Screen recording (experimental) uses Media Foundation, which is part of normal Windows editions.
+    Windows “N” editions need Microsoft's Media Feature Pack.</li>
+  </ul>
+
+  <h2 id="install">Installing</h2>
+  <p>SnapForge is planned to ship as a <strong>portable ZIP</strong>: nothing is installed system-wide.</p>
+  <ol>
+    <li>Download the ZIP with the button above.</li>
+    <li><a href="#verify">Check its SHA-256 checksum</a> against the one shown above.</li>
+    <li>Right-click the ZIP, choose <em>Extract All…</em>, and pick a folder you own, for example
+    <code>Documents\SnapForge</code>.</li>
+    <li>Open the folder and run <code>SnapForge.exe</code>. Keep the other files in the folder next to it.</li>
+  </ol>
+  <p>An installer is not available. If one is published later it will be listed here with its own checksum.</p>
+
+  <h2 id="verify">Verifying the download</h2>
+  <p>Compare the file's SHA-256 checksum with the one on this page and on the GitHub release before you run it.
+  In PowerShell, in the folder containing the download:</p>
+  <pre><code>{{verify_command}}</code></pre>
+  <p>The <code>Hash</code> it prints must match exactly (letter case does not matter). Each release ZIP also
+  contains <code>SHA256SUMS.txt</code> listing the checksum of every file inside it.</p>
+
+  <h2 id="smartscreen">Windows security prompts</h2>
+  <p>Development builds of SnapForge are not code-signed. Windows SmartScreen may therefore say that it
+  “prevented an unrecognized app from starting”. Each release states its signing status above.</p>
+  <ul>
+    <li>Only run SnapForge if you downloaded it from this site or the project's GitHub Releases page
+    <strong>and</strong> the checksum matches.</li>
+    <li>Keep Microsoft Defender and SmartScreen turned on. If Defender reports the file, do not run it — please
+    <a href="support.html#security">report it</a> instead.</li>
+  </ul>
+
+  <h2 id="uninstall">Uninstalling</h2>
+  <ol>
+    <li>If you turned on <em>Launch SnapForge when I sign in to Windows</em>, turn it off in SnapForge's Settings
+    (or in Windows Settings → Apps → Startup).</li>
+    <li>Exit SnapForge from its notification-area icon.</li>
+    <li>Delete the folder you extracted it to.</li>
+    <li>To remove your captures and settings as well, delete <code>%LOCALAPPDATA%\SnapForge</code> (paste it
+    into the File Explorer address bar). If you moved the Library to another folder, delete that folder too.
+    <strong>This permanently deletes your captures.</strong></li>
+  </ol>
+
+  <h2 id="source">Source code and development builds</h2>
+  <p>The source code, documentation and development history are on
+  <a href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">GitHub<span class="visually-hidden"> (external site)</span></a>.
+  Developers can build SnapForge themselves with the .NET 10 SDK; the repository's README explains how.</p>
+</div>
