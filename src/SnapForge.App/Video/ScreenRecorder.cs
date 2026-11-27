@@ -458,6 +458,17 @@ internal sealed unsafe class ScreenRecorder : IDisposable
 
                     if (slot > lastSlot)
                     {
+                        // Slots skipped since the previous frame (the screen changed only between polls) keep the
+                        // previous picture, so the file stays at a constant frame rate. Benchmarks on CI showed
+                        // ~7–17 % of slots missing on real screens before this.
+                        while (last is not null && lastSlot >= 0 && lastSlot < slot - 1)
+                        {
+                            lastSlot++;
+                            last.AddRef();
+                            Interlocked.Increment(ref _framesRepeated);
+                            Enqueue(new FrameItem(last, lastSlot * period, period, Repeat: true));
+                        }
+
                         FrameScheduled?.Invoke(sourceTime, slot * period);
                         Release(ref last);
                         last = buffer;

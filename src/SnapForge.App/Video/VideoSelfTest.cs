@@ -207,6 +207,7 @@ internal static partial class VideoSelfTest
             path = final;
             (long durationMs, int w, int h, bool hasAudio, int samples) = RecordingRecovery.Probe(path);
             report["screen"] = new { result = Summary(r), probe = new { durationMs, w, h, hasAudio, samples }, source = video.Description };
+            Check("screen-constant-frame-rate", Math.Abs(samples - (durationMs * 30 / 1000.0)) <= 2, $"{samples} frames for {durationMs} ms of real screen (expected one per 1/30 s)");
             Check("screen-recording", r.Finalized && samples >= 140 && hasAudio, $"{w}x{h}, {samples} frames ({r.FramesCaptured} captured, {r.FramesRepeated} repeated), {durationMs} ms, audio track {hasAudio}, devices: {string.Join("; ", r.Notices.DefaultIfEmpty("none reported"))}");
         }
 #pragma warning disable CA1031

@@ -1,10 +1,9 @@
 # Screen recording benchmarks (Milestone V1)
 
-**Status: 1440p and 1080p60 jobs finished; 4K and 1080p30 (incl. 120 min) still running** — workflow *Video benchmarks*, run
+**Status: finished** (1080p30 incl. 120 min, 1080p60, 1440p measured; 4K partly — see below) — workflow *Video benchmarks*, run
 [45910273309](https://github.com/bazeocrisy/SnapForge/actions/runs/45910273309) on commit `fccffbe` (same recorder
 code as the final build `ed4815d`; later commits changed UI styling, the encoder label and documentation). Each
-configuration's JSON is uploaded as artifact `video-bench-<label>`. This page is updated with the measured rows when
-the jobs finish; until then the numbers below are from the per-commit CI self-test.
+configuration's JSON is uploaded as artifact `video-bench-<label>`. Rows below come from the job logs.
 
 ## Method
 
@@ -42,11 +41,33 @@ MP4; 0 dropped frames in every row.
 | 1920×1080 · 60 FPS | screen | measured | 30 min | 100 330 (38 761 / 61 569) | 0 | 42.2 | 353 / 573 | 14.6 / 48 | 34.4 | 3.1 s | — |
 | 1920×1080 · 60 FPS | screen | measured | **60 min** | 201 356 (77 361 / 123 995) | 0 | 42.6 | **354 / 573** | 18.7 / 58 | 34.4 | 6.5 s | — |
 | 1920×1080 · 60 FPS | synthetic | measured | 5 min | 17 998 | 0 | 44.2 | 294 / 557 | 17.0 / 149 | 71.9 | 0.9 s | ≈ 0.08 ms / 0.00 ms/min (299 pairs) |
+| 1920×1080 · 30 FPS | screen | measured | 5 min | 7 472 (6 365 / 1 107) ¹ | 0 | 23.2 | 353 / 564 | 39.4 / 66 | 26.8 | 0.2 s | — (no audio device) |
+| 1920×1080 · 30 FPS | screen | measured | 30 min | 44 875 (38 427 / 6 448) ¹ | 0 | 23.4 | 351 / 570 | 38.5 / 66 | 27.9 | 2.5 s | — |
+| 1920×1080 · 30 FPS | screen | measured | **120 min** | 179 277 (153 505 / 25 772) ¹ | 0 | 23.7 | **348 / 569** | 36.2 / 66 | 27.9 | 10.4 s | — |
+| 1920×1080 · 30 FPS | synthetic | measured | 5 min | 9 000 | 0 | 22.0 | 291 / 554 | 33.0 / 33 | 37.0 | 0.4 s | ≈ 0.07 ms / 0.00 ms/min |
+| 1920×1080 · 30 FPS | synthetic | measured | **60 min** | 108 000 | 0 | 21.8 | 289 / 554 | 31.0 / 65 | 37.0 | 7.3 s | ≈ 0.09 ms / 0.00 ms/min (3 599 pairs) |
+| 3840×2160 · 30/60 FPS | screen | **unsupported** | — | — | — | — | — | — | — | — | runner display has no 4K mode |
+| 3840×2160 · 30 FPS | synthetic | completed ² | 5 min | — | — | — | — | — | — | — | numbers in artifact `video-bench-4K` (not readable from this session) |
+| 3840×2160 · 60 FPS | synthetic | completed ² | 5 min | — | — | — | — | — | — | — | ditto; this row took 4 h 04 min including the frame-by-frame sync decode |
+| 3840×2160 · 30 FPS | synthetic | **not completed** | 30 min | — | — | — | — | — | — | — | job time limit (300 min) reached |
 | 2560×1440 · 30 FPS | screen | **unsupported** | — | — | — | — | — | — | — | — | runner display offers 1024×768 / 1920×1080 only |
 | 2560×1440 · 30 FPS | synthetic | measured | 5 min | 9 000 | 0 | 38.0 | 366 / 651 | 33.3 / 99 | 63.9 | 0.8 s | ≈ 0.09 ms / 0.00 ms/min |
 | 2560×1440 · 30 FPS | synthetic | measured | 30 min | 54 000 | 0 | 40.0 | 361 / 657 | 32.3 / 98 | 63.9 | 5.9 s | ≈ 0.09 ms / 0.00 ms/min |
 | 2560×1440 · 60 FPS | screen | **unsupported** | — | — | — | — | — | — | — | — | as above |
 | 2560×1440 · 60 FPS | synthetic | measured | 5 min | 17 997 | 0 | 77.8 | 424 / 680 | 26.1 / 82 | 125.2 | 1.7 s | ≈ 0.06 ms / 0.00 ms/min |
+
+¹ **Defect found by these runs, fixed afterwards:** on a real screen, frames written were 83 % of duration × FPS
+(e.g. 120 min at 30 FPS: 179 277 of 216 000) with 0 dropped. When the screen changed only between two polls, the slot
+in between was left empty instead of repeating the previous picture, so files had variable frame timing (timestamps
+were still correct; players show the previous frame). Fixed in the capture loop — skipped slots now repeat the
+previous frame — and the per-commit self-test now checks `screen-constant-frame-rate` on a real screen. The rows above
+were measured before the fix; CPU, memory and size are not expected to change materially, frame counts will.
+
+² The 4K job wrote its JSON results (artifact `video-bench-4K`, run 45910273309) but was stopped by the job time limit
+before printing them to the log; artifact downloads are blocked from this session, so the 4K numbers are not
+reproduced here. The 4K 60 FPS synthetic row taking 4 hours (for 5 minutes of video) indicates the software encoder
+and/or the sync decode at 4K are far slower than real time on the runner's CPU — **4K60 on the software encoder is
+not expected to be usable**; 4K needs a hardware encoder (PC test V1-REL-07).
 
 Observations: memory does not grow with length (60 min peak = 5 min peak, VID-R13); no frame was dropped even at
 1440p60 on the software encoder (78 % CPU — on a real PC a hardware encoder would take most of this load);
@@ -54,7 +75,7 @@ conversion to the final MP4 takes about 0.1 s per minute recorded. Screen rows a
 runner's screen changes only where the test window moves; file size per minute therefore reflects a mostly static
 screen. GPU load: not measurable (no GPU).
 
-## Known before the long runs finish
+## Per-commit self-test (for comparison)
 
 | Measurement (CI self-test, commit `ed4815d`) | Result |
 |---|---|
