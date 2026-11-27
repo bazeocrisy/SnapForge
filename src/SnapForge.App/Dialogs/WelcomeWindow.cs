@@ -41,7 +41,7 @@ internal sealed class WelcomeWindow : Window
         Section(doc, "Where captures are saved",
             $"Every capture is saved automatically to your local Capture Library:\n{libraryRoot}\nNothing is uploaded. Turn off \"Save to Library\" in the capture panel to capture without keeping a copy. Change the location in Settings → Capture Library. Back up your Library regularly (Settings → Capture Library → Back up).");
         Section(doc, "Record your screen",
-            $"Click Record (or press {recordHotkey}) to open SnapForge Studio: record the screen, the screen with your camera, or the camera only. Camera and microphone are off until you turn them on. Press the hotkey again to pause/resume; Shift+F10 stops and saves an MP4. Windows shows a border around what is recorded and its own camera/microphone indicators.");
+            $"Click Record to open SnapForge Studio: record the screen, the screen with your camera, or the camera only. Camera and microphone are off until you turn them on. {recordHotkey} starts a recording straight away with your last Studio settings; press it again to pause/resume; Shift+F10 stops and saves an MP4. Windows shows a border around what is recorded and its own camera/microphone indicators.");
         Section(doc, "Redaction",
             "The Redact tool replaces pixels with solid black. Images you export, copy or drag out contain only the black box. Your editable Library copy keeps the original pixels so you can undo — use File → Sanitize to remove them for good. Blur and pixelate are not redaction. Videos cannot be redacted.");
         Section(doc, "Closing windows and exiting",

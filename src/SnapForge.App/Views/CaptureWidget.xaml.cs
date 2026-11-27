@@ -27,7 +27,7 @@ internal static class DockActions
     /// QuickDock "Record" and the capture panel's Video "Open Studio…" action. Defaults to starting a recording
     /// directly; the integrator points it at <c>Video.RecordingController.OpenStudio()</c> once that exists.
     /// </summary>
-    internal static Action OpenStudio { get; set; } = () => _ = Video.RecordingController.StartAsync();
+    internal static Action OpenStudio { get; set; } = Video.RecordingController.OpenStudio;
 
     /// <summary>
     /// "Open QuickDock with keyboard" (FA-004): turns QuickDock on if needed and opens it in keyboard mode. Esc
