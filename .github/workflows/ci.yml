@@ -33,6 +33,7 @@ jobs:
     outputs:
       artifact: ${{ steps.names.outputs.artifact }}
       packages: SnapForge-${{ steps.pkg.outputs.version }}-packages-${{ github.sha }}
+      packaged: ${{ steps.pkg.outputs.version != '' }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -53,6 +54,10 @@ jobs:
         run: dotnet build SnapForge.sln -c Release --no-restore -p:ContinuousIntegrationBuild=true
 
       - name: Test (unit, Windows rendering/capture/clipboard, real-input UI tests)
+        id: tests
+        # A test failure does not stop packaging, so the portable/installer/screenshot jobs still produce evidence;
+        # the job is failed explicitly at its end ("Fail the job if tests failed"), so the run is never green.
+        continue-on-error: true
         run: >
           dotnet test SnapForge.sln -c Release --no-build
           --logger "trx;LogFilePrefix=results"
@@ -145,9 +150,16 @@ jobs:
           retention-days: 30
           if-no-files-found: error
 
+      - name: Fail the job if tests failed
+        if: steps.tests.outcome == 'failure'
+        run: |
+          echo "::error::Unit/UI tests failed (see the Test step). Packages were still built for diagnosis only."
+          exit 1
+
   portable-without-dotnet:
     name: Portable build runs without an installed .NET
     needs: windows
+    if: ${{ !cancelled() && needs.windows.outputs.packaged == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 15
     steps:
@@ -377,6 +389,7 @@ jobs:
     needs: windows
     # Long-running (up to ~2 h): once per pushed commit, not again for the pull-request merge build.
     if: github.event_name != 'pull_request'
+    if: ${{ !cancelled() && needs.windows.outputs.packaged == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 150
     steps:
@@ -504,6 +517,7 @@ jobs:
   installer:
     name: Installer — rc.1 → rc.2 upgrade, system-wide install, migration, two users, uninstall keeps data
     needs: [windows, rc1-baseline]
+    if: ${{ !cancelled() && needs.windows.outputs.packaged == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 30
     steps:

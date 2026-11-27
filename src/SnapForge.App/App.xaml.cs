@@ -59,7 +59,6 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
-        Interop.WorkAreaGuard.Install(); // FA-003: keep every window's title bar and frame on screen
 
         // Isolated data profile (--profile <name> or SNAPFORGE_PROFILE): separate settings, Library, logs, temp files
         // and single-instance key; no global hotkeys and no Windows start-up entry. Used for testing.
@@ -138,6 +137,9 @@ public partial class App : Application
         // Single instance: a second launch of the SAME build brings the running SnapForge to the front. A different
         // build (e.g. a newer download while an older copy runs in the notification area) is reported instead of
         // silently handing over to the old copy, and can replace it.
+        // FA-003: keep every window's title bar and frame on screen. Installed for the interactive app only — test
+        // helper modes above (drop target, self-tests) place their windows deliberately.
+        Interop.WorkAreaGuard.Install();
         _instanceMutex = new Mutex(initiallyOwned: true, $@"Local\{InstanceKey}", out bool first);
         Interop.RunningMarker.Hold(); // lets the system-wide (un)installer see SnapForge running in any session
         _activateSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceKey}-activate");
