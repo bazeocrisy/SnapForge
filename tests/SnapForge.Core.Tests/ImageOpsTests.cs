@@ -260,7 +260,11 @@ public class ImageOpsTests
     public void Largest_supported_sizes_validate()
     {
         ImageOps.ValidateSize(32768, 1);
-        ImageOps.ValidateSize(20000, 20000);
+
+        // FA-018: the pixel limit is the 1 GiB image budget (was 400 million pixels ≈ 1.6 GB).
+        ImageOps.ValidateSize(16384, 16384);
+        Assert.Throws<ArgumentOutOfRangeException>(() => ImageOps.ValidateSize(16384, 16385));
+        Assert.Throws<ArgumentOutOfRangeException>(() => ImageOps.ValidateSize(20000, 20000));
         Assert.Throws<ArgumentOutOfRangeException>(() => ImageOps.AddBorder(Unique(2, 2), 16384, Gray));
     }
 

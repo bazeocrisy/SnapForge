@@ -12,7 +12,7 @@ public sealed class PixelBuffer
     public const int BytesPerPixel = 4;
 
     public PixelBuffer(int width, int height)
-        : this(width, height, new byte[checked(width * height * BytesPerPixel)])
+        : this(width, height, Allocate(width, height))
     {
     }
 
@@ -24,7 +24,8 @@ public sealed class PixelBuffer
             throw new ArgumentOutOfRangeException(nameof(width), "Image dimensions must be positive.");
         }
 
-        if (pixels.Length != checked(width * height * BytesPerPixel))
+        ImageBudget.Ensure(width, height);
+        if (pixels.Length != (long)width * height * BytesPerPixel)
         {
             throw new ArgumentException("Pixel array length does not match width * height * 4.", nameof(pixels));
         }
@@ -140,6 +141,13 @@ public sealed class PixelBuffer
     }
 
     public PixelBuffer Clone() => new(Width, Height, (byte[])Pixels.Clone());
+
+    /// <summary>Validates the size against <see cref="ImageBudget"/> before allocating (FA-018).</summary>
+    private static byte[] Allocate(int width, int height)
+    {
+        ImageBudget.Ensure(width, height);
+        return new byte[(long)width * height * BytesPerPixel];
+    }
 
     private int IndexOf(int x, int y)
     {

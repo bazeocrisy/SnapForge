@@ -128,6 +128,11 @@ public sealed class ScrollStitcher
             throw new ArgumentOutOfRangeException(nameof(options), "Limits must be positive (MaxLength may be 0 for no limit).");
         }
 
+        if (options.MaxOutputPixels > Imaging.ImageBudget.MaxPixels)
+        {
+            throw new ArgumentOutOfRangeException(nameof(options), $"MaxOutputPixels may not exceed the image memory budget ({Imaging.ImageBudget.MaxPixels:N0} pixels).");
+        }
+
         if (!(options.MismatchTolerance >= 0 && options.MismatchTolerance < 1))
         {
             throw new ArgumentOutOfRangeException(nameof(options), "MismatchTolerance must be in [0, 1).");
