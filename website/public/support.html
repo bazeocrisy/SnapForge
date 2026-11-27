@@ -1,0 +1,165 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Support and FAQ — SnapForge</title>
+<meta name="description" content="Get help with SnapForge, report bugs and security problems, and read answers to common questions.">
+
+<link rel="canonical" href="https://bazeocrisy.github.io/SnapForge/support.html">
+<meta name="theme-color" content="#0b1220">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SnapForge">
+<meta property="og:title" content="Support and FAQ">
+<meta property="og:description" content="Get help with SnapForge, report bugs and security problems, and read answers to common questions.">
+<meta property="og:url" content="https://bazeocrisy.github.io/SnapForge/support.html">
+<meta property="og:image" content="https://bazeocrisy.github.io/SnapForge/assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SnapForge logo with the slogan Capture. Create. Share.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="assets/img/logo-mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/logo-mark.png">
+<link rel="stylesheet" href="assets/css/site.css">
+<script src="assets/js/site.js" defer></script>
+
+</head>
+<body class="">
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html"><img src="assets/img/logo-mark.svg" alt="" width="32" height="32"><span>Snap<span class="brand-accent">Forge</span></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" hidden>
+      <span class="nav-toggle-bars" aria-hidden="true"></span><span class="nav-toggle-label">Menu</span>
+    </button>
+    <nav id="site-nav" class="site-nav" aria-label="Main">
+      <ul>
+<li><a href="index.html">Home</a></li>
+<li><a href="features.html">Features</a></li>
+<li><a href="download.html">Download</a></li>
+<li><a href="guide.html">User Guide</a></li>
+<li><a href="whats-new.html">What's New</a></li>
+<li><a href="roadmap.html">Roadmap</a></li>
+<li><a href="support.html" aria-current="page">Support</a></li>
+<li><a href="donate.html">Donate</a></li>
+      </ul>
+    </nav>
+  </div>
+  <p class="status-strip"><span class="container">In development — no public release yet. <a href="roadmap.html">Project status</a></span></p>
+</header>
+<main id="main" tabindex="-1">
+<section class="page-hero">
+  <div class="container">
+    <p class="eyebrow">Support</p>
+    <h1>Support and FAQ</h1>
+    <p class="lead">SnapForge is a free, open-source project. Help is provided on GitHub on a best-effort basis.</p>
+  </div>
+</section>
+
+<div class="container narrow section prose">
+  <h2 id="report">Report a bug or suggest a feature</h2>
+  <p>Open an issue on
+  <a href="https://github.com/bazeocrisy/SnapForge/issues" rel="noopener noreferrer">GitHub Issues<span class="visually-hidden"> (external site)</span></a>
+  (a free GitHub account is needed). Please include:</p>
+  <ul>
+    <li>The SnapForge version and commit from <em>Help → About</em>.</li>
+    <li>Your Windows version (<em>Settings → System → About</em>) and your display setup (number of monitors,
+    scaling).</li>
+    <li>What you did, what you expected and what happened instead.</li>
+    <li>Error logs from <code>%LOCALAPPDATA%\SnapForge\logs</code> if there are any (they contain text, never
+    images).</li>
+  </ul>
+  <div class="note" role="note"><p><strong>Check before you attach.</strong> Issues are public. Do not attach
+  screenshots or recordings that show private information — redact images first, and remember that videos
+  cannot be redacted.</p></div>
+
+  <h2 id="security">Report a security problem</h2>
+  <div class="note" role="note"><p><strong>Private reporting is not set up yet.</strong> A private
+  reporting channel will be in place before the first public release, and this page will explain how to use it.</p></div>
+  <p>Until then, please <strong>do not describe vulnerabilities publicly</strong>. If you have found one, open a
+  GitHub issue that only says you have a security report and asks the maintainer for a private channel — with no
+  technical details.</p>
+
+  <h2 id="faq">Frequently asked questions</h2>
+  <details class="faq">
+    <summary>Is SnapForge really free?</summary>
+    <p>Yes. It is open source under the MIT License, with no subscriptions, paid tiers, accounts or ads.
+    Donations are optional and never unlock features.</p>
+  </details>
+  <details class="faq">
+    <summary>When can I download it?</summary>
+    <p>When the first release has been reviewed and approved. The <a href="download.html">Download page</a> will
+    show it, with its checksum.</p>
+  </details>
+  <details class="faq">
+    <summary>Does SnapForge upload my screenshots or collect data?</summary>
+    <p>No. The app has no network code: no uploads, sync, accounts, update checks or telemetry. Captures are stored
+    on your PC. See <a href="privacy.html">Privacy</a>.</p>
+  </details>
+  <details class="faq">
+    <summary>Are my captures encrypted?</summary>
+    <p>No. SnapForge stores them as files in your Windows profile, protected by your Windows account. Turn on
+    Windows device encryption or BitLocker to protect the disk.</p>
+  </details>
+  <details class="faq">
+    <summary>Can someone undo a redaction in an image I sent?</summary>
+    <p>Exported, copied and dragged images contain only the black box, so the hidden pixels are not in the file.
+    Your own Library copy keeps the original until you choose <em>Sanitize</em>. See
+    <a href="features.html#redaction">how redaction works</a>.</p>
+  </details>
+  <details class="faq">
+    <summary>Can I redact a video?</summary>
+    <p>No. Anything visible or audible while recording is in the video. Check your screen before recording.</p>
+  </details>
+  <details class="faq">
+    <summary>Why does Windows warn me before running it?</summary>
+    <p>Development builds are not code-signed, so SmartScreen may show a warning. Only run a copy you downloaded
+    from this site or the project's GitHub Releases whose checksum matches. See
+    <a href="download.html#smartscreen">Windows security prompts</a>.</p>
+  </details>
+  <details class="faq">
+    <summary>Does it work on Windows 10, Mac or phones?</summary>
+    <p>SnapForge supports Windows 11 (x64) only. Windows 10, Windows on Arm, Mac and phones are not supported, and
+    no Mac or phone version is planned.</p>
+  </details>
+  <details class="faq">
+    <summary>Print Screen opens the Windows Snipping Tool instead.</summary>
+    <p>Windows can reserve <kbd>Print Screen</kbd> for the Snipping Tool. Turn off <em>Use the Print screen key to
+    open screen capture</em> in Windows Settings → Accessibility → Keyboard, or choose another hotkey in
+    SnapForge's Settings. SnapForge reports hotkeys it cannot register.</p>
+  </details>
+  <details class="faq">
+    <summary>I can't find the widget.</summary>
+    <p>Choose <em>View → Show capture widget</em> in SnapForge; it moves the widget to the top centre of the screen
+    and opens it briefly.</p>
+  </details>
+  <details class="faq">
+    <summary>How do I remove SnapForge completely?</summary>
+    <p>See <a href="download.html#uninstall">Uninstalling</a>.</p>
+  </details>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a class="brand" href="index.html"><img src="assets/img/logo-mark.svg" alt="" width="28" height="28"><span>Snap<span class="brand-accent">Forge</span></span></a>
+      <p class="slogan">Capture. Create. Share.</p>
+      <p class="small">Free and open source under the MIT License. No subscriptions, accounts, ads or telemetry.</p>
+    </div>
+    <nav aria-label="Footer">
+      <ul>
+<li><a href="privacy.html">Privacy</a></li>
+<li><a href="about.html">About & License</a></li>
+<li><a href="support.html" aria-current="page">Report a problem</a></li>
+<li><a href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">Source code on GitHub<span class="visually-hidden"> (external site)</span></a></li>
+      </ul>
+    </nav>
+  </div>
+  <p class="container small footer-legal">© 2026 bazeocrisy and SnapForge contributors. Screenshots on this site show development builds with fictional demo data.</p>
+</footer>
+</body>
+</html>

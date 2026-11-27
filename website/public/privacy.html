@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Privacy — SnapForge</title>
+<meta name="description" content="Privacy for the SnapForge app and this website: no telemetry, no accounts, no cookies, no analytics. What is stored where, and what third parties may see.">
+
+<link rel="canonical" href="https://bazeocrisy.github.io/SnapForge/privacy.html">
+<meta name="theme-color" content="#0b1220">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SnapForge">
+<meta property="og:title" content="Privacy">
+<meta property="og:description" content="Privacy for the SnapForge app and this website: no telemetry, no accounts, no cookies, no analytics. What is stored where, and what third parties may see.">
+<meta property="og:url" content="https://bazeocrisy.github.io/SnapForge/privacy.html">
+<meta property="og:image" content="https://bazeocrisy.github.io/SnapForge/assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SnapForge logo with the slogan Capture. Create. Share.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="assets/img/logo-mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/logo-mark.png">
+<link rel="stylesheet" href="assets/css/site.css">
+<script src="assets/js/site.js" defer></script>
+
+</head>
+<body class="">
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html"><img src="assets/img/logo-mark.svg" alt="" width="32" height="32"><span>Snap<span class="brand-accent">Forge</span></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" hidden>
+      <span class="nav-toggle-bars" aria-hidden="true"></span><span class="nav-toggle-label">Menu</span>
+    </button>
+    <nav id="site-nav" class="site-nav" aria-label="Main">
+      <ul>
+<li><a href="index.html">Home</a></li>
+<li><a href="features.html">Features</a></li>
+<li><a href="download.html">Download</a></li>
+<li><a href="guide.html">User Guide</a></li>
+<li><a href="whats-new.html">What's New</a></li>
+<li><a href="roadmap.html">Roadmap</a></li>
+<li><a href="support.html">Support</a></li>
+<li><a href="donate.html">Donate</a></li>
+      </ul>
+    </nav>
+  </div>
+  <p class="status-strip"><span class="container">In development — no public release yet. <a href="roadmap.html">Project status</a></span></p>
+</header>
+<main id="main" tabindex="-1">
+<section class="page-hero">
+  <div class="container">
+    <p class="eyebrow">Privacy</p>
+    <h1>Privacy</h1>
+    <p class="lead">Plain-language summary of what the SnapForge app and this website do with your information.
+    Last updated <time datetime="2026-11-27">27 November 2026</time>.</p>
+  </div>
+</section>
+
+<div class="container narrow section prose">
+  <h2 id="app">The SnapForge app</h2>
+  <ul>
+    <li><strong>No network access.</strong> The app contains no code that connects to the internet: no uploads,
+    sync, accounts, update checks, crash reporting or telemetry.</li>
+    <li><strong>Local storage.</strong> Captures, recordings and settings are stored on your PC in
+    <code>%LOCALAPPDATA%\SnapForge</code> (or a Library folder you choose). Error logs contain text only — never
+    image data — and stay on your PC.</li>
+    <li><strong>Not encrypted by SnapForge.</strong> Your files are protected by your Windows account; use Windows
+    device encryption or BitLocker to protect the disk.</li>
+    <li><strong>Redaction.</strong> Exported, copied and dragged images are flattened, with redacted areas burned
+    in and no metadata. Your editable Library copy keeps original pixels until you choose <em>Sanitize</em>.
+    Videos cannot be redacted.</li>
+    <li><strong>Sharing is your choice.</strong> When you paste, drag or export a capture into another app, that
+    app keeps its own copy under its own privacy terms.</li>
+    <li><strong>Screen recording</strong> (experimental) uses Windows' screen capture and audio APIs; Windows shows
+    a border while recording and its microphone indicator while the microphone is on. SnapForge does not hide or
+    bypass these indicators.</li>
+  </ul>
+
+  <h2 id="website">This website</h2>
+  <ul>
+    <li>No cookies, analytics, advertising, fonts or scripts from other companies. The only script is a small
+    local one for the mobile menu and the “copy checksum” button; it stores nothing.</li>
+    <li>The site is hosted on GitHub Pages. GitHub, as the host, receives the technical information every website
+    receives (such as your IP address and browser) and may keep logs under its
+    <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener noreferrer">privacy statement<span class="visually-hidden"> (external site)</span></a>.
+    We do not receive or use those logs.</li>
+    <li>There are no forms, and the site never asks for personal or payment information.</li>
+  </ul>
+
+  <h2 id="third-party">Links to other websites</h2>
+  <p>Links to GitHub, Microsoft documentation and — once set up — donation providers take you to sites with their
+  own privacy policies. Links that leave this site are marked for screen readers as external.</p>
+
+  <h2 id="contact">Questions</h2>
+  <p>Ask on <a href="support.html#report">GitHub Issues</a>. For security problems, see
+  <a href="support.html#security">reporting a security problem</a>.</p>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a class="brand" href="index.html"><img src="assets/img/logo-mark.svg" alt="" width="28" height="28"><span>Snap<span class="brand-accent">Forge</span></span></a>
+      <p class="slogan">Capture. Create. Share.</p>
+      <p class="small">Free and open source under the MIT License. No subscriptions, accounts, ads or telemetry.</p>
+    </div>
+    <nav aria-label="Footer">
+      <ul>
+<li><a href="privacy.html" aria-current="page">Privacy</a></li>
+<li><a href="about.html">About & License</a></li>
+<li><a href="support.html">Report a problem</a></li>
+<li><a href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">Source code on GitHub<span class="visually-hidden"> (external site)</span></a></li>
+      </ul>
+    </nav>
+  </div>
+  <p class="container small footer-legal">© 2026 bazeocrisy and SnapForge contributors. Screenshots on this site show development builds with fictional demo data.</p>
+</footer>
+</body>
+</html>

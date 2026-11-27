@@ -1,0 +1,219 @@
+{
+  "label": "unconfigured",
+  "origin": "http://127.0.0.1:32855/SnapForge/",
+  "browsers": {
+    "chromium": {
+      "status": "tested",
+      "version": "158.0.8127.36",
+      "pages": {
+        "chromium/phone/404.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Page not found — SnapForge"
+        },
+        "chromium/phone/about.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "About and License — SnapForge"
+        },
+        "chromium/phone/donate.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Donate — SnapForge"
+        },
+        "chromium/phone/download.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Download — SnapForge"
+        },
+        "chromium/phone/features.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Features — SnapForge"
+        },
+        "chromium/phone/guide.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "User Guide — SnapForge"
+        },
+        "chromium/phone/index.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "SnapForge — Capture. Create. Share."
+        },
+        "chromium/phone/privacy.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Privacy — SnapForge"
+        },
+        "chromium/phone/roadmap.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Roadmap — SnapForge"
+        },
+        "chromium/phone/support.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Support and FAQ — SnapForge"
+        },
+        "chromium/phone/whats-new.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "What's New — SnapForge"
+        },
+        "chromium/tablet/404.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Page not found — SnapForge"
+        },
+        "chromium/tablet/about.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "About and License — SnapForge"
+        },
+        "chromium/tablet/donate.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Donate — SnapForge"
+        },
+        "chromium/tablet/download.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Download — SnapForge"
+        },
+        "chromium/tablet/features.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Features — SnapForge"
+        },
+        "chromium/tablet/guide.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "User Guide — SnapForge"
+        },
+        "chromium/tablet/index.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "SnapForge — Capture. Create. Share."
+        },
+        "chromium/tablet/privacy.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Privacy — SnapForge"
+        },
+        "chromium/tablet/roadmap.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Roadmap — SnapForge"
+        },
+        "chromium/tablet/support.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Support and FAQ — SnapForge"
+        },
+        "chromium/tablet/whats-new.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "What's New — SnapForge"
+        },
+        "chromium/desktop/404.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Page not found — SnapForge"
+        },
+        "chromium/desktop/about.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "About and License — SnapForge"
+        },
+        "chromium/desktop/donate.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Donate — SnapForge"
+        },
+        "chromium/desktop/download.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Download — SnapForge"
+        },
+        "chromium/desktop/features.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Features — SnapForge"
+        },
+        "chromium/desktop/guide.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "User Guide — SnapForge"
+        },
+        "chromium/desktop/index.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "SnapForge — Capture. Create. Share."
+        },
+        "chromium/desktop/privacy.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Privacy — SnapForge"
+        },
+        "chromium/desktop/roadmap.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Roadmap — SnapForge"
+        },
+        "chromium/desktop/support.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "Support and FAQ — SnapForge"
+        },
+        "chromium/desktop/whats-new.html": {
+          "status": 200,
+          "overflow": 0,
+          "axeViolations": [],
+          "title": "What's New — SnapForge"
+        }
+      }
+    },
+    "firefox": {
+      "status": "NOT TESTED — browser not available here",
+      "error": "browserType.launch: Executable doesn't exist at /opt/pw-browsers/firefox-1543/firefox/firefox"
+    },
+    "webkit": {
+      "status": "NOT TESTED — browser not available here",
+      "error": "browserType.launch: Executable doesn't exist at /opt/pw-browsers/webkit-2359/pw_run.sh"
+    }
+  },
+  "failures": []
+}
