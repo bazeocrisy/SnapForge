@@ -113,7 +113,7 @@ internal sealed unsafe class ScreenRecorder : IDisposable
     private readonly List<IAudioSource> _audio;
     private readonly RecorderOptions _options;
     private readonly string _path;
-    private readonly RecordingClock _clock = new();
+    private readonly RecordingClock _clock;
     private readonly AudioMixer _mixer;
     private readonly Lock _gate = new();
     private readonly BlockingCollection<FrameItem> _frames;
@@ -152,6 +152,7 @@ internal sealed unsafe class ScreenRecorder : IDisposable
         _video = video;
         _audio = [.. audio];
         _options = options;
+        _clock = new RecordingClock(10_000_000L / Math.Max(1, options.FramesPerSecond)); // pauses of whole frames
         _path = path;
         _mixer = new AudioMixer(_audio.Count == 0 ? ["silence"] : [.. _audio.Select(a => a.Name)]);
         _frameBytes = video.Width * video.Height * 4;

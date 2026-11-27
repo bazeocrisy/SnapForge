@@ -387,12 +387,17 @@ jobs:
           retention-days: 30
           if-no-files-found: warn
 
-      - name: Replay start-up window results (after the long screenshot output)
+      - name: Replay start-up window and self-test failures (after the long screenshot output)
         if: always()
         shell: pwsh
         run: |
           $log = Join-Path $env:RUNNER_TEMP 'startup-windows.log'
           if (Test-Path $log) { Get-Content $log } else { Write-Output "no start-up log" }
+          # Same for the self-test reports: only what failed, so the cause is readable at the end of the job.
+          $video = Join-Path $env:RUNNER_TEMP 'video-selftest.txt'
+          if (Test-Path $video) { Select-String -Path $video -Pattern 'FAIL|false|error|exception' -CaseSensitive:$false | ForEach-Object { "video self-test: $($_.Line.Trim())" } }
+          $report = Join-Path $env:RUNNER_TEMP 'video-samples\report.json'
+          if (Test-Path $report) { Select-String -Path $report -Pattern '"(passed|ok|pass)"\s*:\s*false' -Context 6,2 | ForEach-Object { $_.Context.PreContext + $_.Line + $_.Context.PostContext } | ForEach-Object { "video report: $_" } }
 
   benchmarks:
     name: Library scale benchmarks (production durability)
@@ -673,8 +678,12 @@ jobs:
           $pw = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(18)) + 'aA1!'
           net user sftest2 $pw /add /y | Out-Null
           $cred = New-Object System.Management.Automation.PSCredential('sftest2', (ConvertTo-SecureString $pw -AsPlainText -Force))
+          # Start-Process -Credential hands the new process THIS account's environment; a real sign-in gives the user
+          # their own, so the test sets the second user's profile variables (folders resolve from %USERPROFILE%).
+          $u2 = 'C:\Users\sftest2'
+          $user2Env = @{ USERPROFILE = $u2; HOMEPATH = '\Users\sftest2'; USERNAME = 'sftest2'; LOCALAPPDATA = "$u2\AppData\Local"; APPDATA = "$u2\AppData\Roaming"; TEMP = "$u2\AppData\Local\Temp"; TMP = "$u2\AppData\Local\Temp" }
           $report = 'C:\Users\Public\sftest2-library-check.txt'
-          $p = Start-Process -FilePath "$machine\SnapForge.exe" -ArgumentList '--library-check', "`"$report`"" -Credential $cred -LoadUserProfile -Wait -PassThru -WorkingDirectory 'C:\Users\Public'
+          $p = Start-Process -FilePath "$machine\SnapForge.exe" -ArgumentList '--library-check', "`"$report`"" -Credential $cred -LoadUserProfile -Wait -PassThru -WorkingDirectory 'C:\Users\Public' -Environment $user2Env
           if (Test-Path $report) { Get-Content $report } else { Write-Output "WARN no report from the second user (exit $($p.ExitCode))" }
           if ($p.ExitCode -ne 0) { throw "second user could not run SnapForge" }
           if (-not ((Get-Content $report) -match 'C:\\Users\\sftest2\\AppData\\Local\\SnapForge')) { throw "second user's data folder is not in their own profile" }
