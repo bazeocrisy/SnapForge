@@ -603,7 +603,7 @@ public class GateBUiTests
         }
     }
 
-    private static async Task SlowDrag(int x1, int y1, int x2, int y2, bool cancelWithRightClick = false)
+    private static async Task SlowDrag(int x1, int y1, int x2, int y2, bool cancelWithRightClick = false, int hoverMs = 0)
     {
         lock (Trace)
         {
@@ -626,7 +626,7 @@ public class GateBUiTests
         }, null, TimeSpan.FromSeconds(12), TimeSpan.FromSeconds(3));
         try
         {
-            await SlowDragCore(x1, y1, x2, y2, cancelWithRightClick);
+            await SlowDragCore(x1, y1, x2, y2, cancelWithRightClick, hoverMs);
         }
         finally
         {
@@ -639,9 +639,9 @@ public class GateBUiTests
     /// The mouse sequence runs on a thread-pool thread: once the drag starts, the UI thread sits in the modal OLE
     /// drag loop where the WPF dispatcher does not run our awaited continuations, so input must not depend on it.
     /// </summary>
-    private static Task SlowDragCore(int x1, int y1, int x2, int y2, bool cancelWithRightClick) => Task.Run(() => SlowDragInput(x1, y1, x2, y2, cancelWithRightClick));
+    private static Task SlowDragCore(int x1, int y1, int x2, int y2, bool cancelWithRightClick, int hoverMs) => Task.Run(() => SlowDragInput(x1, y1, x2, y2, cancelWithRightClick, hoverMs));
 
-    private static void SlowDragInput(int x1, int y1, int x2, int y2, bool cancelWithRightClick)
+    private static void SlowDragInput(int x1, int y1, int x2, int y2, bool cancelWithRightClick, int hoverMs)
     {
         Log($"down at {x1},{y1}");
         NativeInput.MoveTo(x1, y1);
@@ -668,6 +668,24 @@ public class GateBUiTests
         Thread.Sleep(Step);
         NativeInput.MoveTo(x2, y2);
         Thread.Sleep(Step * 4);
+        if (hoverMs > 0)
+        {
+            // A person often pauses over the target, then adjusts the position a little before letting go.
+            // (DEF-RC2-DND-01: a tooltip of the drag source opened during the pause, just below the pointer;
+            // the adjustment moved the pointer onto it.)
+            Thread.Sleep(hoverMs);
+            Log($"after {hoverMs} ms over the target; window under {x2},{y2}: {NativeInput.WindowAt(x2, y2)}");
+            for (int i = 1; i <= 4; i++)
+            {
+                NativeInput.MoveTo(x2 + (3 * i), y2 + (9 * i));
+                Thread.Sleep(Step);
+                Log($"window under {x2 + (3 * i)},{y2 + (9 * i)}: {NativeInput.WindowAt(x2 + (3 * i), y2 + (9 * i))}");
+            }
+
+            (x2, y2) = (x2 + 12, y2 + 36);
+            Thread.Sleep(Step * 2);
+        }
+
         if (cancelWithRightClick)
         {
             NativeInput.RightClick(); // a right click during a left-button drag cancels it (OLE)
@@ -962,6 +980,113 @@ public class GateBUiTests
         {
             widget.Close();
             other.Close();
+        }
+    });
+
+    // ------------------------------------------------------------------ DEF-RC2-DND-01
+
+    /// <summary>
+    /// Real-mouse drags of <paramref name="count"/> Library captures into a drop target, <paramref name="repeats"/>
+    /// times in the same window, each pausing <paramref name="hoverMs"/> over the target and then adjusting the
+    /// position before release. Returns, per drag, the files the target received (null = no drop) and the trace.
+    /// </summary>
+    private static async Task<List<(string[]? Files, string Trace)>> LibraryDragsAsync(int count, int hoverMs, int repeats)
+    {
+        NewTempStore();
+        AppServices services = TestServices.Create();
+        PixelBuffer img = TestImages.Gradient(80, 60);
+        for (int i = 0; i < count; i++)
+        {
+            services.Library.Create(new CaptureContent(img, []), img, DateTime.UtcNow, $"Drag item {i + 1}");
+        }
+
+        var results = new List<(string[]?, string)>();
+        var w = new MainWindow(services) { Width = 1100, Height = 760, WindowStartupLocation = WindowStartupLocation.Manual, Left = 0, Top = 0 };
+        w.Show();
+        try
+        {
+            w.ShowLibraryWorkspace();
+            await WaitFor(() => w.LibraryPane.VisibleCount == count);
+            await Task.Delay(400);
+            for (int r = 0; r < repeats; r++)
+            {
+                w.LibraryPane.SelectIds(services.Library.Records.Select(x => x.Id));
+                await Task.Delay(200);
+                FrameworkElement tileElement = w.LibraryPane.TileElement(services.Library.Records[0].Id)!;
+                (int tx, int ty) = Centre(tileElement);
+                var target = new DropTarget
+                {
+                    Left = (tx + 250) / PhysicalPlacement.Layout().Monitors[0].DpiScale,
+                    Top = (ty + 120) / PhysicalPlacement.Layout().Monitors[0].DpiScale,
+                };
+                target.Show();
+                try
+                {
+                    await Task.Delay(300);
+                    (int dx, int dy) = Centre(target);
+                    PixelRect b = PhysicalPlacement.GetBounds(target)!.Value;
+                    await SlowDrag(tx, ty, dx, dy, hoverMs: hoverMs);
+                    var sw = Stopwatch.StartNew();
+                    while (target.Files is null && sw.ElapsedMilliseconds < 3000)
+                    {
+                        await Task.Delay(100);
+                    }
+
+                    results.Add((target.Files, $"drag {r + 1}: {TraceText()} | target 0x{new WindowInteropHelper(target).Handle:X} bounds {b.X},{b.Y} {b.Width}x{b.Height}"));
+                }
+                finally
+                {
+                    target.Close();
+                }
+
+                await Task.Delay(300);
+            }
+        }
+        finally
+        {
+            w.AllowClose = true;
+            w.Close();
+        }
+
+        return results;
+    }
+
+    /// <summary>
+    /// DEF-RC2-DND-01 mechanism, with the fix switched off: during the modal OLE loop WPF sees no mouse moves, so the
+    /// tile's tooltip opens mid-drag (just below the pointer); moving onto it makes OLE treat the tooltip as the
+    /// window under the pointer — the real target gets DragLeave and no Drop. Documents why the fix exists.
+    /// </summary>
+    [Fact]
+    public void DEF_RC2_DND_01_without_tooltip_suppression_a_tooltip_opens_mid_drag_and_takes_the_drop() => UiThread.Run(async () =>
+    {
+        CaptureDragDrop.SuppressToolTipsDuringDrag = false;
+        try
+        {
+            (string[]? files, string trace) = (await LibraryDragsAsync(3, hoverMs: 1500, repeats: 1))[0];
+            Assert.True(trace.Contains("tooltip opened during the drag", StringComparison.Ordinal), "no tooltip opened during the drag: " + trace);
+            Assert.True(files is null, "the drop was delivered although a tooltip opened under the pointer: " + trace);
+        }
+        finally
+        {
+            CaptureDragDrop.SuppressToolTipsDuringDrag = true;
+        }
+    });
+
+    /// <summary>DEF-RC2-DND-01 fix: with a pause and an adjustment over the target, every drag delivers every file.</summary>
+    [Theory]
+    [InlineData(1)]
+    [InlineData(3)]
+    public void DEF_RC2_DND_01_library_drags_with_a_pause_over_the_target_deliver_every_file_repeatedly(int count) => UiThread.Run(async () =>
+    {
+        Assert.True(CaptureDragDrop.SuppressToolTipsDuringDrag);
+        List<(string[]? Files, string Trace)> drags = await LibraryDragsAsync(count, hoverMs: 1500, repeats: 3);
+        foreach ((string[]? files, string trace) in drags)
+        {
+            Assert.True(files is not null, "no drop: " + trace);
+            Assert.Equal(count, files!.Length);
+            Assert.Equal(count, files.Select(Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
+            Assert.All(files, f => Assert.Equal((80, 60), (Decode(f).Width, Decode(f).Height)));
+            Assert.DoesNotContain("tooltip opened during the drag", trace, StringComparison.Ordinal);
         }
     });
 
