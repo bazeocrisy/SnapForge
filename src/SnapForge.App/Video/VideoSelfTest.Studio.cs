@@ -20,13 +20,13 @@ internal static partial class VideoSelfTest
         // Screen + SYNTHETIC camera composited into a real screen recording; Studio on screen at the same time.
         try
         {
-            (StudioOverlayResult o, double studioGreen, string? studioError, string? covered) = ScreenPlusSyntheticCamera(dir);
-            report["studioScreenPlusCamera"] = new { synthetic = true, o.InsideShare, o.OtherCorners, o.GreenElsewhere, o.Layout, result = Summary(o.Result), studioWindowGreen = studioGreen, studioError, coveredBy = covered };
+            (StudioOverlayResult o, double studioGreen, string? studioError, string? covered, string diagnostics) = ScreenPlusSyntheticCamera(dir);
+            report["studioScreenPlusCamera"] = new { synthetic = true, o.InsideShare, o.OtherCorners, o.GreenElsewhere, o.Layout, result = Summary(o.Result), studioWindowGreen = studioGreen, studioError, coveredBy = covered, diagnostics };
             string precondition = covered is null ? string.Empty : $" — PRECONDITION NOT MET: the test area was covered by {covered}";
             double dropped = o.Result.FramesWritten == 0 ? 1 : o.Result.FramesDropped / (double)(o.Result.FramesWritten + o.Result.FramesDropped);
             check("studio-screen-plus-camera-synthetic",
                 o.Result.Finalized && o.InsideShare >= 0.9 && o.OtherCorners.All(c => c <= 0.02) && o.GreenElsewhere >= 0.9 && dropped < 0.01,
-                $"SYNTHETIC camera in the bottom-right {o.Layout}: {o.InsideShare:P1} of the overlay shows the synthetic pattern, other corners {string.Join(" / ", o.OtherCorners.Select(c => c.ToString("P1", System.Globalization.CultureInfo.InvariantCulture)))}, screen elsewhere {o.GreenElsewhere:P1} unchanged; {o.Result.FramesWritten} frames, {dropped:P2} dropped{precondition}");
+                $"SYNTHETIC camera in the bottom-right {o.Layout}: {o.InsideShare:P1} of the overlay shows the synthetic pattern, other corners {string.Join(" / ", o.OtherCorners.Select(c => c.ToString("P1", System.Globalization.CultureInfo.InvariantCulture)))}, screen elsewhere {o.GreenElsewhere:P1} unchanged; {o.Result.FramesWritten} frames, {dropped:P2} dropped{precondition}{(o.GreenElsewhere < 0.9 ? " — " + diagnostics : string.Empty)}");
             check("studio-window-not-recorded", studioError is null && studioGreen >= 0.98,
                 studioError ?? $"the Studio window's area is {studioGreen:P1} background in the recording (Studio is excluded from capture){precondition}");
         }
@@ -197,7 +197,7 @@ internal static partial class VideoSelfTest
     /// Shows a lime window and SnapForge Studio over part of it, records the lime area with the SYNTHETIC camera
     /// composited in the bottom-right corner, decodes a frame and measures where the synthetic pattern appears.
     /// </summary>
-    private static (StudioOverlayResult Overlay, double StudioGreen, string? StudioError, string? Covered) ScreenPlusSyntheticCamera(string dir)
+    private static (StudioOverlayResult Overlay, double StudioGreen, string? StudioError, string? Covered, string Diagnostics) ScreenPlusSyntheticCamera(string dir)
     {
         PixelRect area = default;
         var ours = new List<nint>();
@@ -285,6 +285,9 @@ internal static partial class VideoSelfTest
             covered = still is null ? null : $"{still} (still on top after re-raising the test windows; first seen: {covered})";
         }
 
+        // What the screen shows right before recording, through a direct GDI capture (not the recorder's path).
+        PixelBuffer before = SnapForge.App.Capture.ScreenCaptureService.CaptureRegion(area);
+        double limeBefore = Share(before, before.Width / 2, 0, (before.Width / 2) - 140, before.Height / 2, Lime); // same region as the recorded check
         string path = Path.Combine(dir, "studio-screen-plus-camera-synthetic.mp4");
         RecordingResult result;
         OverlayLayout layout;
@@ -336,7 +339,8 @@ internal static partial class VideoSelfTest
         }
 
         File.Delete(path);
-        return (new StudioOverlayResult(result, Math.Round(inside, 4), [.. others.Select(o => Math.Round(o, 4))], Math.Round(green, 4), $"{lw}x{lh} at {layout.X},{layout.Y} of {w}x{h}"), Math.Round(studioGreen, 4), studioError, covered);
+        string diagnostics = $"direct screen capture before recording: {limeBefore:P0} lime in the test area; recorded frame colours (4x3 grid, R,G,B): {ColourGrid(frame)}";
+        return (new StudioOverlayResult(result, Math.Round(inside, 4), [.. others.Select(o => Math.Round(o, 4))], Math.Round(green, 4), $"{lw}x{lh} at {layout.X},{layout.Y} of {w}x{h}"), Math.Round(studioGreen, 4), studioError, covered, diagnostics);
     }
 
     /// <summary>Smallest and largest step between consecutive decoded video timestamps (ms).</summary>
@@ -362,6 +366,35 @@ internal static partial class VideoSelfTest
     }
 
     /// <summary>Full red with blue or green: the SYNTHETIC camera's magenta / yellow (the test screen is lime: no red).</summary>
+    /// <summary>Average colour of each cell of a 4×3 grid (diagnostics in failure messages).</summary>
+    private static string ColourGrid(PixelBuffer frame)
+    {
+        var cells = new List<string>();
+        for (int gy = 0; gy < 3; gy++)
+        {
+            for (int gx = 0; gx < 4; gx++)
+            {
+                long r = 0, g = 0, b = 0, n = 0;
+                int x0 = frame.Width * gx / 4, x1 = frame.Width * (gx + 1) / 4, y0 = frame.Height * gy / 3, y1 = frame.Height * (gy + 1) / 3;
+                for (int y = y0; y < y1; y += 4)
+                {
+                    for (int x = x0; x < x1; x += 4)
+                    {
+                        int o = ((y * frame.Width) + x) * 4;
+                        b += frame.Pixels[o];
+                        g += frame.Pixels[o + 1];
+                        r += frame.Pixels[o + 2];
+                        n++;
+                    }
+                }
+
+                cells.Add(n == 0 ? "-" : $"{r / n},{g / n},{b / n}");
+            }
+        }
+
+        return string.Join(" | ", cells);
+    }
+
     private static bool Synthetic(byte b, byte g, byte r) => r > 180 && (b > 150 || g > 150);
 
     private static bool Lime(byte b, byte g, byte r) => g > 200 && r < 60 && b < 60;
