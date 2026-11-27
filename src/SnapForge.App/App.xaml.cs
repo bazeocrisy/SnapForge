@@ -545,7 +545,7 @@ public partial class App : Application
             "• To capture without keeping a copy, turn off \"Save to Library\" in the Capture window, or use the preset \"Full screen to Clipboard (no history)\".\n" +
             "• Redaction: exported images (PNG/JPEG, clipboard) contain only the black box. The editable Library copy keeps the original pixels so you can undo; use File → Sanitize to remove them permanently.\n" +
             "• Deleted captures go to the Library's Trash first. Backups you make, exported files and Windows file-recovery or backup tools can keep copies that SnapForge cannot remove.\n\n" +
-            "You can change the location, retention and backups in Settings → Library.";
+            "You can change the location, retention and backups in Settings → Capture Library.";
         if (owner is { IsVisible: true })
         {
             MessageBox.Show(owner, text, $"{ProductInfo.Name} — privacy and storage", MessageBoxButton.OK, MessageBoxImage.Information);

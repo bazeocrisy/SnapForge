@@ -268,7 +268,7 @@ public partial class MainWindow
         }
     }
 
-    // ------------------------------------------------------------------ image files in (import)
+    // ------------------------------------------------------------------ image and MP4 files in (import)
 
     private void OnWindowDragOver(object sender, DragEventArgs e)
     {
@@ -298,7 +298,7 @@ public partial class MainWindow
 
     private static IReadOnlyList<string> ImportablePaths(IDataObject data) =>
         data.GetDataPresent(DataFormats.FileDrop) && data.GetData(DataFormats.FileDrop) is string[] files
-            ? [.. files.Where(ImageImport.IsSupportedPath)]
+            ? [.. files.Where(f => ImageImport.IsSupportedPath(f) || Path.GetExtension(f).Equals(".mp4", StringComparison.OrdinalIgnoreCase))]
             : [];
 
     private async void OnImportImages(object sender, RoutedEventArgs e) => await ImportWithDialogAsync().ConfigureAwait(true);

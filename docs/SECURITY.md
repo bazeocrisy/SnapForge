@@ -58,7 +58,7 @@ Full pipeline review: [REDACTION.md](REDACTION.md).
 
 | Area | Control |
 |---|---|
-| Privileges | `asInvoker`; no services, drivers, keyboard hooks, startup entries or elevation |
+| Privileges | `asInvoker`; no services, drivers, keyboard hooks or elevation; one optional per-user startup entry (Settings → launch with Windows, off by default) |
 | Storage integrity | Atomic temp-file + flush + rename writes; manifest with SHA-256 written last; damaged captures listed but never opened; stale temp files cleaned |
 | Capture without history | "Save to Library" off keeps the capture only in memory; closing asks before losing it |
 | Memory hygiene | Full-desktop frame zeroed after crop; document buffers zeroed when a capture is closed or evicted (best effort) |

@@ -59,6 +59,15 @@ public partial class ReleaseCandidateUiTests
             var controls = new List<FrameworkElement> { w.UndoButton, w.RedoButton, w.DeleteButton, w.DragOutButton, w.CopyButton, w.SaveButton };
             controls.AddRange(w.ToolButtonsPanel.Children.OfType<RadioButton>().Where(b => b.Visibility == Visibility.Visible));
             Assert.True(controls.Count >= 18);
+            if (width >= 1280)
+            {
+                // At the default window size the toolbar must stay one row (a second row costs canvas height).
+                double row = w.UndoButton.ActualHeight + 12;
+                Assert.True(w.ToolButtonsPanel.ActualHeight <= row,
+                    $"toolbar wraps at {width} px: tools {w.ToolButtonsPanel.DesiredSize.Width:0}x{w.ToolButtonsPanel.ActualHeight:0}, " +
+                    $"edit {((FrameworkElement)w.UndoButton.Parent).ActualWidth:0}, output {((FrameworkElement)w.SaveButton.Parent).ActualWidth:0}, content {content.ActualWidth:0}");
+            }
+
             foreach (FrameworkElement c in controls)
             {
                 Rect r = c.TransformToAncestor(content).TransformBounds(new Rect(0, 0, c.ActualWidth, c.ActualHeight));

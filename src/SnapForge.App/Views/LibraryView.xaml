@@ -32,7 +32,7 @@
                                     <MenuItem Header="_Tags…" Click="OnEditTags" />
                                     <MenuItem Header="Move to _folder…" Click="OnSetFolder" />
                                     <Separator />
-                                    <MenuItem Header="_Export as PNG/JPEG…" Tag="export" Click="OnExport" />
+                                    <MenuItem Header="_Export image (PNG, JPEG, BMP, TIFF)…" Tag="export" Click="OnExport" />
                                     <MenuItem Header="Export editable capture (.sfcap)…" Tag="image-only" Click="OnExportPackage" />
                                     <MenuItem Header="_Sanitize…" Tag="image-only" Click="OnSanitize" />
                                     <Separator />
@@ -162,7 +162,7 @@
                                 ValueChanged="OnSizeChanged" AutomationProperties.Name="Thumbnail size" />
                     </StackPanel>
                     <StackPanel Orientation="Horizontal" VerticalAlignment="Center" Margin="0,2">
-                        <Button x:Name="ImportButton" Content="Import…" Click="OnImport" Margin="0,0,4,0" ToolTip="Import PNG, JPEG or BMP images (you can also drop files here)" />
+                        <Button x:Name="ImportButton" Content="Import…" Click="OnImport" Margin="0,0,4,0" ToolTip="Import PNG, JPEG or BMP images and MP4 videos (you can also drop files here)" />
                         <Button x:Name="OpenButton" Content="Open" Click="OnOpenSelected" Margin="0,0,4,0" IsEnabled="False" ToolTip="Open in Editor (Enter)" />
                         <Button x:Name="ExportButton" Content="Export…" Click="OnExport" Margin="0,0,4,0" IsEnabled="False" />
                         <Button x:Name="DeleteButton" Content="Move to Trash" Click="OnDelete" Margin="0,0,4,0" IsEnabled="False" ToolTip="Del" />

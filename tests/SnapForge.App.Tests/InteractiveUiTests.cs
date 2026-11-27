@@ -103,7 +103,7 @@ public class InteractiveUiTests
             Left = 0,
             Top = 0,
             Width = 1280, // default width: one toolbar row, so the image shows at 1:1 (narrow widths: ReleaseCandidateUiTests)
-            Height = 700,
+            Height = 740,
             Topmost = true,
         };
         try
@@ -161,8 +161,23 @@ public class InteractiveUiTests
             await ClickElement(window.SelectTool);
             await ClickImage(window, 80, 100);
             Assert.True(window.DeleteButton.IsEnabled);
+            Guid selectedId = Assert.IsType<RectangleAnnotation>(window.Editor.Selected).Id;
+
+            // Copy + paste and duplicate the selection: each adds an independent copy 16 px down-right.
+            ClickMenu(window, "_Edit", "Copy _annotation");
+            ClickMenu(window, "_Edit", "_Paste");
+            ClickMenu(window, "_Edit", "D_uplicate annotation");
+            var rects = doc.Annotations.OfType<RectangleAnnotation>().ToList();
+            Assert.Equal(3, rects.Count);
+            Assert.Equal(3, rects.Select(r => r.Id).Distinct().Count());
+            AssertNear(new RectD(96, 86, 100, 70), rects[1].Rect);
+            AssertNear(new RectD(96, 86, 100, 70), rects[2].Rect);
+            Assert.Equal(selectedId, window.Editor.Selected?.Id);
+
+            // Delete the selected original with the Delete button; the copies stay.
             await ClickElement(window.DeleteButton);
-            Assert.DoesNotContain(doc.Annotations, a => a is RectangleAnnotation);
+            Assert.DoesNotContain(doc.Annotations, a => a.Id == selectedId);
+            Assert.Equal(2, doc.Annotations.OfType<RectangleAnnotation>().Count());
         }
         finally
         {
@@ -225,6 +240,13 @@ public class InteractiveUiTests
     {
         (int sx, int sy) = ImageToScreen(window, x, y);
         return Click(sx, sy);
+    }
+
+    private static void ClickMenu(MainWindow w, string top, string header)
+    {
+        MenuItem root = w.MainMenu.Items.OfType<MenuItem>().Single(m => (string)m.Header == top);
+        MenuItem item = root.Items.OfType<MenuItem>().Single(m => (string)m.Header == header);
+        item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
     }
 
     private static Task ClickElement(FrameworkElement element)

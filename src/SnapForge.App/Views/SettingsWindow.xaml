@@ -77,7 +77,7 @@
                 </DockPanel>
                 <TextBlock x:Name="HotkeyStatus" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource MutedTextBrush}" />
                 <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,6,0,0"
-                           Text="If Print Screen is reported as in use, Windows is probably using it to open the Snipping Tool: Settings → Accessibility → Keyboard → turn off “Use the Print screen key to open screen capture”, then reopen this window. Preset hotkeys are set from the Capture window (right-click a preset)." />
+                           Text="If Print Screen is reported as in use, Windows is probably using it to open the Snipping Tool: Settings → Accessibility → Keyboard → turn off “Use the Print screen key to open screen capture”, then reopen this window. Preset hotkeys are set in the capture panel: Presets → (preset) → Set hotkey…." />
 
                 <TextBlock Text="CAPTURE LIBRARY" Style="{StaticResource SectionHeader}" />
                 <TextBlock Text="Location (local disk; SnapForge never uploads captures):" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" />

@@ -199,6 +199,10 @@ figure.shot { margin: 0; }
 figure.shot img { display: block; border-radius: 10px; border: 1px solid var(--slate-200); box-shadow: var(--shadow); }
 figure.shot figcaption, .hero-figure figcaption { font-size: 0.85rem; color: var(--slate-600); margin-top: 0.6rem; }
 .shot-pair { display: grid; gap: 1rem; }
+.gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 340px), 1fr)); gap: 1.5rem; margin-top: 1.5rem; }
+.gallery figure.shot img { width: 100%; aspect-ratio: 16 / 10; object-fit: contain; background: var(--navy-950); }
+figure.shot a { display: block; border-radius: 10px; }
+figure.shot a:focus-visible { outline: 3px solid var(--orange-500); outline-offset: 3px; }
 
 .checklist { list-style: none; padding: 0; }
 .checklist li { padding-left: 1.8rem; position: relative; margin-bottom: 0.45rem; }

@@ -392,7 +392,7 @@
     <Style x:Key="HToolButton" TargetType="RadioButton" BasedOn="{StaticResource ToolButton}">
         <Setter Property="Width" Value="Auto" />
         <Setter Property="Height" Value="46" />
-        <Setter Property="MinWidth" Value="52" />
+        <Setter Property="MinWidth" Value="46" />
         <Setter Property="Margin" Value="1,0" />
         <Setter Property="Template">
             <Setter.Value>
@@ -401,7 +401,7 @@
                         <Border x:Name="Bd" Background="Transparent" CornerRadius="7" />
                         <Border x:Name="Indicator" Height="3" CornerRadius="1.5" VerticalAlignment="Bottom" Margin="12,0"
                                 Background="{DynamicResource AccentBrush}" Visibility="Collapsed" />
-                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="6,2,6,4" />
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" Margin="4,2,4,4" />
                     </Grid>
                     <ControlTemplate.Triggers>
                         <Trigger Property="IsMouseOver" Value="True">

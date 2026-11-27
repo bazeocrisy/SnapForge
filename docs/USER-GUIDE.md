@@ -501,7 +501,7 @@ The zoom percentage is shown in the status bar. Zoom ranges from 5 % to 800 %.
 * **Saving** happens automatically to the Library.
 * **Copy image** (**Ctrl+C**, **Copy** button, **File → Copy image**): copies the finished image to the
   clipboard.
-* **Export** (**Ctrl+S**, **Export** button, **File → Export as PNG/JPEG…**): saves the finished image as a
+* **Export** (**Ctrl+S**, **Export** button, **File → Export image (PNG, JPEG, BMP, TIFF)…**): saves the finished image as a
   **PNG**, **JPEG**, **BMP** or **TIFF** file. The default name is like `SnapForge 2026-11-25 134905.png`, and
   the default folder is **Pictures\Screenshots** (or **Pictures** if that folder does not exist). JPEG files
   are saved at quality 92.
@@ -897,7 +897,7 @@ Click **Sort:** and choose **Newest first**, **Oldest first**, **Recently opened
 | **Toggle favorite** | Adds to or removes from Favorites. |
 | **Tags…** | Type tags separated by commas. With several captures selected, the tags you type replace their existing tags. |
 | **Move to folder…** | Type a folder name. Leave it empty to remove the capture from folders. A capture is in one folder at most. |
-| **Export as PNG/JPEG…** (**Export MP4 video…** for videos) | Saves a copy as a file. |
+| **Export image (PNG, JPEG, BMP, TIFF)…** (**Export MP4 video…** for videos) | Saves a copy as a file. |
 | **Export editable capture (.sfcap)…** | Images only. See [Editable captures](#editable-captures-sfcap). |
 | **Sanitize…** | Images only. See [Sanitize](#sanitize). |
 | **Move to Trash** (**Del**) | Moves to the Trash. |
@@ -1007,7 +1007,7 @@ their own copies.
 
 ### Dragging files into SnapForge
 
-Drop PNG, JPEG or BMP files from File Explorer onto the SnapForge window to import them into the Library. See
+Drop PNG, JPEG or BMP images or MP4 videos from File Explorer onto the SnapForge window to import them into the Library. See
 [Import](#import-images-and-mp4-videos).
 
 ### If a drag does not work
@@ -1523,7 +1523,6 @@ More detail: [SECURITY.md](SECURITY.md) and [REDACTION.md](REDACTION.md).
   video removes the file without overwriting it.
 * Library backups contain images only; back up the `videos` folder separately.
 * Settings are not included in backups.
-* Dropping MP4 files onto the window does not import them; use **Import…**.
 
 **Screen recording**
 

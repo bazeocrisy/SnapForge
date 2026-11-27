@@ -149,7 +149,7 @@
                         <Separator />
                         <MenuItem x:Name="SaveToLibraryMenu" Header="Save to _Library" Click="OnSaveToLibrary" />
                         <MenuItem Header="_Import images…" Click="OnImportImages" />
-                        <MenuItem x:Name="ExportMenu" Header="_Export as PNG/JPEG…" InputGestureText="Ctrl+S" Click="OnSave" />
+                        <MenuItem x:Name="ExportMenu" Header="_Export image (PNG, JPEG, BMP, TIFF)…" InputGestureText="Ctrl+S" Click="OnSave" />
                         <MenuItem x:Name="CopyMenu" Header="_Copy image" InputGestureText="Ctrl+C" Click="OnCopy" />
                         <MenuItem x:Name="PrintMenu" Header="_Print…" InputGestureText="Ctrl+P" Click="OnPrint" />
                         <MenuItem x:Name="ExportPackageMenu" Header="Export editable capture (.sfcap)…" Click="OnExportPackage" />

@@ -593,7 +593,7 @@ public partial class LibraryView : UserControl
                         item.Header = video ? "_Play" : "_Open in Editor";
                         break;
                     case "export":
-                        item.Header = video ? "_Export MP4 video…" : "_Export as PNG/JPEG…";
+                        item.Header = video ? "_Export MP4 video…" : "_Export image (PNG, JPEG, BMP, TIFF)…";
                         break;
                     case "image-only":
                         item.Visibility = video ? Visibility.Collapsed : Visibility.Visible;

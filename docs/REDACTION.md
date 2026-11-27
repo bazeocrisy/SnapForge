@@ -74,5 +74,6 @@ was already copied or saved.
   contain screen content.
 * **Black box size reveals length** of the redacted text (inherent to box redaction).
 * **Other screenshot tools** (Print Screen to OneDrive, Snipping Tool history) are outside SnapForge.
-* Redaction color is fixed to black; blur/pixelate are intentionally not offered because they can be partially
-  reversible.
+* Redaction color is fixed to black. Since 1.0 the Editor also offers **Blur** and **Pixelate** as visual effects;
+  they are labelled "not redaction" because blurred or pixelated text can sometimes be partially recovered. Use
+  Redact for anything secret.
