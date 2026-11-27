@@ -30,12 +30,42 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-      - name: Validate configuration, links, accessibility basics, no trackers, no external resources
-        run: python3 website/build.py --check
+      - name: Generated website/public matches a fresh build; configuration, links, accessibility basics, no trackers
+        run: python3 -B website/build.py --check
+      - name: Unit tests (build gates, stale-output detection, release verifier against a fake GitHub)
+        run: python3 -B -m unittest discover -s website/tests -v
+
+  browsers:
+    name: Browser tests (Chromium, Firefox, WebKit)
+    needs: check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with:
+          node-version: 22
+      - name: Install pinned test dependencies (package-lock.json, integrity-checked)
+        working-directory: website/tests
+        run: npm ci --ignore-scripts --no-audit --no-fund
+      - name: Install the three browser engines for that Playwright version
+        working-directory: website/tests
+        run: npx --no-install playwright install --with-deps chromium firefox webkit
+      - name: Run browser checks (all three engines required)
+        working-directory: website/tests
+        run: node browser-check.js ../public ../test-output --label ci --browsers chromium,firefox,webkit --require-all
+      - name: Upload results and screenshots
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: website-browser-tests-${{ github.sha }}
+          path: website/test-output
+          retention-days: 30
 
   deploy:
     name: Deploy to GitHub Pages (manual, owner-approved)
-    needs: check
+    needs: [check, browsers]
     if: >-
       github.event_name == 'workflow_dispatch' && inputs.deploy &&
       github.ref == 'refs/heads/main' && vars.WEBSITE_DEPLOY_APPROVED == 'true'

@@ -1,0 +1,29 @@
+# Verifies a PUBLISHED GitHub Release against website/config.json before the website may link to it.
+# Read-only: it never creates, edits or publishes a release, and it does not commit anything. It runs on Windows so
+# that a "signed" claim is checked with Get-AuthenticodeSignature. The verification record is uploaded as an
+# artifact for the owner to review and commit (see website/LAUNCH-CHECKLIST.md).
+name: Website release verification
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+      - name: Verify release, asset name, downloaded bytes, size, checksum, package contents and signing claim
+        env:
+          GITHUB_TOKEN: ${{ github.token }}
+        run: python -B website/tools/verify-release.py --out release-verification.json
+      - name: Upload verification record
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: release-verification-${{ github.sha }}
+          path: release-verification.json
+          retention-days: 30

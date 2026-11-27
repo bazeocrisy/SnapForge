@@ -18,6 +18,7 @@ const [siteArg, outDir] = process.argv.slice(2);
 const siteDir = siteArg && path.resolve(siteArg);
 const label = (process.argv.indexOf("--label") > 0 ? process.argv[process.argv.indexOf("--label") + 1] : "site");
 const browserNames = (process.argv.indexOf("--browsers") > 0 ? process.argv[process.argv.indexOf("--browsers") + 1] : "chromium").split(",");
+const requireAll = process.argv.includes("--require-all");
 if (!siteArg || !outDir) { console.error("usage: browser-check.js <site-dir> <output-dir>"); process.exit(2); }
 fs.mkdirSync(outDir, { recursive: true });
 
@@ -53,8 +54,13 @@ const VIEWPORTS = [
   for (const bname of browserNames) {
     let browser;
     try { browser = await pw[bname].launch(); }
-    catch (e) { results.browsers[bname] = "not available: " + e.message.split("\n")[0]; console.log(`SKIP ${bname}: not installed`); continue; }
-    const br = results.browsers[bname] = { pages: {} };
+    catch (e) {
+      results.browsers[bname] = { status: "NOT TESTED — browser not available here", error: e.message.split("\n")[0] };
+      if (requireAll) fail(`${bname}: browser not available (--require-all)`);
+      else console.log(`NOT TESTED ${bname}: browser not installed in this environment`);
+      continue;
+    }
+    const br = results.browsers[bname] = { status: "tested", version: browser.version(), pages: {} };
     for (const vp of VIEWPORTS) {
       const ctx = await browser.newContext({ viewport: { width: vp.width, height: vp.height }, deviceScaleFactor: 1,
         reducedMotion: vp.name === "phone" ? "reduce" : "no-preference" });
@@ -83,14 +89,14 @@ const VIEWPORTS = [
         if (info.brokenImages.length) fail(`${key}: images not loaded ${info.brokenImages}`);
         if (info.cookies) fail(`${key}: cookies set`);
         let axe = { violations: [] };
-        if (bname === "chromium") {
+        {
           await page.evaluate(axeSource);  // via DevTools, so the page's CSP stays enforced
           axe = await page.evaluate(async () => await window.axe.run(document, {
             runOnly: { type: "tag", values: ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa", "wcag22aa", "best-practice"] } }));
           for (const v of axe.violations) fail(`${key}: axe ${v.id} (${v.impact}) — ${v.help} — ${v.nodes.slice(0, 3).map(n => n.target.join(" ")).join(" | ")}`);
         }
         br.pages[key] = { status, overflow: info.overflow, axeViolations: axe.violations.map(v => v.id), title: info.title };
-        if (bname === "chromium" || name === "index.html")
+        if (bname === "chromium" || name === "index.html" || name === "download.html")
           await page.screenshot({ path: path.join(outDir, `${label}-${bname}-${vp.name}-${name.replace(".html", "")}.png`), fullPage: true });
         await page.close();
       }

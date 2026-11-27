@@ -1,68 +1,72 @@
 # SnapForge website
 
 The SnapForge project website, for free GitHub Pages hosting at **https://bazeocrisy.github.io/SnapForge/**.
-**Status: draft for review — not deployed.** Nothing is published until the owner completes the steps under
-[Deployment](#deployment).
+**Status: draft for review (PR #2) — not deployed, no release.** Launch steps are in
+[LAUNCH-CHECKLIST.md](LAUNCH-CHECKLIST.md); branding and name decisions in [BRANDING.md](BRANDING.md); the review
+handoff in [HANDOFF.md](HANDOFF.md).
 
 Plain HTML and CSS, one small local script (mobile menu, "copy checksum"), no frameworks, no third-party resources,
 no analytics, no cookies, no storage. Every link is relative, so the site works under `/SnapForge/`, on a custom
 domain, or from any local web server.
 
-## Layout
+## Source files and generated files
 
-| Path | What it is |
-|---|---|
-| `config.json` | **The only file to edit for releases and donations** (see below) |
-| `src/layout.html` | Shared page shell: header, navigation, footer, meta tags, Content-Security-Policy |
-| `src/pages/*.html` | Page content (Home, Features, Download, User Guide, What's New, Roadmap, Support/FAQ, Donate, Privacy, About/License, 404) |
-| `build.py` | Builds `src/` + `config.json` into `public/` and validates it (Python 3 standard library only) |
-| `public/` | **The generated site that is deployed** (HTML is generated; CSS, JS, images and icons live here directly) |
-| `tests/browser-check.js` | Browser tests (Playwright + axe-core) — see [Testing](#testing) |
-| `tools/` | Open Graph image source (`og-image.html`) and renderer (`make-og-image.js`) |
-| `test-evidence/` | Browser screenshots and JSON results from the last test run |
-| `design-references/` | The supplied concept images (generated references — **not published**, not real UI) and the current app icon for comparison |
+| Path | Kind | What it is |
+|---|---|---|
+| `src/layout.html` | **source** | Shared page shell: header, navigation, footer, meta tags, Content-Security-Policy |
+| `src/pages/*.html` | **source** | Page content with `{{tokens}}` filled by the build (Home, Features, Download, User Guide, What's New, Roadmap, Support/FAQ, Donate, Privacy, About/License, 404) |
+| `static/**` | **source** | Copied verbatim into the site: `assets/css/site.css`, `assets/js/site.js`, `assets/icons/*.svg`, `assets/img/` (logo, Open Graph image), `assets/screenshots/*.jpg`, `favicon.ico` |
+| `static/assets/img/og-image.png` | **source** (rendered once) | Made by `node tools/make-og-image.js` from `tools/og-image.html`; re-render after changing the logo or slogan |
+| `config.json` | **source** | Release, donation and security-contact settings — see below |
+| `release-verification.json` | **source** (tool output, reviewed) | Written only by `tools/verify-release.py` after it has checked the real GitHub Release. Absent until a release exists |
+| `public/**` | **generated — do not edit** | The deployed site. `build.py` deletes it and rebuilds it entirely: `static/**` copied, every `*.html`, `sitemap.xml` and `robots.txt` generated |
+| `build.py` | tool | Build + validation (Python 3 standard library only) |
+| `tools/verify-release.py` | tool | Release-publication verifier (read-only) |
+| `tests/test_website.py` | tests | Unit tests: build gates, stale-output detection, verifier against a fake GitHub |
+| `tests/browser-check.js`, `tests/package*.json` | tests | Browser tests (Playwright + axe-core, pinned by `package-lock.json`); not needed to build or deploy |
+| `test-evidence/` | evidence | Screenshots and JSON from the last local browser run |
+| `design-references/` | reference | Supplied concept images (not published, not real UI) and the current app icon |
+
+`public/` is committed because GitHub Pages deploys it as-is and reviewers can read the exact HTML. **CI detects
+stale or hand-edited output:** `python3 website/build.py --check` builds into a temporary folder and fails if
+`public/` differs in any byte, is missing a file or has an extra one (tested in `tests/test_website.py`).
+After changing anything under `src/`, `static/` or `config.json`, run `python3 website/build.py` and commit
+`public/` together with the change.
 
 ## Preview locally
 
 ```bash
-python3 website/build.py                                   # after any change to src/ or config.json
+python3 website/build.py                                   # after any change to src/, static/ or config.json
 python3 -m http.server 8000 --directory website/public     # then open http://localhost:8000/
 ```
 
-To preview under the real base path, serve the folder as `/SnapForge/` — `tests/browser-check.js` does exactly that.
+## Release download
 
-## Release download (config.json → `release`)
+The Download button is **disabled** and the Download page says "No public release yet" unless **all** of these
+hold — `release.ownerApproved: true` on its own is refused by the build:
 
-The Download button is **disabled** and the Download page says "No public release yet" until all of this is true:
+1. The owner approved the software release, and it is published as a **GitHub Release** of `bazeocrisy/SnapForge`
+   (not a draft or pre-release). Actions artifacts are rejected: they expire and need a GitHub sign-in.
+2. `config.json → release` is filled in from that release.
+3. `tools/verify-release.py` (or the **Website release verification** workflow, which runs it on Windows) has
+   checked the actual release: exact asset name, the downloadable bytes, file size, SHA-256, the package contents
+   and the signing claim — and written `release-verification.json`, which must match `config.json` field for field.
+4. Private vulnerability reporting is enabled and verified (`config.json → security.privateReporting`).
 
-1. The owner has approved a release and published it as a **GitHub Release** of `bazeocrisy/SnapForge`
-   (Actions artifacts are rejected by the build: they expire and need a GitHub sign-in).
-2. `config.json` is filled in from that release:
+The website lists package contents (license, notices, checksum list) **only from the verification record**; until
+then it says they will be listed once verified. Nothing in this repository creates or publishes a release.
+Procedure: [LAUNCH-CHECKLIST.md §B](LAUNCH-CHECKLIST.md#b-before-the-site-may-offer-a-download).
 
-```json
-"release": {
-  "ownerApproved": true,
-  "version": "1.0.0",
-  "date": "2027-01-15",
-  "downloadUrl": "https://github.com/bazeocrisy/SnapForge/releases/download/v1.0.0/SnapForge-1.0.0-win-x64.zip",
-  "fileName": "SnapForge-1.0.0-win-x64.zip",
-  "sizeBytes": 56487727,
-  "sha256": "<64 lower-case hex characters of the ZIP>",
-  "signed": false,
-  "signer": null,
-  "releaseNotesUrl": "https://github.com/bazeocrisy/SnapForge/releases/tag/v1.0.0",
-  "packageType": "portable"
-}
-```
+## Security reporting
 
-`sizeBytes` and `sha256` must be measured from the file **as uploaded to the release** (download it and run
-`Get-FileHash` / `sha256sum`; size from Explorer → Properties → Size in bytes). Set `signed: true` and `signer`
-only for an Authenticode-signed build. `build.py` validates every field and refuses to build otherwise. After a
-change run `python3 website/build.py`, check the Download page, commit.
+`config.json → security.privateReporting` stays `{ "url": null, "verified": false }` until the owner has enabled
+GitHub private vulnerability reporting and checked it works ([LAUNCH-CHECKLIST.md §C](LAUNCH-CHECKLIST.md#c-private-vulnerability-reporting-required-before-launch)).
+Until then the Support page says private reporting is not set up, asks people not to disclose details publicly
+and to request a private channel without technical details. A release cannot be shown before it is verified.
 
-## Donations (config.json → `donations`)
+## Donations (`config.json → donations`)
 
-Each provider is **hidden** until it has a URL **and** `verified: true`. The build accepts only these URL forms:
+Each provider is **hidden** until it has a URL **and** `verified: true`. Accepted URL forms:
 
 | Provider | Set up (by the owner) | URL form |
 |---|---|---|
@@ -70,98 +74,47 @@ Each provider is **hidden** until it has a URL **and** `verified: true`. The bui
 | Buy Me a Coffee | buymeacoffee.com → create page | `https://www.buymeacoffee.com/<name>` |
 | PayPal | paypal.com → Donate button (hosted) or paypal.me link | `https://www.paypal.com/donate/?hosted_button_id=<ID>` or `https://paypal.me/<name>` |
 
-Open each link yourself, confirm it shows your account, then set `verified: true`. The site uses plain external
-links only — no embedded buttons, scripts or trackers. Do not describe donations as tax-deductible.
+Plain external links only — no embedded buttons, scripts or trackers; no tax-deductibility claims.
 
 ## Deployment
 
-The workflow `.github/workflows/website.yml` **validates** the site on every push/PR that touches `website/`.
-It **deploys only** when all of these are true — nothing deploys automatically:
-
-1. This branch has been reviewed and merged into `main` (workflows can only be run by hand from the default branch).
-2. Repository **Settings → Pages → Build and deployment → Source: GitHub Actions**.
-3. Repository **Settings → Secrets and variables → Actions → Variables**: `WEBSITE_DEPLOY_APPROVED` = `true`.
-4. **Actions → Website → Run workflow** on `main` with **deploy** ticked.
-
-To take the site down: Settings → Pages → Unpublish (and set the variable to `false`).
-
-Recommended before deploying: Settings → Environments → `github-pages` → required reviewer = owner.
+`.github/workflows/website.yml` validates every push/PR touching `website/` (build check, unit tests, browser
+tests in Chromium, Firefox and WebKit). It **deploys only** when the owner runs it by hand from `main` with
+**deploy** ticked **and** the repository variable `WEBSITE_DEPLOY_APPROVED` is `true` — see
+[LAUNCH-CHECKLIST.md §A](LAUNCH-CHECKLIST.md#a-before-the-site-may-be-deployed-even-with-no-release-yet).
+`.github/workflows/website-release-verify.yml` only reads a published release and uploads the record.
 
 ## Testing
 
 ```bash
-python3 website/build.py --check          # what CI runs: up to date, config, links, a11y basics, no trackers
-# browser tests (Playwright and axe-core installed in the environment):
-node website/tests/browser-check.js website/public /tmp/site-test --label unconfigured --browsers chromium,firefox,webkit
+python3 -B website/build.py --check                         # generated output up to date + site validation
+python3 -B -m unittest discover -s website/tests -v         # 20 unit tests
+cd website/tests && npm ci && npx playwright install chromium firefox webkit
+node browser-check.js ../public ../test-output --label local --browsers chromium,firefox,webkit
 ```
 
-`build.py --check` fails on: stale `public/`, invalid configuration, broken internal links or anchors,
-root-absolute links (break under `/SnapForge/`), external images/CSS/scripts, iframes, trackers or
-cookie/storage code, missing `lang`/title/description, not exactly one `<h1>`, skipped heading levels, images
-without `alt`, buttons without `type`, links without text, duplicate ids, and declared colour pairs below WCAG AA
-contrast. It prints every external link.
+`build.py --check` fails on: `public/` not matching a fresh build, invalid configuration (including a release
+without a matching verification record or without verified private reporting), broken internal links or anchors,
+root-absolute links, external images/CSS/scripts, iframes, trackers or cookie/storage code, missing
+`lang`/title/description, not exactly one `<h1>`, skipped heading levels, images without `alt`, buttons without
+`type`, links without text, duplicate ids, and declared colour pairs below WCAG AA contrast.
 
-`browser-check.js` serves the site at `/SnapForge/` and, at 375 px (phone, reduced motion), 768 px (tablet) and
-1280 px (desktop), checks each page: HTTP 200, no console errors or CSP violations, no request leaving the site,
-every image decoded, no horizontal scrolling, **axe-core WCAG 2.0/2.1/2.2 A and AA rules + best practices**,
-cookies unset; plus skip link and focus order, visible focus on 25 tabbed elements, mobile menu by keyboard and
-Escape, the nested-URL 404 page, and navigation without JavaScript.
+`browser-check.js` serves the site at `/SnapForge/` and, at 375 px (phone, reduced motion), 768 px and 1280 px,
+checks each page in each engine: HTTP 200, no console errors or CSP violations, no request leaving the site, every
+image decoded, no horizontal scrolling, **axe-core WCAG 2.0/2.1/2.2 A/AA + best-practice rules**, no cookies; plus
+skip link, visible focus on 25 tabbed elements, mobile menu by keyboard and Escape, a nested-URL 404 page and
+navigation without JavaScript. An engine that is not installed is reported as **NOT TESTED** (never as passed);
+`--require-all` (used in CI) turns that into a failure.
 
-### Results (27 November 2026, this branch)
-
-| Check | Environment | Result |
-|---|---|---|
-| `build.py --check` | Linux, Python 3 | **Pass** — 11 pages, 4 external links (GitHub repo, Issues, Security, GitHub privacy statement) |
-| Configuration validation | Invalid test configs: Actions-artifact URL, unverified donation link, bad SHA-256/date | **Rejected** with clear messages (exit 2) |
-| Browser checks, unconfigured (live state) | Chromium (Playwright), 3 viewports × 11 pages + keyboard/menu/404/no-JS | **Pass, 0 failures, 0 axe violations** — `test-evidence/unconfigured-results.json` |
-| Browser checks, configured | Same, built with a **test-only** config (fake v0.0.0-test release, fake sponsor/PayPal links; never committed) | **Pass, 0 failures** — `test-evidence/configured-results.json` |
-| Firefox, WebKit (Safari engine) | — | **Not run**: browsers not installed in the build environment. Run the command above with `--browsers firefox,webkit` where they are installed |
-| Real devices, screen readers (NVDA, Narrator, VoiceOver), Windows High Contrast | — | **Not tested** |
-| Lighthouse | — | **Not run**. Page weight (HTML + CSS + JS + images): Home 72 KB, Features 261 KB (lazy-loaded screenshots), other pages 24–32 KB; no web fonts, no blocking third-party requests |
-| Deployed site, GitHub Pages headers, link previews (Open Graph) | — | **Not tested** (not deployed) |
-| External links | — | Not fetched by the tests; `…/security` private reporting and Issues being enabled are **unverified** |
-
-Screenshots in `test-evidence/` are real Chromium renders of this site (phone/tablet/desktop, menu open, no-JS,
-configured and unconfigured Download and Donate pages).
-
-## Content sources and claims
-
-Every feature claim was checked against the repository (README, Milestone 3 and V1 handoffs, SECURITY.md,
-COMPATIBILITY.md, VIDEO-ACCEPTANCE.md) on 27 November 2026. Status labels: *Development build* (Milestone 3 —
-built, CI-tested, awaiting review), *Experimental* (screen recording — separate branch, not approved), *Planned*
-(V2/V3 — not authorised). Nothing is labelled *Available* because nothing is released. Product screenshots are the
-real CI screenshots from `docs/screenshots/v1` (development build, fictional demo data), captioned as such; the
-recording toolbar image is a documentation capture shown without its capture exclusion, and is captioned so.
-
-Claims deliberately **not** made: encryption, guaranteed privacy, video redaction, compatibility with specific
-drop targets (Explorer/Office/Teams/browsers — pending manual tests), Windows 10 support, hardware-encoder or 4K
-recording, a release date.
-
-## For owner review (flags)
-
-1. **Logo differs from the app icon.** The site uses the supplied proposed logo (orange corner brackets around an
-   aperture, `public/assets/img/logo-mark.svg`); the app currently uses an orange rounded square with white corner
-   brackets and a dot (`design-references/current-app-icon.png`). Approve one, or ask for the app icon to be updated.
-2. **Name.** The site uses "SnapForge" as the official name (per the brief); the repository README still calls it a
-   working name and documents naming conflicts (docs/RESEARCH.md §4, docs/NAMING.md). Resolve before launch.
-3. **`main` is empty.** The repository's default branch currently holds only an initial commit; the app code is on
-   unmerged review branches. "View source on GitHub" therefore shows an empty repository until Milestone 3 is
-   merged. Deploy the site after that merge. (The license text is embedded on the About page for this reason.)
-4. **H.264/AAC distribution licensing** is stated as "to be confirmed before screen recording is released"
-   (from VIDEO-ARCHITECTURE.md §4).
-5. **Security reporting:** enable GitHub private vulnerability reporting (Settings → Code security) or provide a
-   contact; the Support page links to the Security tab. **Issues** must be enabled for bug reports.
-6. **Supported Windows versions** follow docs/COMPATIBILITY.md (Windows 11 24H2+ x64 target; Windows 10 not
-   supported/tested), which is stricter than the repository README's "Windows 10 and 11".
-7. Donation accounts, release, signing status and the "Last updated" date on the Privacy page need owner input
-   at launch.
+Manual keyboard and screen-reader procedures: [MANUAL-ACCEPTANCE.md](MANUAL-ACCEPTANCE.md). Results of the
+automated runs: [HANDOFF.md](HANDOFF.md#test-evidence).
 
 ## Known limitations
 
-* Only Chromium was tested; Firefox/Safari, real phones and screen readers are untested.
-* The Content-Security-Policy is set with a `<meta>` tag (GitHub Pages cannot set headers), so `frame-ancestors`
-  and other header-only protections are not available.
+* The Content-Security-Policy is a `<meta>` tag (GitHub Pages cannot set headers), so `frame-ancestors` and other
+  header-only protections are unavailable.
 * GitHub Pages logs visitor IP addresses as the host; this is disclosed on the Privacy page.
 * The 404 page uses absolute `/SnapForge/` paths (it is served at any depth); with a custom domain at the root,
   change `siteUrl` in `config.json` and rebuild.
 * The User Guide describes the current development builds and must be re-checked against the released build.
+* Signed-release claims can only be validated on Windows (the verification workflow runs there).

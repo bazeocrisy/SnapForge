@@ -1,8 +1,10 @@
 {
   "label": "configured",
-  "origin": "http://127.0.0.1:41993/SnapForge/",
+  "origin": "http://127.0.0.1:38973/SnapForge/",
   "browsers": {
     "chromium": {
+      "status": "tested",
+      "version": "158.0.8127.36",
       "pages": {
         "chromium/phone/404.html": {
           "status": 200,

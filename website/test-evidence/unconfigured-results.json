@@ -1,8 +1,10 @@
 {
   "label": "unconfigured",
-  "origin": "http://127.0.0.1:39971/SnapForge/",
+  "origin": "http://127.0.0.1:32855/SnapForge/",
   "browsers": {
     "chromium": {
+      "status": "tested",
+      "version": "158.0.8127.36",
       "pages": {
         "chromium/phone/404.html": {
           "status": 200,
@@ -203,6 +205,14 @@
           "title": "What's New — SnapForge"
         }
       }
+    },
+    "firefox": {
+      "status": "NOT TESTED — browser not available here",
+      "error": "browserType.launch: Executable doesn't exist at /opt/pw-browsers/firefox-1543/firefox/firefox"
+    },
+    "webkit": {
+      "status": "NOT TESTED — browser not available here",
+      "error": "browserType.launch: Executable doesn't exist at /opt/pw-browsers/webkit-2359/pw_run.sh"
     }
   },
   "failures": []

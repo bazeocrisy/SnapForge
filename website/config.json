@@ -1,7 +1,13 @@
 {
-  "_comment": "Central website configuration. Edit, then run `python3 website/build.py`. See website/README.md. Leave values null/empty until the owner has approved and verified them; unconfigured items are hidden or shown as 'not available yet'.",
+  "_comment": "Central website configuration. Edit, then run `python3 website/build.py`. See README.md and LAUNCH-CHECKLIST.md. Leave values null/false until the owner has approved and verified them; unconfigured items are hidden or shown as 'not available yet'. release.ownerApproved: true is refused unless release-verification.json (written by tools/verify-release.py) matches the release details exactly and private vulnerability reporting is verified.",
   "siteUrl": "https://bazeocrisy.github.io/SnapForge/",
   "repositoryUrl": "https://github.com/bazeocrisy/SnapForge",
+  "security": {
+    "privateReporting": {
+      "url": null,
+      "verified": false
+    }
+  },
   "release": {
     "ownerApproved": false,
     "version": null,
@@ -16,8 +22,17 @@
     "packageType": "portable"
   },
   "donations": {
-    "githubSponsors": { "url": null, "verified": false },
-    "buyMeACoffee": { "url": null, "verified": false },
-    "paypal": { "url": null, "verified": false }
+    "githubSponsors": {
+      "url": null,
+      "verified": false
+    },
+    "buyMeACoffee": {
+      "url": null,
+      "verified": false
+    },
+    "paypal": {
+      "url": null,
+      "verified": false
+    }
   }
 }

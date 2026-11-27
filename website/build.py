@@ -1,10 +1,15 @@
 #!/usr/bin/env python3
 """Build and validate the SnapForge website (static HTML, Python standard library only).
 
-  python3 website/build.py            build website/src -> website/public
-  python3 website/build.py --check    build to a temporary folder, fail if website/public is out of date,
-                                      then validate (links, accessibility basics, no trackers, config)
+  python3 website/build.py            regenerate website/public from website/src, website/static and config.json
+  python3 website/build.py --check    build into a temporary folder and fail if website/public differs from it in any
+                                      way (stale, edited by hand, missing or extra files), then validate the site
   python3 website/build.py --config other.json --out DIR   build with another configuration (tests)
+
+Source of truth:  src/layout.html, src/pages/*.html (page content), static/** (CSS, JS, images, icons, favicon),
+                  config.json (release, donations, security contact), release-verification.json (written only by
+                  tools/verify-release.py after it has checked the real GitHub Release).
+Generated:        everything in public/ — never edit it by hand; it is deleted and rebuilt on every build.
 
 The site is plain HTML/CSS with one small script; every link is relative, so it works under
 https://bazeocrisy.github.io/SnapForge/ and when opened from a local web server.
@@ -27,8 +32,9 @@ from urllib.parse import urlparse
 
 ROOT = Path(__file__).resolve().parent
 SRC = ROOT / "src"
+STATIC = ROOT / "static"
 PUBLIC = ROOT / "public"
-GENERATED_SUFFIXES = (".html", ".xml", ".txt")  # files the build writes; everything else in public/ is a static asset
+VERIFICATION = ROOT / "release-verification.json"
 REPO = "https://github.com/bazeocrisy/SnapForge"
 SITE_BASE = "https://bazeocrisy.github.io/SnapForge/"  # updated from config in main()
 
@@ -52,6 +58,10 @@ FOOTER = [
 
 RELEASE_URL = re.compile(r"^https://github\.com/bazeocrisy/SnapForge/releases/download/[A-Za-z0-9._-]+/[A-Za-z0-9._-]+\.(zip|exe|msi|msix)$")
 NOTES_URL = re.compile(r"^https://github\.com/bazeocrisy/SnapForge/releases/tag/[A-Za-z0-9._-]+$")
+PRIVATE_REPORTING_URL = "https://github.com/bazeocrisy/SnapForge/security/advisories/new"
+# release fields that must be identical in config.json and the verification record
+VERIFIED_FIELDS = ("version", "date", "downloadUrl", "fileName", "sizeBytes", "sha256", "signed", "signer",
+                   "releaseNotesUrl", "packageType")
 DONATION_RULES = {
     "githubSponsors": ("GitHub Sponsors", re.compile(r"^https://github\.com/sponsors/[A-Za-z0-9-]{1,39}$")),
     "buyMeACoffee": ("Buy Me a Coffee", re.compile(r"^https://(www\.)?buymeacoffee\.com/[A-Za-z0-9_]{1,64}/?$")),
@@ -63,11 +73,35 @@ class ConfigError(Exception):
     pass
 
 
-def load_config(path: Path) -> dict:
+def load_config(path: Path, verification_path: Path = VERIFICATION) -> dict:
     cfg = json.loads(path.read_text(encoding="utf-8"))
     errors: list[str] = []
     rel = cfg.get("release") or {}
+    sec = ((cfg.get("security") or {}).get("privateReporting") or {})
+    if sec.get("url") and sec["url"] != PRIVATE_REPORTING_URL:
+        errors.append(f"security.privateReporting.url must be {PRIVATE_REPORTING_URL}")
+    if sec.get("verified") and not sec.get("url"):
+        errors.append("security.privateReporting.verified needs security.privateReporting.url")
+    cfg["_verification"] = None
     if rel.get("ownerApproved"):
+        # ownerApproved alone is not proof that a safe release exists: require the record written by
+        # tools/verify-release.py for exactly these release details, and an operational private security contact.
+        if not (sec.get("url") and sec.get("verified")):
+            errors.append("a release cannot be shown until private vulnerability reporting is enabled and verified "
+                          "(security.privateReporting.url + verified: true) — see LAUNCH-CHECKLIST.md")
+        if not verification_path.exists():
+            errors.append(f"release.ownerApproved is true but {verification_path.name} is missing: run "
+                          "tools/verify-release.py (or the 'Website release verification' workflow) against the "
+                          "published GitHub Release first — see LAUNCH-CHECKLIST.md")
+        else:
+            rec = json.loads(verification_path.read_text(encoding="utf-8"))
+            if rec.get("result") != "verified":
+                errors.append(f"{verification_path.name}: result is not 'verified'")
+            for k in VERIFIED_FIELDS:
+                if (rec.get("release") or {}).get(k) != rel.get(k):
+                    errors.append(f"{verification_path.name} does not match config.json for release.{k} "
+                                  f"({(rec.get('release') or {}).get(k)!r} vs {rel.get(k)!r}) — re-run verification")
+            cfg["_verification"] = rec
         need = ["version", "date", "downloadUrl", "fileName", "sizeBytes", "sha256", "releaseNotesUrl"]
         for k in need:
             if rel.get(k) in (None, ""):
@@ -181,11 +215,64 @@ def release_panel(cfg: dict) -> str:
     <div><dt>File</dt><dd><code>{esc(r["fileName"])}</code> · {human_size(r["sizeBytes"])}</dd></div>
     <div><dt>Package</dt><dd>{kind}</dd></div>
     <div><dt>Signing</dt><dd>{signed}</dd></div>
+    <div><dt>Verified</dt><dd>Download, size, checksum and signing checked on
+      <time datetime="{esc(cfg["_verification"]["checkedAt"][:10])}">{esc(cfg["_verification"]["checkedAt"][:10])}</time></dd></div>
     <div class="wide"><dt>SHA-256</dt><dd><code class="hash" id="sha256">{esc(r["sha256"])}</code>
       <button class="btn btn-small copy" type="button" data-copy="sha256">Copy</button></dd></div>
   </dl>
   <p>{ext_link(r["releaseNotesUrl"], "Release notes for " + esc(r["version"]))}</p>
 </section>"""
+
+
+def package_contents(cfg: dict) -> str:
+    """What is inside the download — only from the verification record, never assumed."""
+    rec = cfg.get("_verification")
+    if not rec:
+        return ("<p>The exact contents of the release package (for example the license, third-party notices and a "
+                "checksum list) will be listed here once a release has been published and verified. Nothing is "
+                "promised until then.</p>")
+    files = rec.get("packageContents") or []
+    items = "".join(f"<li><code>{esc(f)}</code></li>" for f in files)
+    checked = rec.get("checkedAt", "")[:10]
+    return (f"<p>Verified contents of <code>{esc(cfg['release']['fileName'])}</code> "
+            f"(checked <time datetime=\"{esc(checked)}\">{esc(checked)}</time>):</p><ul>{items}</ul>")
+
+
+def sums_sentence(cfg: dict) -> str:
+    rec = cfg.get("_verification")
+    if rec and "SHA256SUMS.txt" in (rec.get("packageContents") or []) and rec.get("innerChecksumsVerified"):
+        return (" The ZIP also contains <code>SHA256SUMS.txt</code> with the checksum of every file inside it; "
+                "these were checked when the release was verified.")
+    return ""
+
+
+def notices_statement(cfg: dict) -> str:
+    rec = cfg.get("_verification")
+    contents = (rec or {}).get("packageContents") or []
+    if "THIRD-PARTY-NOTICES.md" in contents:
+        return ("The full list is in <code>THIRD-PARTY-NOTICES.md</code>, included in the release package "
+                "(verified) and in the source code.")
+    return ("The full list is in <code>THIRD-PARTY-NOTICES.md</code> in the source code. Which notice files are "
+            "inside a release package is confirmed when that release is verified.")
+
+
+def security_block(cfg: dict) -> str:
+    sec = ((cfg.get("security") or {}).get("privateReporting") or {})
+    if sec.get("url") and sec.get("verified"):
+        return f"""<p>Report vulnerabilities <strong>privately</strong> with GitHub's
+  {ext_link(sec["url"], "Report a vulnerability form")} (a free GitHub account is needed). Only the maintainers can
+  see the report. Please include the SnapForge version and commit (<em>Help → About</em>), your Windows version,
+  the steps to reproduce and what an attacker could achieve.</p>
+  <ul>
+    <li>Do not post details in public issues, discussions or social media before a fix is available.</li>
+    <li>Do not include other people's personal data, and do not test against systems you do not own.</li>
+    <li>Reports are handled on a best-effort basis by volunteers; there is no bug bounty.</li>
+  </ul>"""
+    return """<div class="note" role="note"><p><strong>Private reporting is not set up yet.</strong> A private
+  reporting channel will be in place before the first public release, and this page will explain how to use it.</p></div>
+  <p>Until then, please <strong>do not describe vulnerabilities publicly</strong>. If you have found one, open a
+  GitHub issue that only says you have a security report and asks the maintainer for a private channel — with no
+  technical details.</p>"""
 
 
 def verify_command(cfg: dict) -> str:
@@ -255,25 +342,31 @@ def footer_html(current: str) -> str:
 
 
 def build(cfg: dict, out: Path) -> list[str]:
+    """Rebuild `out` from scratch: static/ copied verbatim, then pages, sitemap.xml and robots.txt generated."""
     layout = (SRC / "layout.html").read_text(encoding="utf-8")
     if out.exists():
-        for p in out.rglob("*"):
-            if p.is_file() and p.suffix in GENERATED_SUFFIXES and "assets" not in p.relative_to(out).parts:
-                p.unlink()
-    else:
-        out.mkdir(parents=True)
-    if out.resolve() != PUBLIC.resolve():
-        # copy static assets so the output is a complete site
-        for p in PUBLIC.rglob("*"):
-            if p.is_file() and not (p.suffix in GENERATED_SUFFIXES and "assets" not in p.relative_to(PUBLIC).parts):
-                dest = out / p.relative_to(PUBLIC)
-                dest.parent.mkdir(parents=True, exist_ok=True)
-                shutil.copy2(p, dest)
+        is_public = out.resolve() == PUBLIC.resolve()
+        looks_built = (out / "index.html").exists() and (out / "sitemap.xml").exists()
+        if not (is_public or looks_built or not any(out.iterdir())):
+            raise SystemExit(f"refusing to delete {out}: not website/public, not empty and not a previous build")
+        shutil.rmtree(out)
+    shutil.copytree(STATIC, out)
     tokens = {
         "{{download_cta}}": download_cta(cfg),
         "{{download_cta_small}}": download_cta(cfg, large=False),
         "{{release_panel}}": release_panel(cfg),
         "{{verify_command}}": verify_command(cfg),
+        "{{package_contents}}": package_contents(cfg),
+        "{{sums_sentence}}": sums_sentence(cfg),
+        "{{notices_statement}}": notices_statement(cfg),
+        "{{security_block}}": security_block(cfg),
+        "{{package_type_sentence}}": (
+            "This release is a <strong>portable ZIP</strong>: nothing is installed system-wide."
+            if release_live(cfg) and cfg["release"].get("packageType") == "portable" else
+            "This release uses an installer; see its release notes." if release_live(cfg) else
+            "SnapForge is planned to ship as a <strong>portable ZIP</strong>: nothing is installed system-wide."),
+        "{{source_status}}": "" if release_live(cfg) else
+            "Until the first release, the application code is on development branches that are under review. ",
         "{{donate_block}}": donate_block(cfg),
         "{{donate_teaser}}": donate_teaser(cfg),
         "{{repo}}": REPO,
@@ -521,10 +614,11 @@ def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--check", action="store_true")
     ap.add_argument("--config", default=str(ROOT / "config.json"))
+    ap.add_argument("--verification", default=str(VERIFICATION))
     ap.add_argument("--out")
     args = ap.parse_args()
     try:
-        cfg = load_config(Path(args.config))
+        cfg = load_config(Path(args.config), Path(args.verification))
     except ConfigError as e:
         print("configuration error:\n" + str(e), file=sys.stderr)
         return 2
@@ -536,7 +630,8 @@ def main() -> int:
             build(cfg, tmp / "site")
             diffs = same_tree(tmp / "site", PUBLIC)
             if diffs:
-                print("website/public is out of date — run python3 website/build.py\n  " + "\n  ".join(diffs[:20]),
+                print("website/public does not match a fresh build (stale, hand-edited, missing or extra files) — "
+                      "run python3 website/build.py and commit the result\n  " + "\n  ".join(diffs[:30]),
                       file=sys.stderr)
                 return 1
             problems = validate(PUBLIC)
