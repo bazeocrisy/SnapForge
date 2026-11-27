@@ -8,7 +8,7 @@ need the owner's explicit approval (see [RELEASE-PROCESS.md](RELEASE-PROCESS.md)
 
 | Item | Link |
 |---|---|
-| Integration pull request (`release/v1.0-candidate` → `main`, **do not merge without approval**) | {{PR}} |
+| Integration pull request (`release/v1.0-candidate` → `main`, **do not merge without approval**) | [PR #3](https://github.com/bazeocrisy/SnapForge/pull/3) (draft) |
 | Exact source commit of the verified packages | [`748eedb`](https://github.com/bazeocrisy/SnapForge/commit/748eedba8cf5d9281cbd04aa7311e02ce8ab96c3) (`748eedba8cf5d9281cbd04aa7311e02ce8ab96c3`). Later commits on the branch change only documentation, the website and this page — check with `git diff --stat 748eedb release/v1.0-candidate` |
 | CI run for that commit (all 5 jobs passed) | [CI run 83](https://github.com/bazeocrisy/SnapForge/actions/runs/46034042240) — previous fully green run: [CI run 82](https://github.com/bazeocrisy/SnapForge/actions/runs/46030782634) (`e5f5363`) |
 | Windows packages (portable ZIP, per-user installer, SBOM, `SHA256SUMS.txt`) | [`SnapForge-1.0.0-rc.1-packages-748eedb…`](https://github.com/bazeocrisy/SnapForge/actions/runs/46034042240/artifacts/15215118886) on that run (GitHub sign-in required; Actions artifacts expire after 14–30 days — not a public download) |
@@ -20,7 +20,7 @@ need the owner's explicit approval (see [RELEASE-PROCESS.md](RELEASE-PROCESS.md)
 | Known limitations | [KNOWN-LIMITATIONS.md](KNOWN-LIMITATIONS.md) |
 | Manual acceptance checklist (physical PC) | [MANUAL-ACCEPTANCE-1.0.md](MANUAL-ACCEPTANCE-1.0.md) |
 | Release notes | [RELEASE-NOTES-1.0.0-rc.1.md](RELEASE-NOTES-1.0.0-rc.1.md) |
-| Website (built output on `gh-pages`; GitHub Pages not yet switched on by the owner) | branch `gh-pages`, commit {{GHPAGES}}; would be served at https://bazeocrisy.github.io/SnapForge/ |
+| Website (built output on `gh-pages`; GitHub Pages not yet switched on by the owner) | branch `gh-pages`, commit [`b5b5aa4`](https://github.com/bazeocrisy/SnapForge/commit/b5b5aa4) (published from `7a00102`; download button disabled); would be served at https://bazeocrisy.github.io/SnapForge/ |
 | Product inventory at start of this work | [FINAL-PRODUCT-INVENTORY.md](FINAL-PRODUCT-INVENTORY.md) |
 
 **Package checksums** (from the CI log of the run above; verify with `Get-FileHash` against `SHA256SUMS.txt`):
