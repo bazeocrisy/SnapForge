@@ -32,8 +32,14 @@ public sealed class LibraryChangedEventArgs(IReadOnlyCollection<Guid> ids) : Eve
 public sealed partial class CaptureLibrary
 {
     public const int ThumbnailSize = 320;
-    private const string SanitizedBaseFile = "base.sanitized.sfpx";
+
+    /// <summary>Prefix of a capture folder being created (published by renaming it to its id: the commit point).</summary>
+    internal const string CreatingPrefix = ".creating-";
+
     private readonly object _gate = new();
+
+    /// <summary>Serialises commits and folder clean-up, so an index never deletes files of a save in progress.</summary>
+    private readonly object _writeLock = new();
     private readonly Dictionary<Guid, CaptureRecord> _records = [];
 
     private CaptureLibrary(string root)
@@ -91,8 +97,9 @@ public sealed partial class CaptureLibrary
     /// <summary>Removes leftovers of interrupted writes and builds the index. Safe to call from a background thread.</summary>
     public void CompleteOpen()
     {
-        AtomicFile.CleanupTemporaryFiles(Root);
+        // Capture folders first: their leftovers (which may hold pre-sanitize pixels) are overwritten before deletion.
         Reindex();
+        AtomicFile.CleanupTemporaryFiles(Root);
         IsIndexed = true;
         Indexed?.Invoke(this, EventArgs.Empty);
     }
@@ -118,13 +125,23 @@ public sealed partial class CaptureLibrary
         var found = new Dictionary<Guid, CaptureRecord>();
         foreach (string dir in Directory.EnumerateDirectories(CapturesDirectory))
         {
-            if (Guid.TryParse(Path.GetFileName(dir), out Guid id))
+            string name = Path.GetFileName(dir);
+            if (name.StartsWith(CreatingPrefix, StringComparison.Ordinal))
             {
-                CompleteInterruptedSanitize(dir);
-                if (File.Exists(Path.Combine(dir, CaptureFormat.ManifestFile)))
+                // A capture whose creation never reached its commit point (the folder rename).
+                lock (_writeLock)
                 {
-                    found[id] = ReadRecord(id, dir);
+                    SecureDeleteDirectory(dir);
                 }
+            }
+            else if (Guid.TryParse(name, out Guid id) && File.Exists(Path.Combine(dir, CaptureFormat.ManifestFile)))
+            {
+                lock (_writeLock)
+                {
+                    RecoverCaptureFolder(dir);
+                }
+
+                found[id] = ReadRecord(id, dir);
             }
         }
 
@@ -157,12 +174,20 @@ public sealed partial class CaptureLibrary
     {
         ArgumentNullException.ThrowIfNull(content);
         Guid id = Guid.NewGuid();
-        string dir = FolderOf(id);
-        Directory.CreateDirectory(dir);
-        var meta = new CaptureMetadata { Title = title ?? DefaultTitle(createdUtc) };
-        WriteMeta(dir, meta);
-        bool reversible = content.Annotations.OfType<RedactionMaskAnnotation>().Any();
-        WriteContent(id, dir, content.BaseImage, content.Annotations, flattened, createdUtc, sanitizedUtc: null, reversible);
+        lock (_writeLock)
+        {
+            // Built complete in a staging folder, then published by one rename (the commit point); a crash before
+            // the rename leaves a ".creating-" folder that the next open securely deletes.
+            string staging = Path.Combine(CapturesDirectory, CreatingPrefix + id.ToString("N"));
+            Directory.CreateDirectory(staging);
+            var meta = new CaptureMetadata { Title = title ?? DefaultTitle(createdUtc) };
+            WriteMeta(staging, meta);
+            bool reversible = content.Annotations.OfType<RedactionMaskAnnotation>().Any();
+            CommitGeneration(staging, id, previous: null, content.BaseImage, content.Annotations, flattened, createdUtc, sanitizedUtc: null, reversible);
+            MoveDirectory(staging, CaptureFolder(id));
+            DurabilityFaults.Checkpoint("capture.create.published");
+        }
+
         return Refresh(id);
     }
 
@@ -175,57 +200,132 @@ public sealed partial class CaptureLibrary
     public CaptureRecord SaveContent(Guid id, PixelBuffer? newBase, IReadOnlyList<Annotation> annotations, PixelBuffer flattened, bool hasReversibleRedactions)
     {
         RequireImage(id);
-        string dir = ExistingFolder(id);
-        JsonObject manifest = ReadManifest(dir);
-        DateTime created = CaptureFormat.ParseIso(manifest["createdUtc"]?.GetValue<string>());
-        DateTime? sanitized = manifest["sanitizedUtc"]?.GetValue<string>() is { } s ? CaptureFormat.ParseIso(s) : null;
-        WriteContent(id, dir, newBase, annotations, flattened, created, hasReversibleRedactions ? null : sanitized, hasReversibleRedactions, manifest);
+        ArgumentNullException.ThrowIfNull(annotations);
+        ArgumentNullException.ThrowIfNull(flattened);
+        lock (_writeLock)
+        {
+            string dir = ExistingFolder(id);
+            CaptureManifest previous = CaptureManifest.Read(dir);
+            CaptureManifest committed = CommitGeneration(dir, id, previous, newBase, annotations, flattened, previous.CreatedUtc, hasReversibleRedactions ? null : previous.SanitizedUtc, hasReversibleRedactions);
+            DeleteUnreferenced(dir, committed);
+        }
+
         return Refresh(id);
     }
 
     /// <summary>
-    /// Destructive sanitization of the stored copy: replaces the base image with <paramref name="sanitizedBase"/>
-    /// (redactions burned in), overwriting the previous base and thumbnail files with zeros before removing them.
-    /// Crash-safe: an interrupted sanitize is completed on the next start.
+    /// Destructive sanitization of the stored copy (FA-016). Commits a new generation whose base is
+    /// <paramref name="sanitizedBase"/> with every redaction burned in, whose annotations have no redaction masks and
+    /// no annotation hidden under a redaction, and whose thumbnail has the redactions burned in; then overwrites the
+    /// previous base, annotations and thumbnail files with zeros and deletes them. Returns only after all of that.
     /// </summary>
+    /// <remarks>
+    /// Enforced here whatever the caller passes: the masks applied are those in <paramref name="annotations"/> plus
+    /// those stored in the capture; an annotation is "hidden" when it intersects a mask that comes later in z-order
+    /// (the rule of <see cref="Editing.EditorDocument.Sanitize"/>, which the App runs first and whose rasterized
+    /// result it passes as <paramref name="sanitizedBase"/>). Crash-safe: the manifest is the commit point, so an
+    /// interruption leaves either the complete unsanitized capture or the complete sanitized one, and leftovers of
+    /// the old generation are overwritten and deleted when the library is next opened. If deleting the old files
+    /// fails, the sanitized generation is committed and an <see cref="IOException"/> is thrown.
+    /// </remarks>
     public CaptureRecord Sanitize(Guid id, PixelBuffer sanitizedBase, IReadOnlyList<Annotation> annotations, PixelBuffer flattened)
     {
         RequireImage(id);
         ArgumentNullException.ThrowIfNull(sanitizedBase);
-        string dir = ExistingFolder(id);
-        JsonObject manifest = ReadManifest(dir);
-        byte[] baseBytes = PixelCodec.Encode(sanitizedBase);
-        AtomicFile.WriteAllBytes(Path.Combine(dir, SanitizedBaseFile), baseBytes);
-        AtomicFile.OverwriteAndDelete(Path.Combine(dir, CaptureFormat.ThumbFile));
-        AtomicFile.OverwriteAndDelete(Path.Combine(dir, CaptureFormat.BaseFile));
-        File.Move(Path.Combine(dir, SanitizedBaseFile), Path.Combine(dir, CaptureFormat.BaseFile));
-        DateTime created = CaptureFormat.ParseIso(manifest["createdUtc"]?.GetValue<string>());
-        manifest["baseSha256"] = AtomicFile.Sha256Hex(baseBytes);
-        WriteContent(id, dir, newBase: null, annotations, flattened, created, DateTime.UtcNow, reversibleRedactions: false, manifest);
-        AtomicFile.CleanupTemporaryFiles(dir);
+        ArgumentNullException.ThrowIfNull(annotations);
+        ArgumentNullException.ThrowIfNull(flattened);
+        lock (_writeLock)
+        {
+            string dir = ExistingFolder(id);
+            CaptureManifest previous = CaptureManifest.Read(dir);
+            List<Annotation> stored = CaptureFormat.DeserializeAnnotations(CaptureFormat.ReadVerified(dir, previous.Annotations));
+            (PixelBuffer burnedBase, PixelBuffer burnedFlat, List<Annotation> kept) = SanitizePlan(sanitizedBase, flattened, annotations, stored);
+            CaptureManifest committed = CommitGeneration(dir, id, previous, burnedBase, kept, burnedFlat, previous.CreatedUtc, DateTime.UtcNow, reversibleRedactions: false);
+            try
+            {
+                DeleteUnreferenced(dir, committed);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                throw new IOException($"The sanitized copy was saved, but the previous files could not be removed yet ({ex.Message}). SnapForge removes them the next time it opens the library.", ex);
+            }
+        }
+
         return Refresh(id);
+    }
+
+    /// <summary>The sanitized base, thumbnail source and annotations for <see cref="Sanitize"/>.</summary>
+    internal static (PixelBuffer Base, PixelBuffer Flattened, List<Annotation> Annotations) SanitizePlan(PixelBuffer sanitizedBase, PixelBuffer flattened, IReadOnlyList<Annotation> annotations, IReadOnlyList<Annotation> stored)
+    {
+        static bool Intersects(Geometry.RectD r, Geometry.PixelRect p) =>
+            r.X < p.Right && r.Right > p.X && r.Y < p.Bottom && r.Bottom > p.Y;
+
+        static HashSet<Guid> HiddenIds(IReadOnlyList<Annotation> list)
+        {
+            var hidden = new HashSet<Guid>();
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] is not RedactionMaskAnnotation && list.Skip(i + 1).OfType<RedactionMaskAnnotation>().Any(m => Intersects(list[i].Bounds, m.Region)))
+                {
+                    hidden.Add(list[i].Id);
+                }
+            }
+
+            return hidden;
+        }
+
+        var masks = annotations.OfType<RedactionMaskAnnotation>().Concat(stored.OfType<RedactionMaskAnnotation>()).ToList();
+        HashSet<Guid> hidden = HiddenIds(annotations);
+        hidden.UnionWith(HiddenIds(stored));
+        var kept = annotations.Where(a => a is not RedactionMaskAnnotation && !hidden.Contains(a.Id)).ToList();
+
+        PixelBuffer burnedBase = sanitizedBase.Clone();
+        PixelBuffer burnedFlat = flattened.Clone();
+        foreach (RedactionMaskAnnotation mask in masks)
+        {
+            burnedBase.FillRect(mask.Region, mask.Color);
+            if (flattened.Width == sanitizedBase.Width && flattened.Height == sanitizedBase.Height)
+            {
+                burnedFlat.FillRect(mask.Region, mask.Color);
+            }
+        }
+
+        return (burnedBase, burnedFlat, kept);
     }
 
     public CaptureContent Load(Guid id)
     {
         RequireImage(id);
         string dir = ExistingFolder(id);
-        JsonObject manifest = ReadManifest(dir);
-        byte[] baseBytes = File.ReadAllBytes(Path.Combine(dir, CaptureFormat.BaseFile));
-        byte[] annBytes = File.ReadAllBytes(Path.Combine(dir, CaptureFormat.AnnotationsFile));
-        Verify(manifest, "baseSha256", baseBytes, CaptureFormat.BaseFile);
-        Verify(manifest, "annotationsSha256", annBytes, CaptureFormat.AnnotationsFile);
+        CaptureManifest manifest = CaptureManifest.Read(dir);
+        byte[] baseBytes = CaptureFormat.ReadVerified(dir, manifest.Base);
+        byte[] annBytes = CaptureFormat.ReadVerified(dir, manifest.Annotations);
         return new CaptureContent(PixelCodec.Decode(baseBytes), CaptureFormat.DeserializeAnnotations(annBytes));
     }
 
     public PixelBuffer? LoadThumbnail(Guid id)
     {
-        string file = Path.Combine(FolderOf(id), CaptureFormat.ThumbFile);
+        string dir = FolderOf(id);
         try
         {
-            return File.Exists(file) ? PixelCodec.Decode(File.ReadAllBytes(file)) : null;
+            if (IsVideoFolder(dir))
+            {
+                string file = Path.Combine(dir, CaptureFormat.ThumbFile);
+                return File.Exists(file) ? PixelCodec.Decode(File.ReadAllBytes(file)) : null;
+            }
+
+            CaptureManifest m = CaptureManifest.Read(dir);
+            if (m.Thumb is null)
+            {
+                return null;
+            }
+
+            // v2 thumbnails are hashed; v1 thumbnails are not (regenerable cache).
+            return m.Thumb.Sha256 is null
+                ? PixelCodec.Decode(File.ReadAllBytes(Path.Combine(dir, m.Thumb.Name)))
+                : PixelCodec.Decode(CaptureFormat.ReadVerified(dir, m.Thumb));
         }
-        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException or InvalidOperationException or FormatException)
         {
             return null;
         }
@@ -281,15 +381,9 @@ public sealed partial class CaptureLibrary
         Guid[] list = ids.ToArray();
         foreach (Guid id in list)
         {
-            string dir = FolderOf(id);
-            if (Directory.Exists(dir))
+            lock (_writeLock)
             {
-                foreach (string file in Directory.EnumerateFiles(dir))
-                {
-                    DeleteLibraryFile(file);
-                }
-
-                Directory.Delete(dir, recursive: true);
+                SecureDeleteDirectory(FolderOf(id));
             }
 
             lock (_gate)
@@ -401,14 +495,10 @@ public sealed partial class CaptureLibrary
             // Images only: the backup format predates video, and older versions must be able to restore it.
             foreach (CaptureRecord r in Records.Where(r => r.Damage is null && !r.IsVideo))
             {
-                string dir = FolderOf(r.Id);
-                foreach (string name in CaptureFormat.ContentFiles)
+                foreach ((string name, byte[] data) in CaptureFormat.LegacyLayout(FolderOf(r.Id)))
                 {
-                    string file = Path.Combine(dir, name);
-                    if (File.Exists(file))
-                    {
-                        zip.CreateEntryFromFile(file, $"captures/{r.Id:D}/{name}", CompressionLevel.NoCompression);
-                    }
+                    using Stream s = zip.CreateEntry($"captures/{r.Id:D}/{name}", CompressionLevel.NoCompression).Open();
+                    s.Write(data);
                 }
 
                 count++;
@@ -548,48 +638,66 @@ public sealed partial class CaptureLibrary
 
     private CaptureRecord AdoptStagedCapture(string staging, bool keepIdIfFree, Guid preferredId = default)
     {
-        JsonObject manifest = ReadManifest(staging);
-        Guid id = keepIdIfFree && preferredId != Guid.Empty && Find(preferredId) is null ? preferredId : Guid.NewGuid();
-        manifest["id"] = id.ToString("D");
-        AtomicFile.WriteAllBytes(Path.Combine(staging, CaptureFormat.ManifestFile), JsonSerializer.SerializeToUtf8Bytes(manifest, AnnotationSerializer.Indented));
+        CaptureManifest manifest = CaptureManifest.Read(staging);
+        Guid id = keepIdIfFree && preferredId != Guid.Empty && Find(preferredId) is null && !Directory.Exists(CaptureFolder(preferredId)) ? preferredId : Guid.NewGuid();
+        manifest.Json["id"] = id.ToString("D");
+        AtomicFile.WriteAllBytes(Path.Combine(staging, CaptureFormat.ManifestFile), JsonSerializer.SerializeToUtf8Bytes(manifest.Json, AnnotationSerializer.Indented));
         if (!File.Exists(Path.Combine(staging, CaptureFormat.MetaFile)))
         {
             WriteMeta(staging, new CaptureMetadata { Title = DefaultTitle(DateTime.UtcNow) });
         }
 
         // Verify before adopting: hashes and decodability.
-        byte[] baseBytes = File.ReadAllBytes(Path.Combine(staging, CaptureFormat.BaseFile));
-        byte[] annBytes = File.ReadAllBytes(Path.Combine(staging, CaptureFormat.AnnotationsFile));
-        Verify(manifest, "baseSha256", baseBytes, CaptureFormat.BaseFile);
-        Verify(manifest, "annotationsSha256", annBytes, CaptureFormat.AnnotationsFile);
-        PixelCodec.Decode(baseBytes);
-        CaptureFormat.DeserializeAnnotations(annBytes);
+        PixelCodec.Decode(CaptureFormat.ReadVerified(staging, manifest.Base));
+        CaptureFormat.DeserializeAnnotations(CaptureFormat.ReadVerified(staging, manifest.Annotations));
 
-        Directory.Move(staging, FolderOf(id));
+        lock (_writeLock)
+        {
+            MoveDirectory(staging, CaptureFolder(id));
+        }
+
         return Refresh(id);
     }
 
-    private static void WriteContent(Guid id, string dir, PixelBuffer? newBase, IReadOnlyList<Annotation> annotations, PixelBuffer flattened, DateTime createdUtc, DateTime? sanitizedUtc, bool reversibleRedactions, JsonObject? previous = null)
+    /// <summary>
+    /// Writes a new generation (FA-015): the content files under new unique names (each flushed to disk), then the
+    /// manifest naming them with their SHA-256 and size, atomically replacing the previous manifest. The manifest
+    /// replace is the single commit point: before it the previous generation is intact and referenced; after it the
+    /// new one is. Files of older generations are removed separately by <see cref="DeleteUnreferenced"/>.
+    /// </summary>
+    private static CaptureManifest CommitGeneration(string dir, Guid id, CaptureManifest? previous, PixelBuffer? newBase, IReadOnlyList<Annotation> annotations, PixelBuffer flattened, DateTime createdUtc, DateTime? sanitizedUtc, bool reversibleRedactions)
     {
-        string? baseHash = previous?["baseSha256"]?.GetValue<string>();
-        int width = previous?["width"]?.GetValue<int>() ?? 0, height = previous?["height"]?.GetValue<int>() ?? 0;
+        int generation = checked((previous?.Generation ?? 0) + 1);
+        CaptureFileRef baseRef;
+        int width, height;
         if (newBase is not null)
         {
-            byte[] baseBytes = PixelCodec.Encode(newBase);
-            AtomicFile.WriteAllBytes(Path.Combine(dir, CaptureFormat.BaseFile), baseBytes);
-            baseHash = AtomicFile.Sha256Hex(baseBytes);
+            baseRef = WriteGenerationFile(dir, CaptureFormat.GenerationBaseFile(generation), PixelCodec.Encode(newBase));
             (width, height) = (newBase.Width, newBase.Height);
         }
+        else
+        {
+            CaptureManifest prev = previous ?? throw new InvalidOperationException("A new capture needs base pixels.");
+            string file = Path.Combine(dir, prev.Base.Name);
+            if (!File.Exists(file) || prev.Base.Sha256 is null)
+            {
+                throw new InvalidDataException("The stored base image is missing or has no hash; the capture cannot be saved without new base pixels.");
+            }
 
-        byte[] annBytes = CaptureFormat.SerializeAnnotations(annotations);
-        AtomicFile.WriteAllBytes(Path.Combine(dir, CaptureFormat.AnnotationsFile), annBytes);
-        AtomicFile.WriteAllBytes(Path.Combine(dir, CaptureFormat.ThumbFile), PixelCodec.Encode(Thumbnailer.Create(flattened, ThumbnailSize)));
+            // An unchanged base keeps its file (and, for a v1 folder, its legacy name): no multi-megabyte rewrite.
+            baseRef = prev.Base with { Bytes = prev.Base.Bytes ?? new FileInfo(file).Length };
+            (width, height) = (prev.Width, prev.Height);
+        }
 
-        var manifest = new JsonObject
+        CaptureFileRef annRef = WriteGenerationFile(dir, CaptureFormat.GenerationAnnotationsFile(generation), CaptureFormat.SerializeAnnotations(annotations));
+        CaptureFileRef thumbRef = WriteGenerationFile(dir, CaptureFormat.GenerationThumbFile(generation), PixelCodec.Encode(Thumbnailer.Create(flattened, ThumbnailSize)));
+
+        var json = new JsonObject
         {
             ["format"] = CaptureFormat.FormatId,
             ["version"] = CaptureFormat.CurrentVersion,
             ["id"] = id.ToString("D"),
+            ["generation"] = generation,
             ["createdUtc"] = CaptureFormat.Iso(createdUtc),
             ["modifiedUtc"] = CaptureFormat.Iso(DateTime.UtcNow),
             ["width"] = width,
@@ -598,13 +706,131 @@ public sealed partial class CaptureLibrary
             ["redactionCount"] = annotations.Count(a => a is RedactionMaskAnnotation),
             ["containsUnsanitizedRedactions"] = reversibleRedactions,
             ["sanitizedUtc"] = sanitizedUtc is { } s ? CaptureFormat.Iso(s) : null,
-            ["baseSha256"] = baseHash ?? throw new InvalidOperationException("A new capture needs base pixels."),
-            ["annotationsSha256"] = AtomicFile.Sha256Hex(annBytes),
+            ["files"] = CaptureManifest.FilesJson(baseRef, annRef, thumbRef),
             ["generator"] = $"{ProductInfo.Name} {typeof(CaptureLibrary).Assembly.GetName().Version}",
         };
 
-        // Manifest last: it is the commit point that references the files written above.
-        AtomicFile.WriteAllBytes(Path.Combine(dir, CaptureFormat.ManifestFile), JsonSerializer.SerializeToUtf8Bytes(manifest, AnnotationSerializer.Indented));
+        byte[] manifestBytes = JsonSerializer.SerializeToUtf8Bytes(json, AnnotationSerializer.Indented);
+        DurabilityFaults.Checkpoint("capture.generation-written");
+        AtomicFile.WriteAllBytes(Path.Combine(dir, CaptureFormat.ManifestFile), manifestBytes); // the commit point
+        DurabilityFaults.Checkpoint("capture.manifest-committed");
+        return CaptureManifest.Parse(manifestBytes);
+    }
+
+    private static CaptureFileRef WriteGenerationFile(string dir, string name, byte[] data)
+    {
+        AtomicFile.WriteAllBytes(Path.Combine(dir, name), data);
+        return new CaptureFileRef(name, AtomicFile.Sha256Hex(data), data.Length);
+    }
+
+    /// <summary>
+    /// Overwrites with zeros and deletes every content file of the folder that <paramref name="manifest"/> does not
+    /// reference (superseded generations, uncommitted generations, interrupted temporary files). Unknown files are
+    /// left alone. Returns the number of files removed.
+    /// </summary>
+    private static int DeleteUnreferenced(string dir, CaptureManifest manifest)
+    {
+        HashSet<string> keep = manifest.ReferencedFiles();
+        int removed = 0;
+        foreach (string file in Directory.GetFiles(dir))
+        {
+            string name = Path.GetFileName(file);
+            if (!keep.Contains(name) && CaptureManifest.IsContentFileName(name))
+            {
+                AtomicFile.OverwriteAndDelete(file);
+                removed++;
+            }
+        }
+
+        return removed;
+    }
+
+    /// <summary>
+    /// Brings a capture folder to a coherent state on open/index: recovers an interrupted sanitize of a v1 folder
+    /// written by SnapForge 1.0 RC, then securely deletes every content file the manifest does not reference.
+    /// A folder whose manifest cannot be read is left untouched (it is listed as damaged).
+    /// </summary>
+    private static void RecoverCaptureFolder(string dir)
+    {
+        try
+        {
+            CaptureManifest m = CaptureManifest.Read(dir);
+            if (m.Version == 1 && !File.Exists(Path.Combine(dir, CaptureFormat.BaseFile)) && File.Exists(Path.Combine(dir, CaptureFormat.LegacySanitizedBaseFile)))
+            {
+                m = AdoptLegacyInterruptedSanitize(dir, m);
+            }
+
+            DeleteUnreferenced(dir, m);
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or JsonException or InvalidOperationException or FormatException or UnauthorizedAccessException)
+        {
+            // Damaged: keep every file for inspection or recovery.
+        }
+    }
+
+    /// <summary>
+    /// SnapForge 1.0 RC sanitized v1 folders by swapping files: if it stopped after deleting the old base and before
+    /// renaming the sanitized one into place, the sanitized base is adopted as generation 1 (with its own hash).
+    /// The record keeps "contains unsanitized redactions" if masks remain, so the user is offered sanitize again
+    /// (which also removes annotations hidden under them).
+    /// </summary>
+    private static CaptureManifest AdoptLegacyInterruptedSanitize(string dir, CaptureManifest legacy)
+    {
+        string pending = Path.Combine(dir, CaptureFormat.LegacySanitizedBaseFile);
+        byte[] baseBytes = File.ReadAllBytes(pending);
+        PixelBuffer sanitized = PixelCodec.Decode(baseBytes);
+        byte[] annBytes = CaptureFormat.ReadVerified(dir, legacy.Annotations);
+        List<Annotation> annotations = CaptureFormat.DeserializeAnnotations(annBytes);
+        string baseName = CaptureFormat.GenerationBaseFile(1);
+        File.Move(pending, Path.Combine(dir, baseName), overwrite: true);
+        JsonObject json = (JsonObject)legacy.Json.DeepClone();
+        json.Remove("baseSha256");
+        json.Remove("annotationsSha256");
+        json["version"] = CaptureFormat.CurrentVersion;
+        json["generation"] = 1;
+        json["width"] = sanitized.Width;
+        json["height"] = sanitized.Height;
+        json["containsUnsanitizedRedactions"] = annotations.OfType<RedactionMaskAnnotation>().Any();
+        json["files"] = CaptureManifest.FilesJson(
+            new CaptureFileRef(baseName, AtomicFile.Sha256Hex(baseBytes), baseBytes.Length),
+            new CaptureFileRef(legacy.Annotations.Name, AtomicFile.Sha256Hex(annBytes), annBytes.Length),
+            thumb: null);
+        byte[] manifestBytes = JsonSerializer.SerializeToUtf8Bytes(json, AnnotationSerializer.Indented);
+        AtomicFile.WriteAllBytes(Path.Combine(dir, CaptureFormat.ManifestFile), manifestBytes);
+        return CaptureManifest.Parse(manifestBytes);
+    }
+
+    /// <summary>Overwrites (images and small files) and deletes every file of a folder, then the folder.</summary>
+    private static void SecureDeleteDirectory(string dir)
+    {
+        if (!Directory.Exists(dir))
+        {
+            return;
+        }
+
+        foreach (string file in Directory.EnumerateFiles(dir, "*", SearchOption.AllDirectories))
+        {
+            DeleteLibraryFile(file);
+        }
+
+        Directory.Delete(dir, recursive: true);
+    }
+
+    /// <summary>Renames a folder (atomic on one volume), retrying briefly while another program (antivirus, indexer) holds a file.</summary>
+    private static void MoveDirectory(string source, string destination)
+    {
+        for (int attempt = 1; ; attempt++)
+        {
+            try
+            {
+                Directory.Move(source, destination);
+                return;
+            }
+            catch (Exception ex) when (attempt < 5 && (ex is UnauthorizedAccessException || (ex is IOException && !Directory.Exists(destination))))
+            {
+                Thread.Sleep(50 * attempt);
+            }
+        }
     }
 
     private CaptureRecord Refresh(Guid id)
@@ -626,23 +852,34 @@ public sealed partial class CaptureLibrary
         long size = Directory.EnumerateFiles(dir).Sum(f => new FileInfo(f).Length);
         try
         {
-            JsonObject m = ReadManifest(dir);
-            if (!File.Exists(Path.Combine(dir, CaptureFormat.BaseFile)) || !File.Exists(Path.Combine(dir, CaptureFormat.AnnotationsFile)))
+            CaptureManifest manifest = CaptureManifest.Read(dir);
+            JsonObject m = manifest.Json;
+            foreach (CaptureFileRef file in new[] { manifest.Base, manifest.Annotations })
             {
-                throw new InvalidDataException("Content files are missing.");
+                // Indexing checks presence and (v2) size only; hashes are verified when the capture is loaded.
+                var info = new FileInfo(Path.Combine(dir, file.Name));
+                if (!info.Exists)
+                {
+                    throw new InvalidDataException("Content files are missing.");
+                }
+
+                if (file.Bytes is long expected && info.Length != expected)
+                {
+                    throw new InvalidDataException($"{file.Name} is damaged or was modified (its size changed).");
+                }
             }
 
             return new CaptureRecord
             {
                 Id = id,
                 Meta = meta,
-                CreatedUtc = CaptureFormat.ParseIso(m["createdUtc"]?.GetValue<string>()),
+                CreatedUtc = manifest.CreatedUtc,
                 ModifiedUtc = CaptureFormat.ParseIso(m["modifiedUtc"]?.GetValue<string>()),
-                Width = m["width"]?.GetValue<int>() ?? 0,
-                Height = m["height"]?.GetValue<int>() ?? 0,
+                Width = manifest.Width,
+                Height = manifest.Height,
                 AnnotationCount = m["annotationCount"]?.GetValue<int>() ?? 0,
                 HasReversibleRedactions = m["containsUnsanitizedRedactions"]?.GetValue<bool>() ?? false,
-                SanitizedUtc = m["sanitizedUtc"]?.GetValue<string>() is { } s ? CaptureFormat.ParseIso(s) : null,
+                SanitizedUtc = manifest.SanitizedUtc,
                 SizeBytes = size,
             };
         }
@@ -652,13 +889,8 @@ public sealed partial class CaptureLibrary
         }
     }
 
-    private static JsonObject ReadManifest(string dir)
-    {
-        byte[] bytes = File.ReadAllBytes(Path.Combine(dir, CaptureFormat.ManifestFile));
-        JsonObject m = JsonNode.Parse(bytes) as JsonObject ?? throw new InvalidDataException("Manifest is not an object.");
-        CaptureFormat.CheckVersion(m, CaptureFormat.FormatId);
-        return m;
-    }
+    /// <summary>The committed manifest of an image capture (tests and integrity checks).</summary>
+    internal CaptureManifest ReadCaptureManifest(Guid id) => CaptureManifest.Read(ExistingFolder(id));
 
     private static CaptureMetadata ReadMeta(string dir)
     {
@@ -700,25 +932,6 @@ public sealed partial class CaptureLibrary
             ["lastOpenedUtc"] = meta.LastOpenedUtc is { } l ? CaptureFormat.Iso(l) : null,
         };
         AtomicFile.WriteAllBytes(Path.Combine(dir, CaptureFormat.MetaFile), JsonSerializer.SerializeToUtf8Bytes(o, AnnotationSerializer.Indented));
-    }
-
-    private static void Verify(JsonObject manifest, string key, byte[] data, string name)
-    {
-        string? expected = manifest[key]?.GetValue<string>();
-        if (expected is null || !string.Equals(expected, AtomicFile.Sha256Hex(data), StringComparison.OrdinalIgnoreCase))
-        {
-            throw new InvalidDataException($"{name} failed its integrity check (the file is damaged or was modified).");
-        }
-    }
-
-    private static void CompleteInterruptedSanitize(string dir)
-    {
-        string pending = Path.Combine(dir, SanitizedBaseFile);
-        if (File.Exists(pending))
-        {
-            AtomicFile.OverwriteAndDelete(Path.Combine(dir, CaptureFormat.BaseFile));
-            File.Move(pending, Path.Combine(dir, CaptureFormat.BaseFile));
-        }
     }
 
     private static string[] NormalizeTags(IEnumerable<string> tags) =>
