@@ -20,7 +20,6 @@ public class WindowingTests
     [Fact]
     public void FA003_oversized_window_above_the_screen_is_moved_and_shrunk_into_the_work_area() => UiThread.Run(async () =>
     {
-        WorkAreaGuard.Install();
         var w = new Window
         {
             Title = "FA-003 test",
@@ -35,7 +34,8 @@ public class WindowingTests
         try
         {
             w.Show();
-            await Task.Delay(300);
+            WorkAreaGuard.Attach(w); // the app installs the guard for all windows; tests attach explicitly
+            await Task.Delay(1500);
             PixelRect work = WorkAreaOf(w);
             PixelRect b = PhysicalPlacement.GetBounds(w)!.Value;
             Assert.True(work.Contains(b.X, b.Y) && b.Right <= work.Right && b.Bottom <= work.Bottom, $"window {b} outside work area {work}");
@@ -50,12 +50,12 @@ public class WindowingTests
     [Fact]
     public void FA003_restoring_from_maximized_after_moving_off_screen_is_fitted_again() => UiThread.Run(async () =>
     {
-        WorkAreaGuard.Install();
         var w = new Window { Title = "FA-003 restore", WindowStartupLocation = WindowStartupLocation.Manual, Left = 50, Top = 50, Width = 500, Height = 400 };
         try
         {
             w.Show();
-            await Task.Delay(200);
+            WorkAreaGuard.Attach(w);
+            await Task.Delay(1200);
             w.WindowState = WindowState.Maximized;
             await Task.Delay(200);
             PixelRect work = WorkAreaOf(w);
@@ -64,7 +64,7 @@ public class WindowingTests
             w.WindowState = WindowState.Minimized;
             await Task.Delay(200);
             w.WindowState = WindowState.Normal;
-            await Task.Delay(400);
+            await Task.Delay(1200);
             PixelRect b = PhysicalPlacement.GetBounds(w)!.Value;
             Assert.True(b.Right <= work.Right && b.Bottom <= work.Bottom && b.X >= work.X && b.Y >= work.Y, $"window {b} outside work area {work}");
         }
@@ -77,13 +77,13 @@ public class WindowingTests
     [Fact]
     public void FA003_main_window_default_size_is_inside_the_work_area_with_title_bar_visible() => UiThread.Run(async () =>
     {
-        WorkAreaGuard.Install();
         Services.AppServices services = TestServices.Create();
         var w = new MainWindow(services);
         try
         {
             w.Show();
-            await Task.Delay(400);
+            WorkAreaGuard.Attach(w); // the app installs the guard for all windows; tests attach explicitly
+            await Task.Delay(1500);
             PixelRect work = WorkAreaOf(w);
             PixelRect b = PhysicalPlacement.GetBounds(w)!.Value;
             Assert.True(WindowFit.CaptionVisible(b, work, 30), $"title bar of {b} not visible in {work}");

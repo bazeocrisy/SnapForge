@@ -26,15 +26,46 @@ internal static class WorkAreaGuard
         _installed = true;
         EventManager.RegisterClassHandler(typeof(Window), FrameworkElement.LoadedEvent, new RoutedEventHandler((sender, _) =>
         {
-            if (sender is Window w && Applies(w))
+            if (sender is Window w)
             {
-                FitSoon(w);
-                w.StateChanged -= OnStateChanged;
-                w.StateChanged += OnStateChanged;
+                Attach(w);
             }
         }));
+
+        // The Loaded class handler is not raised for every window in every hosting situation (CI run 90), so a cheap
+        // scan of the application's windows also attaches to each newly shown window.
+        var scan = new System.Windows.Threading.DispatcherTimer(System.Windows.Threading.DispatcherPriority.Background) { Interval = TimeSpan.FromMilliseconds(500) };
+        scan.Tick += (_, _) =>
+        {
+            if (Application.Current is { } app && app.Dispatcher.CheckAccess())
+            {
+                foreach (Window w in app.Windows)
+                {
+                    if (w.IsVisible)
+                    {
+                        Attach(w);
+                    }
+                }
+            }
+        };
+        scan.Start();
         SystemEvents.DisplaySettingsChanged += OnDisplayChanged;
         SystemEvents.UserPreferenceChanged += OnPreferenceChanged; // taskbar moved/resized changes the work area
+    }
+
+    private static readonly System.Runtime.CompilerServices.ConditionalWeakTable<Window, object> Attached = new();
+
+    /// <summary>Fits <paramref name="w"/> once and keeps it fitted on restore (idempotent).</summary>
+    internal static void Attach(Window w)
+    {
+        if (!Applies(w) || Attached.TryGetValue(w, out _))
+        {
+            return;
+        }
+
+        Attached.Add(w, new object());
+        w.StateChanged += OnStateChanged;
+        FitSoon(w);
     }
 
     /// <summary>Windows with a standard caption that the user moves and resizes.</summary>
