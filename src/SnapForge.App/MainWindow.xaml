@@ -151,6 +151,7 @@
                         <MenuItem Header="_Import images…" Click="OnImportImages" />
                         <MenuItem x:Name="ExportMenu" Header="_Export as PNG/JPEG…" InputGestureText="Ctrl+S" Click="OnSave" />
                         <MenuItem x:Name="CopyMenu" Header="_Copy image" InputGestureText="Ctrl+C" Click="OnCopy" />
+                        <MenuItem x:Name="PrintMenu" Header="_Print…" InputGestureText="Ctrl+P" Click="OnPrint" />
                         <MenuItem x:Name="ExportPackageMenu" Header="Export editable capture (.sfcap)…" Click="OnExportPackage" />
                         <MenuItem Header="_Import editable capture (.sfcap)…" Click="OnImportPackage" />
                         <Separator />
@@ -165,6 +166,9 @@
                         <MenuItem x:Name="RedoMenu" Header="_Redo" InputGestureText="Ctrl+Y" Click="OnRedo" />
                         <Separator />
                         <MenuItem x:Name="DeleteMenu" Header="_Delete annotation" InputGestureText="Del" Click="OnDeleteSelection" />
+                        <MenuItem Header="Copy _annotation" InputGestureText="Ctrl+Shift+C" Click="OnCopyAnnotation" />
+                        <MenuItem Header="_Paste" InputGestureText="Ctrl+V" Click="OnPaste" ToolTip="Pastes a copied annotation, or opens a clipboard image as a new capture" />
+                        <MenuItem Header="D_uplicate annotation" InputGestureText="Ctrl+D" Click="OnDuplicateAnnotation" />
                         <MenuItem Header="_Copy image" InputGestureText="Ctrl+C" Click="OnCopy" />
                     </MenuItem>
                     <MenuItem Header="_Image" SubmenuOpened="OnMenuOpened">
@@ -182,6 +186,7 @@
                         <MenuItem Header="Canvas si_ze…" InputGestureText="Ctrl+Alt+C" Click="OnCanvasSize" />
                         <MenuItem Header="Add _border…" Click="OnAddBorder" />
                         <MenuItem Header="Add drop s_hadow" Click="OnAddShadow" />
+                        <MenuItem Header="Add _watermark…" Click="OnAddWatermark" />
                         <MenuItem Header="_Blur area" InputGestureText="B" Click="OnBlurTool" />
                         <MenuItem Header="_Pixelate area" InputGestureText="P" Click="OnPixelateTool" />
                         <Separator />
@@ -299,6 +304,15 @@
                                     </Grid>
                                     <TextBlock Text="Step" FontSize="10" HorizontalAlignment="Center" />
                                 </StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="FreehandTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Freehand" Checked="OnToolChecked" ToolTip="Pen (D) — draw freehand" AutomationProperties.Name="Pen tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconPen}" /><TextBlock Text="Pen" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="CalloutTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Callout" Checked="OnToolChecked" ToolTip="Callout (K) — drag from what you point at to where the bubble goes" AutomationProperties.Name="Callout tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconCallout}" /><TextBlock Text="Callout" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                            </RadioButton>
+                            <RadioButton x:Name="StampTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Stamp" Checked="OnToolChecked" Click="OnStampToolClick" ToolTip="Stamp (S) — click to place; click the button again to choose the stamp" AutomationProperties.Name="Stamp tool">
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconStamp}" /><TextBlock Text="Stamp" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <Rectangle Style="{StaticResource Separator}" Height="32" />
                             <RadioButton x:Name="RedactTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Redact" Checked="OnToolChecked" ToolTip="Redact (X) — blacks out pixels in every export" AutomationProperties.Name="Redact tool">

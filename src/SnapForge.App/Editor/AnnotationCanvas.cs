@@ -64,6 +64,14 @@ internal sealed class AnnotationCanvas : Canvas
 
     public ArgbColor RedactionColor { get; set; } = ArgbColor.Black;
 
+    /// <summary>The stamp placed by the Stamp tool.</summary>
+    public StampKind StampKind { get; set; } = StampKind.Check;
+
+    /// <summary>Asks for callout text (set by the window; tests can replace it).</summary>
+    public Func<string?>? AskCalloutText { get; set; }
+
+    private readonly List<PointD> _freehand = [];
+
     /// <summary>Blur tool strength (box-blur radius in pixels).</summary>
     public int BlurRadius { get; set; } = 8;
 
@@ -399,6 +407,16 @@ internal sealed class AnnotationCanvas : Canvas
                     StrokeWidth = StrokeWidth,
                 }));
                 break;
+            case AnnotationTool.Stamp:
+                double size = Math.Max(24, StrokeWidth * 10);
+                _document.Execute(new AddAnnotationCommand(new StampAnnotation(p, StampKind, size) { Color = CurrentColor, StrokeWidth = StrokeWidth }));
+                break;
+            case AnnotationTool.Freehand:
+                _freehand.Clear();
+                _freehand.Add(p);
+                _dragStart = p;
+                CaptureMouse();
+                break;
             default:
                 _dragStart = p;
                 CaptureMouse();
@@ -439,7 +457,17 @@ internal sealed class AnnotationCanvas : Canvas
             return;
         }
 
-        if (Tool is AnnotationTool.Redact or AnnotationTool.Crop or AnnotationTool.Blur or AnnotationTool.Pixelate)
+        if (Tool == AnnotationTool.Freehand)
+        {
+            PointD last = _freehand[^1];
+            if (Math.Abs(p.X - last.X) + Math.Abs(p.Y - last.Y) >= 1.5 && _freehand.Count < FreehandAnnotation.MaxPoints)
+            {
+                _freehand.Add(p);
+            }
+
+            _preview = new FreehandAnnotation(_freehand) { Color = CurrentColor, StrokeWidth = StrokeWidth };
+        }
+        else if (Tool is AnnotationTool.Redact or AnnotationTool.Crop or AnnotationTool.Blur or AnnotationTool.Pixelate)
         {
             _redactPreview = RectD.FromPoints(start, p).ToCoveringPixelRect().Intersect(_document.Image.Bounds);
         }
@@ -501,6 +529,26 @@ internal sealed class AnnotationCanvas : Canvas
                 _document.Execute(new CropCommand(region));
             }
         }
+        else if (Tool == AnnotationTool.Freehand)
+        {
+            if (_freehand.Count > 0)
+            {
+                _document.Execute(new AddAnnotationCommand(new FreehandAnnotation(_freehand) { Color = CurrentColor, StrokeWidth = StrokeWidth }));
+                _freehand.Clear();
+            }
+        }
+        else if (Tool == AnnotationTool.Callout)
+        {
+            double fontSize = FontSizeForStroke(StrokeWidth);
+            if (AskCalloutText?.Invoke() is { Length: > 0 } text)
+            {
+                PointD m = Rendering.AnnotationRenderer.MeasureText(text, fontSize);
+                double w = Math.Max(80, m.X + 24), h = Math.Max(36, m.Y + 16);
+                PointD centre = Math.Abs(p.X - start.X) + Math.Abs(p.Y - start.Y) < 10 ? new PointD(start.X + w, start.Y - h) : p;
+                var box = new RectD(centre.X - (w / 2), centre.Y - (h / 2), w, h);
+                _document.Execute(new AddAnnotationCommand(new CalloutAnnotation(box, start, text, fontSize) { Color = CurrentColor, StrokeWidth = Math.Max(2, StrokeWidth / 2) }));
+            }
+        }
         else if (Tool is AnnotationTool.Blur or AnnotationTool.Pixelate)
         {
             PixelRect region = RectD.FromPoints(start, p).ToCoveringPixelRect().Intersect(_document.Image.Bounds);
@@ -560,6 +608,8 @@ internal sealed class AnnotationCanvas : Canvas
                     : new LineAnnotation(start, end) { Color = CurrentColor, StrokeWidth = StrokeWidth };
             case AnnotationTool.Highlight:
                 return new HighlightAnnotation(RectD.FromPoints(start, end)) { Color = CurrentColor, StrokeWidth = StrokeWidth };
+            case AnnotationTool.Callout:
+                return new LineAnnotation(start, end) { Color = CurrentColor, StrokeWidth = Math.Max(2, StrokeWidth / 2) }; // preview of the pointer
             case AnnotationTool.Rectangle:
             case AnnotationTool.Ellipse:
                 if (constrain)

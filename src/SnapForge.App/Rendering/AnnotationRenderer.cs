@@ -50,6 +50,15 @@ internal static class AnnotationRenderer
                 dc.DrawRectangle(Frozen(new SolidColorBrush(BitmapConversion.ToMediaColor(m.Color with { A = 255 }))), null,
                     new Rect(m.Region.X, m.Region.Y, m.Region.Width, m.Region.Height));
                 break;
+            case FreehandAnnotation f:
+                DrawFreehand(dc, f);
+                break;
+            case CalloutAnnotation c:
+                DrawCallout(dc, c);
+                break;
+            case StampAnnotation st:
+                DrawStamp(dc, st);
+                break;
             default:
                 throw new NotSupportedException($"No renderer for {annotation?.GetType().Name}.");
         }
@@ -129,6 +138,139 @@ internal static class AnnotationRenderer
             TextAlignment = TextAlignment.Left,
         };
         dc.DrawText(ft, new Point(s.Center.X - ft.Width / 2, s.Center.Y - ft.Height / 2));
+    }
+
+    private static void DrawFreehand(DrawingContext dc, FreehandAnnotation f)
+    {
+        if (f.Points.Count == 1)
+        {
+            dc.DrawEllipse(Frozen(new SolidColorBrush(BitmapConversion.ToMediaColor(f.Color))), null, P(f.Points[0]), f.StrokeWidth / 2, f.StrokeWidth / 2);
+            return;
+        }
+
+        var g = new StreamGeometry();
+        using (StreamGeometryContext ctx = g.Open())
+        {
+            ctx.BeginFigure(P(f.Points[0]), isFilled: false, isClosed: false);
+            ctx.PolyLineTo([.. f.Points.Skip(1).Select(P)], isStroked: true, isSmoothJoin: true);
+        }
+
+        g.Freeze();
+        dc.DrawGeometry(null, StrokePen(f.Color, f.StrokeWidth), g);
+    }
+
+    private static void DrawCallout(DrawingContext dc, CalloutAnnotation c)
+    {
+        Rect box = R(c.Box);
+        double radius = Math.Min(10, Math.Min(box.Width, box.Height) / 4);
+        var bubble = new RectangleGeometry(box, radius, radius);
+        // Tail: a triangle from two points on the box edge facing the tail to the tail point.
+        Point centre = P(c.Box.Center), tail = P(c.Tail);
+        Vector dir = tail - centre;
+        Geometry shape = bubble;
+        if (!box.Contains(tail) && dir.Length > 1)
+        {
+            dir.Normalize();
+            var normal = new Vector(-dir.Y, dir.X);
+            double baseHalf = Math.Min(14, Math.Min(box.Width, box.Height) / 4);
+            var tri = new StreamGeometry();
+            using (StreamGeometryContext ctx = tri.Open())
+            {
+                ctx.BeginFigure(centre + (normal * baseHalf), isFilled: true, isClosed: true);
+                ctx.LineTo(tail, isStroked: true, isSmoothJoin: false);
+                ctx.LineTo(centre - (normal * baseHalf), isStroked: true, isSmoothJoin: false);
+            }
+
+            tri.Freeze();
+            shape = new CombinedGeometry(GeometryCombineMode.Union, bubble, tri);
+        }
+
+        shape.Freeze();
+        dc.DrawGeometry(Brushes.White, StrokePen(c.Color, c.StrokeWidth, PenLineJoin.Round), shape);
+        if (!string.IsNullOrEmpty(c.Text))
+        {
+            FormattedText ft = Format(c.Text, c.FontSize, Frozen(new SolidColorBrush(Color.FromRgb(20, 20, 20))));
+            ft.MaxTextWidth = Math.Max(10, box.Width - 16);
+            ft.MaxTextHeight = Math.Max(10, box.Height - 8);
+            ft.TextAlignment = TextAlignment.Center;
+            dc.DrawText(ft, new Point(box.X + 8, box.Y + ((box.Height - ft.Height) / 2)));
+        }
+    }
+
+    /// <summary>Original vector stamps (no third-party artwork).</summary>
+    private static void DrawStamp(DrawingContext dc, StampAnnotation st)
+    {
+        double s = st.Size, x = st.Center.X - (s / 2), y = st.Center.Y - (s / 2);
+        Brush fill = Frozen(new SolidColorBrush(BitmapConversion.ToMediaColor(st.Color)));
+        Brush ink = Frozen(new SolidColorBrush(ContrastFor(st.Color)));
+        var inkPen = new Pen(ink, Math.Max(2, s / 9)) { StartLineCap = PenLineCap.Round, EndLineCap = PenLineCap.Round, LineJoin = PenLineJoin.Round };
+        inkPen.Freeze();
+        Point c = P(st.Center);
+        switch (st.Kind)
+        {
+            case StampKind.Warning:
+                var tri = new StreamGeometry();
+                using (StreamGeometryContext ctx = tri.Open())
+                {
+                    ctx.BeginFigure(new Point(c.X, y + (s * 0.06)), isFilled: true, isClosed: true);
+                    ctx.LineTo(new Point(x + (s * 0.97), y + (s * 0.92)), true, true);
+                    ctx.LineTo(new Point(x + (s * 0.03), y + (s * 0.92)), true, true);
+                }
+
+                tri.Freeze();
+                dc.DrawGeometry(fill, null, tri);
+                dc.DrawLine(inkPen, new Point(c.X, y + (s * 0.35)), new Point(c.X, y + (s * 0.62)));
+                dc.DrawEllipse(ink, null, new Point(c.X, y + (s * 0.77)), s / 18, s / 18);
+                return;
+            case StampKind.Star:
+                var star = new StreamGeometry();
+                using (StreamGeometryContext ctx = star.Open())
+                {
+                    for (int i = 0; i < 10; i++)
+                    {
+                        double r = (i % 2 == 0 ? 0.5 : 0.21) * s, a = (-Math.PI / 2) + (i * Math.PI / 5);
+                        var p = new Point(c.X + (r * Math.Cos(a)), c.Y + (r * Math.Sin(a)));
+                        if (i == 0)
+                        {
+                            ctx.BeginFigure(p, isFilled: true, isClosed: true);
+                        }
+                        else
+                        {
+                            ctx.LineTo(p, true, true);
+                        }
+                    }
+                }
+
+                star.Freeze();
+                dc.DrawGeometry(fill, null, star);
+                return;
+        }
+
+        dc.DrawEllipse(fill, null, c, s / 2, s / 2);
+        switch (st.Kind)
+        {
+            case StampKind.Check:
+                var check = new StreamGeometry();
+                using (StreamGeometryContext ctx = check.Open())
+                {
+                    ctx.BeginFigure(new Point(x + (s * 0.27), y + (s * 0.52)), false, false);
+                    ctx.LineTo(new Point(x + (s * 0.44), y + (s * 0.69)), true, true);
+                    ctx.LineTo(new Point(x + (s * 0.74), y + (s * 0.34)), true, true);
+                }
+
+                check.Freeze();
+                dc.DrawGeometry(null, inkPen, check);
+                break;
+            case StampKind.Cross:
+                dc.DrawLine(inkPen, new Point(x + (s * 0.32), y + (s * 0.32)), new Point(x + (s * 0.68), y + (s * 0.68)));
+                dc.DrawLine(inkPen, new Point(x + (s * 0.68), y + (s * 0.32)), new Point(x + (s * 0.32), y + (s * 0.68)));
+                break;
+            default:
+                string glyph = st.Kind == StampKind.Info ? "i" : "?";
+                var ft = new FormattedText(glyph, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, StepTypeface, s * 0.62, ink, PixelsPerDip);
+                dc.DrawText(ft, new Point(c.X - (ft.Width / 2), c.Y - (ft.Height / 2)));
+                break;
+        }
     }
 
     private static FormattedText Format(string text, double fontSize, Brush brush) =>

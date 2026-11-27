@@ -10,6 +10,9 @@ public class ExportRulesTests
     [InlineData("a.jpg", ImageFileFormat.Jpeg)]
     [InlineData("a.JPEG", ImageFileFormat.Jpeg)]
     [InlineData("a.jpe", ImageFileFormat.Jpeg)]
+    [InlineData("a.bmp", ImageFileFormat.Bmp)]
+    [InlineData("a.TIFF", ImageFileFormat.Tiff)]
+    [InlineData("a.tif", ImageFileFormat.Tiff)]
     public void Format_from_extension(string path, ImageFileFormat expected) =>
         Assert.Equal(expected, ExportRules.FormatFromPath(path));
 
@@ -31,6 +34,8 @@ public class ExportRulesTests
     {
         Assert.Equal(("x.jpg", ImageFileFormat.Jpeg), ExportRules.ResolveSaveTarget("x", 2));
         Assert.Equal(("x.png", ImageFileFormat.Png), ExportRules.ResolveSaveTarget("x", 1));
+        Assert.Equal(("x.bmp", ImageFileFormat.Bmp), ExportRules.ResolveSaveTarget("x", 3));
+        Assert.Equal(("x.tif", ImageFileFormat.Tiff), ExportRules.ResolveSaveTarget("x", 4));
         Assert.Equal(("x.v2.png", ImageFileFormat.Png), ExportRules.ResolveSaveTarget("x.v2", 1));
     }
 

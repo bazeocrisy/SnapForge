@@ -63,6 +63,23 @@ public static class AnnotationSerializer
                     o["number"] = x.Number;
                     o["radius"] = x.Radius;
                     break;
+                case FreehandAnnotation x:
+                    o["type"] = "freehand";
+                    o["points"] = new JsonArray([.. x.Points.SelectMany(p => new JsonNode?[] { p.X, p.Y })]);
+                    break;
+                case CalloutAnnotation x:
+                    o["type"] = "callout";
+                    o["box"] = Rect(x.Box);
+                    o["tail"] = Point(x.Tail);
+                    o["text"] = x.Text;
+                    o["fontSize"] = x.FontSize;
+                    break;
+                case StampAnnotation x:
+                    o["type"] = "stamp";
+                    o["center"] = Point(x.Center);
+                    o["kind"] = x.Kind.ToString().ToLowerInvariant();
+                    o["size"] = x.Size;
+                    break;
                 case RedactionMaskAnnotation x:
                     o["type"] = "redaction";
                     o["region"] = new JsonArray(x.Region.X, x.Region.Y, x.Region.Width, x.Region.Height);
@@ -95,6 +112,10 @@ public static class AnnotationSerializer
                 "text" => new TextAnnotation(Point(o, "position"), Str(o, "text"), Num(o, "fontSize")) { MeasuredSize = Point(o, "measuredSize") },
                 "step" => new StepMarkerAnnotation(Point(o, "center"), (int)Num(o, "number"), Num(o, "radius")),
                 "redaction" => new RedactionMaskAnnotation(Region(o)),
+                "freehand" => new FreehandAnnotation(FreehandPoints(o)),
+                "callout" => new CalloutAnnotation(Rect(o, "box"), Point(o, "tail"), Str(o, "text"), Num(o, "fontSize")),
+                "stamp" => new StampAnnotation(Point(o, "center"), Enum.TryParse(Str(o, "kind"), ignoreCase: true, out StampKind k) && Enum.IsDefined(k)
+                    ? k : throw new InvalidDataException("Unknown stamp kind."), Num(o, "size")),
                 _ => throw new InvalidDataException($"Unknown annotation type '{type}'."),
             };
             a = a with
@@ -149,6 +170,30 @@ public static class AnnotationSerializer
     {
         double[] v = Numbers(o, name, 4);
         return new RectD(v[0], v[1], v[2], v[3]);
+    }
+
+    private static List<PointD> FreehandPoints(JsonObject o)
+    {
+        JsonArray arr = o["points"] as JsonArray ?? throw new InvalidDataException("Missing 'points'.");
+        if (arr.Count < 2 || arr.Count % 2 != 0 || arr.Count > FreehandAnnotation.MaxPoints * 2)
+        {
+            throw new InvalidDataException("'points' must hold 1 to 4000 x,y pairs.");
+        }
+
+        var points = new List<PointD>(arr.Count / 2);
+        for (int i = 0; i < arr.Count; i += 2)
+        {
+            double x = arr[i]?.GetValue<double>() ?? throw new InvalidDataException("Null in 'points'.");
+            double y = arr[i + 1]?.GetValue<double>() ?? throw new InvalidDataException("Null in 'points'.");
+            if (!double.IsFinite(x) || !double.IsFinite(y))
+            {
+                throw new InvalidDataException("'points' is not finite.");
+            }
+
+            points.Add(new PointD(x, y));
+        }
+
+        return points;
     }
 
     private static PixelRect Region(JsonObject o)

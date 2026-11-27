@@ -36,6 +36,14 @@ internal static class AnnotationGeometry
                 return t with { Position = P(t.Position + half) - half };
             case RedactionMaskAnnotation m:
                 return m with { Region = ImageOps.TransformRect(m.Region, width, height, transform) };
+            case FreehandAnnotation f:
+                return f.Map(P);
+            case CalloutAnnotation co:
+                // The box keeps its size and orientation (text is never rotated); its centre and the tail follow.
+                PointD centre = P(co.Box.Center);
+                return co with { Box = new RectD(centre.X - (co.Box.Width / 2), centre.Y - (co.Box.Height / 2), co.Box.Width, co.Box.Height), Tail = P(co.Tail) };
+            case StampAnnotation st:
+                return st with { Center = P(st.Center) };
             default:
                 PointD c = annotation.Bounds.Center;
                 PointD moved = P(c);
@@ -81,6 +89,12 @@ internal static class AnnotationGeometry
                     MeasuredSize = new PointD(t.MeasuredSize.X * u, t.MeasuredSize.Y * u),
                     StrokeWidth = t.StrokeWidth * u,
                 };
+            case FreehandAnnotation f:
+                return f.Map(P) with { StrokeWidth = f.StrokeWidth * u };
+            case CalloutAnnotation co:
+                return co with { Box = R(co.Box), Tail = P(co.Tail), FontSize = co.FontSize * u, StrokeWidth = co.StrokeWidth * u };
+            case StampAnnotation st:
+                return st with { Center = P(st.Center), Size = st.Size * u };
             default:
                 PointD c = annotation.Bounds.Center;
                 PointD moved = P(c);

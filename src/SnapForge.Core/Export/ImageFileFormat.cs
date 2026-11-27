@@ -6,6 +6,8 @@ public enum ImageFileFormat
 {
     Png,
     Jpeg,
+    Bmp,
+    Tiff,
 }
 
 public static class ExportRules
@@ -14,12 +16,14 @@ public static class ExportRules
     public const int JpegQuality = 92;
 
     /// <summary>Filter string for Win32 save dialogs; index 1 = PNG, 2 = JPEG.</summary>
-    public const string SaveDialogFilter = "PNG image (*.png)|*.png|JPEG image (*.jpg;*.jpeg)|*.jpg;*.jpeg";
+    public const string SaveDialogFilter = "PNG image (*.png)|*.png|JPEG image (*.jpg;*.jpeg)|*.jpg;*.jpeg|BMP image (*.bmp)|*.bmp|TIFF image (*.tif;*.tiff)|*.tif;*.tiff";
 
     public static string Extension(ImageFileFormat format) => format switch
     {
         ImageFileFormat.Png => ".png",
         ImageFileFormat.Jpeg => ".jpg",
+        ImageFileFormat.Bmp => ".bmp",
+        ImageFileFormat.Tiff => ".tif",
         _ => throw new ArgumentOutOfRangeException(nameof(format)),
     };
 
@@ -31,6 +35,8 @@ public static class ExportRules
         {
             ".PNG" => ImageFileFormat.Png,
             ".JPG" or ".JPEG" or ".JPE" => ImageFileFormat.Jpeg,
+            ".BMP" => ImageFileFormat.Bmp,
+            ".TIF" or ".TIFF" => ImageFileFormat.Tiff,
             _ => null,
         };
     }
@@ -48,7 +54,13 @@ public static class ExportRules
             return (chosenPath, format);
         }
 
-        ImageFileFormat fromFilter = filterIndex == 2 ? ImageFileFormat.Jpeg : ImageFileFormat.Png;
+        ImageFileFormat fromFilter = filterIndex switch
+        {
+            2 => ImageFileFormat.Jpeg,
+            3 => ImageFileFormat.Bmp,
+            4 => ImageFileFormat.Tiff,
+            _ => ImageFileFormat.Png,
+        };
         return (chosenPath + Extension(fromFilter), fromFilter);
     }
 

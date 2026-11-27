@@ -76,6 +76,7 @@ public partial class MainWindow : Window
         };
 
         Editor.StateChanged += (_, _) => UpdateCommandState();
+        Editor.AskCalloutText = () => Dialogs.InputDialog.Ask(this, "Callout", "Text for the callout:");
         SourceInitialized += (_, _) =>
         {
             WindowChrome.UseDarkTitleBar(this, ThemeManager.IsDark);
@@ -863,6 +864,9 @@ public partial class MainWindow : Window
         AnnotationTool.StepMarker => "Click to place the next numbered step.",
         AnnotationTool.Highlight => "Drag over content to highlight it.",
         AnnotationTool.Crop => "Drag the area to keep. The rest is removed (Undo restores it while editing).",
+        AnnotationTool.Freehand => "Drag to draw freehand.",
+        AnnotationTool.Callout => "Drag from the thing you are pointing at to where the bubble should go, then type its text.",
+        AnnotationTool.Stamp => "Click to place the stamp. Click the Stamp button again to choose another stamp.",
         AnnotationTool.Blur => "Drag over an area to blur it. Blur is not redaction — use Redact (X) for passwords and personal data.",
         AnnotationTool.Pixelate => "Drag over an area to pixelate it. Pixelation is not redaction — use Redact (X) for sensitive data.",
         AnnotationTool.Redact => "Drag over sensitive content. Exports contain only the black box; the editable Library copy keeps originals until you sanitize.",
@@ -971,6 +975,29 @@ public partial class MainWindow : Window
 
     private void OnBlurTool(object sender, RoutedEventArgs e) => BlurTool.IsChecked = true;
 
+    /// <summary>Stamp button: selects the tool and offers the stamp kinds.</summary>
+    private void OnStampToolClick(object sender, RoutedEventArgs e)
+    {
+        var menu = new ContextMenu { PlacementTarget = StampTool, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
+        foreach ((StampKind kind, string label) in new[]
+        {
+            (StampKind.Check, "✓  Check"), (StampKind.Cross, "✗  Cross"), (StampKind.Warning, "⚠  Warning"),
+            (StampKind.Info, "i  Info"), (StampKind.Question, "?  Question"), (StampKind.Star, "★  Star"),
+        })
+        {
+            var item = new MenuItem { Header = label, IsCheckable = true, IsChecked = Editor.StampKind == kind };
+            item.Click += (_, _) =>
+            {
+                Editor.StampKind = kind;
+                SetStatus($"Stamp: {kind}. Click on the image to place it.");
+            };
+            menu.Items.Add(item);
+        }
+
+        StampTool.ContextMenu = menu;
+        menu.IsOpen = true;
+    }
+
     private void OnPixelateTool(object sender, RoutedEventArgs e) => PixelateTool.IsChecked = true;
 
     /// <summary>Runs an undoable whole-image command on the open capture and reports it.</summary>
@@ -1018,6 +1045,85 @@ public partial class MainWindow : Window
     private void OnAddBorder(object sender, RoutedEventArgs e) => ApplyImageCommand(
         _ => Dialogs.BorderDialog.Ask(this) is { } t ? new AddBorderCommand(t, Editor.CurrentColor) : null,
         "Border added");
+
+    /// <summary>Image → Add watermark: semi-transparent text in the bottom-right corner, burned into the image (undoable).</summary>
+    private void OnAddWatermark(object sender, RoutedEventArgs e) => ApplyImageCommand(doc =>
+    {
+        if (Dialogs.InputDialog.Ask(this, "Add watermark", "Watermark text (placed in the bottom-right corner at 45 % opacity):", "Confidential") is not { Length: > 0 } text)
+        {
+            return null;
+        }
+
+        PixelBuffer mark = Rendering.WatermarkRenderer.Render(text, Math.Clamp(doc.Image.Height / 18.0, 12, 120));
+        int margin = Math.Max(8, doc.Image.Width / 60);
+        return new OverlayImageCommand(mark, Math.Max(0, doc.Image.Width - mark.Width - margin), Math.Max(0, doc.Image.Height - mark.Height - margin), 0.45);
+    }, "Watermark added");
+
+    private Annotation? _annotationClipboard;
+
+    private void OnCopyAnnotation(object sender, RoutedEventArgs e)
+    {
+        if (Editor.Selected is { } a and not RedactionMaskAnnotation)
+        {
+            _annotationClipboard = a;
+            SetStatus("Annotation copied. Ctrl+V pastes it (also into another capture).");
+        }
+        else
+        {
+            SetStatus("Select an annotation first (Select tool, V). Redactions cannot be copied.");
+        }
+    }
+
+    private void OnPaste(object sender, RoutedEventArgs e)
+    {
+        if (_annotationClipboard is { } a && _current?.Document is { } doc)
+        {
+            Annotation copy = a.Translate(16, 16) with { Id = Guid.NewGuid() };
+            doc.Execute(new AddAnnotationCommand(copy));
+            _annotationClipboard = copy;
+            SetStatus("Annotation pasted.");
+            return;
+        }
+
+        OnNewFromClipboard(sender, e);
+    }
+
+    private void OnDuplicateAnnotation(object sender, RoutedEventArgs e)
+    {
+        if (Editor.Selected is { } a and not RedactionMaskAnnotation && _current?.Document is { } doc)
+        {
+            doc.Execute(new AddAnnotationCommand(a.Translate(16, 16) with { Id = Guid.NewGuid() }));
+            SetStatus("Annotation duplicated.");
+        }
+    }
+
+    /// <summary>File → Print: the capture as exported (annotations and redactions applied), fitted to the page.</summary>
+    private void OnPrint(object sender, RoutedEventArgs e)
+    {
+        if (_current is null)
+        {
+            SetStatus("Open a capture first.");
+            return;
+        }
+
+        var dialog = new PrintDialog();
+        if (dialog.ShowDialog() != true)
+        {
+            return;
+        }
+
+        PixelBuffer image = RenderFinalImage();
+        double pageW = dialog.PrintableAreaWidth, pageH = dialog.PrintableAreaHeight, margin = 36;
+        double scale = Math.Min(1, Math.Min((pageW - (2 * margin)) / image.Width, (pageH - (2 * margin)) / image.Height));
+        var visual = new System.Windows.Media.DrawingVisual();
+        using (System.Windows.Media.DrawingContext dc = visual.RenderOpen())
+        {
+            dc.DrawImage(BitmapConversion.ToFrozenBitmap(image), new Rect(margin, margin, image.Width * scale, image.Height * scale));
+        }
+
+        dialog.PrintVisual(visual, _current.Title);
+        SetStatus($"Sent \"{_current.Title}\" to {dialog.PrintQueue?.FullName ?? "the printer"}.");
+    }
 
     private void OnAddShadow(object sender, RoutedEventArgs e) => ApplyImageCommand(
         _ => new AddDropShadowCommand(8, 8, 10, new ArgbColor(110, 0, 0, 0), ArgbColor.White),
@@ -1566,6 +1672,7 @@ public partial class MainWindow : Window
                 case Key.S when _current is not null: Handle(e, () => _ = ExportAsync()); return;
                 case Key.W when _current is not null && editorVisible: Handle(e, () => OnCloseCapture(this, e)); return;
                 case Key.T when shift && _current is not null: Handle(e, () => OnExtractText(this, e)); return;
+                case Key.P when !shift && _current is not null: Handle(e, () => OnPrint(this, e)); return;
                 case Key.P when shift && _current?.CaptureId is { } pinId:
                     Handle(e, () => _services.Tray.SetPinned(pinId, !_services.Tray.Items.Any(i => i.Id == pinId && i.Pinned)));
                     return;
@@ -1578,7 +1685,10 @@ public partial class MainWindow : Window
                     case Key.Z when shift: Handle(e, Redo); return;
                     case Key.Z: Handle(e, Undo); return;
                     case Key.Y: Handle(e, Redo); return;
+                    case Key.C when shift: Handle(e, () => OnCopyAnnotation(this, e)); return;
                     case Key.C: Handle(e, () => _ = CopyAsync()); return;
+                    case Key.V when !shift: Handle(e, () => OnPaste(this, e)); return;
+                    case Key.D: Handle(e, () => OnDuplicateAnnotation(this, e)); return;
                     case Key.D0 or Key.NumPad0: Handle(e, ApplyFitZoom); return;
                     case Key.OemPlus or Key.Add: Handle(e, () => ZoomBy(1.25)); return;
                     case Key.OemMinus or Key.Subtract: Handle(e, () => ZoomBy(1 / 1.25)); return;
@@ -1612,6 +1722,9 @@ public partial class MainWindow : Window
             case Key.X: Handle(e, () => RedactTool.IsChecked = true); return;
             case Key.C: Handle(e, () => CropTool.IsChecked = true); return;
             case Key.B: Handle(e, () => BlurTool.IsChecked = true); return;
+            case Key.D: Handle(e, () => FreehandTool.IsChecked = true); return;
+            case Key.K: Handle(e, () => CalloutTool.IsChecked = true); return;
+            case Key.S: Handle(e, () => StampTool.IsChecked = true); return;
             case Key.P: Handle(e, () => PixelateTool.IsChecked = true); return;
         }
     }

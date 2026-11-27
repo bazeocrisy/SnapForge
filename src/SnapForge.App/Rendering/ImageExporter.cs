@@ -42,7 +42,7 @@ internal static class ImageExporter
         return ImageCompositor.ComposeOver(image, overlay);
     }
 
-    /// <summary>Encodes to PNG or JPEG. No metadata (EXIF, location, user name) is written.</summary>
+    /// <summary>Encodes to PNG, JPEG, BMP or TIFF (lossless LZW). No metadata (EXIF, location, user name) is written.</summary>
     public static byte[] Encode(PixelBuffer image, ImageFileFormat format) => Encode(image, format, ExportRules.JpegQuality);
 
     /// <summary>Encodes with an explicit JPEG quality (1–100; ignored for PNG). No metadata is written.</summary>
@@ -54,6 +54,8 @@ internal static class ImageExporter
         {
             ImageFileFormat.Png => new PngBitmapEncoder(),
             ImageFileFormat.Jpeg => new JpegBitmapEncoder { QualityLevel = Math.Clamp(jpegQuality, 1, 100) },
+            ImageFileFormat.Bmp => new BmpBitmapEncoder(),
+            ImageFileFormat.Tiff => new TiffBitmapEncoder { Compression = TiffCompressOption.Lzw },
             _ => throw new ArgumentOutOfRangeException(nameof(format)),
         };
         encoder.Frames.Add(BitmapFrame.Create(source));

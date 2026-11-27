@@ -18,4 +18,13 @@ public enum AnnotationTool
 
     /// <summary>Pixelates a region of the image (not redaction).</summary>
     Pixelate,
+
+    /// <summary>Freehand pen.</summary>
+    Freehand,
+
+    /// <summary>Speech-bubble callout: drag from the point of interest to where the bubble goes.</summary>
+    Callout,
+
+    /// <summary>Click to place a stamp (check, cross, warning, info, question, star).</summary>
+    Stamp,
 }
