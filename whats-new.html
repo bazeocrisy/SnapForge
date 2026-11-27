@@ -1,0 +1,121 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>What&#x27;s New — SnapForge</title>
+<meta name="description" content="Development progress of SnapForge. There is no public release yet; this page lists what has been built and is under review.">
+
+<link rel="canonical" href="https://bazeocrisy.github.io/SnapForge/whats-new.html">
+<meta name="theme-color" content="#0b1220">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SnapForge">
+<meta property="og:title" content="What&#x27;s New">
+<meta property="og:description" content="Development progress of SnapForge. There is no public release yet; this page lists what has been built and is under review.">
+<meta property="og:url" content="https://bazeocrisy.github.io/SnapForge/whats-new.html">
+<meta property="og:image" content="https://bazeocrisy.github.io/SnapForge/assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SnapForge logo with the slogan Capture. Create. Share.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="assets/img/logo-mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/logo-mark.png">
+<link rel="stylesheet" href="assets/css/site.css">
+<script src="assets/js/site.js" defer></script>
+
+</head>
+<body class="">
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html"><img src="assets/img/logo-mark.svg" alt="" width="32" height="32"><span>Snap<span class="brand-accent">Forge</span></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" hidden>
+      <span class="nav-toggle-bars" aria-hidden="true"></span><span class="nav-toggle-label">Menu</span>
+    </button>
+    <nav id="site-nav" class="site-nav" aria-label="Main">
+      <ul>
+<li><a href="index.html">Home</a></li>
+<li><a href="features.html">Features</a></li>
+<li><a href="download.html">Download</a></li>
+<li><a href="guide.html">User Guide</a></li>
+<li><a href="whats-new.html" aria-current="page">What's New</a></li>
+<li><a href="roadmap.html">Roadmap</a></li>
+<li><a href="support.html">Support</a></li>
+<li><a href="donate.html">Donate</a></li>
+      </ul>
+    </nav>
+  </div>
+  <p class="status-strip"><span class="container">In development — no public release yet. <a href="roadmap.html">Project status</a></span></p>
+</header>
+<main id="main" tabindex="-1">
+<section class="page-hero">
+  <div class="container">
+    <p class="eyebrow">What's New</p>
+    <h1>Development notes</h1>
+    <p class="lead">SnapForge has no public release yet. Release notes will appear here when one is published;
+    until then, this page summarises what has been built and where it stands.</p>
+  </div>
+</section>
+
+<div class="container narrow section">
+  <ol class="timeline">
+    <li class="is-exp">
+      <h2 id="v1-recording">Screen recording <span class="badge badge-exp">Experimental</span></h2>
+      <p class="muted small">November 2026 · separate development branch · awaiting independent review</p>
+      <ul>
+        <li>Video mode in the capture panel and a Record button on the widget.</li>
+        <li>Region, window or display to MP4 (H.264 + AAC) with system sound and microphone.</li>
+        <li>Floating toolbar, excluded from the recording; pause, resume, stop, cancel; hotkeys.</li>
+        <li>Crash recovery for interrupted recordings; videos in the Library with a player.</li>
+        <li>Automated tests on a cloud Windows machine: sound/picture sync, pause and resume, crash recovery
+        and long recordings (up to two hours at 1080p). Tests on real PCs with sound devices and graphics cards
+        are still to be done.</li>
+      </ul>
+    </li>
+    <li class="is-review">
+      <h2 id="m3">Capture workflow, widget and drag-and-drop <span class="badge badge-dev">Development build</span></h2>
+      <p class="muted small">November 2026 · awaiting independent review</p>
+      <ul>
+        <li>New compact capture panel with presets and their own hotkeys.</li>
+        <li>Desktop widget that docks to the top, left or right edge of any monitor.</li>
+        <li>Native drag-and-drop of flattened images from the Editor, the recent captures tray and the Library;
+        import by dropping image files onto SnapForge.</li>
+        <li>Optional launch with Windows, background Library loading, high-contrast theme support.</li>
+      </ul>
+    </li>
+    <li class="is-review">
+      <h2 id="mvp">Editor and Library <span class="badge badge-dev">Development build</span></h2>
+      <p class="muted small">November 2026</p>
+      <ul>
+        <li>Capture of regions, windows, displays and the full screen across monitors.</li>
+        <li>Annotations, Quick Styles, crop, undo/redo, black-box redaction.</li>
+        <li>An editable local Library with tags, folders, favourites, search, Trash and backup.</li>
+      </ul>
+    </li>
+  </ol>
+</div>
+
+</main>
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a class="brand" href="index.html"><img src="assets/img/logo-mark.svg" alt="" width="28" height="28"><span>Snap<span class="brand-accent">Forge</span></span></a>
+      <p class="slogan">Capture. Create. Share.</p>
+      <p class="small">Free and open source under the MIT License. No subscriptions, accounts, ads or telemetry.</p>
+    </div>
+    <nav aria-label="Footer">
+      <ul>
+<li><a href="privacy.html">Privacy</a></li>
+<li><a href="about.html">About & License</a></li>
+<li><a href="support.html">Report a problem</a></li>
+<li><a href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">Source code on GitHub<span class="visually-hidden"> (external site)</span></a></li>
+      </ul>
+    </nav>
+  </div>
+  <p class="container small footer-legal">© 2026 bazeocrisy and SnapForge contributors. Screenshots on this site show development builds with fictional demo data.</p>
+</footer>
+</body>
+</html>
