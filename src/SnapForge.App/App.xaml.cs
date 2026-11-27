@@ -153,7 +153,7 @@ public partial class App : Application
         {
             window.Dispatcher.BeginInvoke(() =>
             {
-                ShowPrivacyNotice(window);
+                ShowWelcome(window);
                 services.UpdateSettings(s => s with { PrivacyNoticeShown = true });
             }, DispatcherPriority.ApplicationIdle);
         }
@@ -479,6 +479,17 @@ public partial class App : Application
     }
 
     internal static void NotifyBalloon(string title, string text, bool warning = false) => _shell?.ShowBalloon(title, text, warning);
+
+    /// <summary>First-launch welcome / Help → Getting started (offline).</summary>
+    internal static void ShowWelcome(Window? owner)
+    {
+        AppServices? services = AppServices.Current;
+        string root = services?.Library.Root ?? "(not opened)";
+        string capture = services?.Settings.CaptureHotkey is { } ch ? Views.CaptureWindow.FriendlyGesture(ch) : "the Capture button";
+        string record = services?.Settings.Video.RecordHotkey?.ToString() ?? "the Record button";
+        Dialogs.WelcomeWindow.ShowFor(owner, root, capture, record,
+            services is null ? null : () => _ = CaptureWithOptionsAsync(services.Settings.Capture));
+    }
 
     internal static void ShowPrivacyNotice(Window? owner)
     {

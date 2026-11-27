@@ -207,6 +207,7 @@
                         <MenuItem Header="Capture _window…" Click="OnShowCaptureWindow" />
                     </MenuItem>
                     <MenuItem Header="_Help">
+                        <MenuItem Header="_Getting started" Click="OnGettingStarted" />
                         <MenuItem Header="_Keyboard shortcuts" InputGestureText="F1" Click="OnShortcuts" />
                         <MenuItem Header="Where are my captures? (_privacy)" Click="OnPrivacyInfo" />
                         <MenuItem Header="_About SnapForge" Click="OnAbout" />

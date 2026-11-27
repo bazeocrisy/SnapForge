@@ -1684,6 +1684,8 @@ public partial class MainWindow : Window
 
     private void OnPrivacyInfo(object sender, RoutedEventArgs e) => App.ShowPrivacyNotice(this);
 
+    private void OnGettingStarted(object sender, RoutedEventArgs e) => App.ShowWelcome(this);
+
     private void OnAbout(object sender, RoutedEventArgs e) => MessageBox.Show(this,
         $"{ProductInfo.Name} — Capture. Create. Share.\n\n{SnapForge.App.Services.InstanceInfo.Describe()}\n\n" +
         $"Program: {Environment.ProcessPath}\nLibrary: {_services.Library.Root}\n\n" +
