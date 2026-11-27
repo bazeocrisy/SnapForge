@@ -49,6 +49,9 @@ internal static class CaptureDragDrop
     /// <summary>True while the modal OLE drag loop runs (tests use it as a watchdog signal).</summary>
     internal static bool IsDragging { get; private set; }
 
+    /// <summary>Test hook: called with the effect the target chose when the OLE drag loop has ended.</summary>
+    internal static Action<DragDropEffects>? AfterDragHook { get; set; }
+
     /// <summary>The last drag's data object (tests inspect what a target would receive).</summary>
     internal static LazyCaptureFiles? LastDrag { get; private set; }
 
@@ -76,6 +79,7 @@ internal static class CaptureDragDrop
         {
             IsDragging = false;
             data.EndDrag(effect != DragDropEffects.None);
+            AfterDragHook?.Invoke(effect);
         }
 
         return effect;

@@ -541,6 +541,11 @@ public class GateBUiTests
             {
                 e.Effects = e.Data.GetDataPresent(DataFormats.FileDrop) ? DragDropEffects.Copy : DragDropEffects.None;
                 e.Handled = true;
+                if (e.Effects != _lastOver)
+                {
+                    _lastOver = e.Effects;
+                    Log($"target: drag over answers {e.Effects}");
+                }
             };
             Drop += (_, e) =>
             {
@@ -552,6 +557,8 @@ public class GateBUiTests
         }
 
         public string[]? Files { get; private set; }
+
+        private DragDropEffects? _lastOver;
     }
 
     /// <summary>Events seen during the current drag test (included in failure messages).</summary>
@@ -581,6 +588,7 @@ public class GateBUiTests
         }
 
         CaptureDragDrop.BeforeDragHook = d => Log($"drag started with {d.Items.Count} item(s)");
+        CaptureDragDrop.AfterDragHook = e => Log($"drag ended: target chose {e}");
 
         // Watchdog on another thread: if the OLE drag loop is still running long after the input sequence, end it
         // with real Esc + button-up input so a broken drag fails this test instead of hanging every later test.
@@ -600,6 +608,7 @@ public class GateBUiTests
         finally
         {
             CaptureDragDrop.BeforeDragHook = null;
+            CaptureDragDrop.AfterDragHook = null;
         }
     }
 
