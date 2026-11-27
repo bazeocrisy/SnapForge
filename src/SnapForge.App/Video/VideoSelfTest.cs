@@ -123,6 +123,8 @@ internal static partial class VideoSelfTest
             Check("av-sync", e.ErrorsMs.Count >= 10 && e.MaxAbsMs <= 20, $"{e.ErrorsMs.Count} flash/beep pairs: A/V error mean {e.MeanMs} ms, max |error| {e.MaxAbsMs} ms, drift {e.DriftMsPerMinute} ms/min (video timestamp error max {e.VideoErrorsMs.Max(Math.Abs)} ms, audio {e.AudioErrorsMs.Max(Math.Abs)} ms)");
             Check("constant-frame-rate", Math.Abs(sync.VideoFrames - (r.DurationMs * 30 / 1000.0)) <= 2, $"{sync.VideoFrames} frames for {r.DurationMs} ms");
             Check("timestamps-exact", sync.NonMonotonicTimestamps == 0 && Math.Abs(sync.FirstVideoMs) < 1, $"first decoded frame at {sync.FirstVideoMs} ms, {sync.NonMonotonicTimestamps} out-of-order timestamps");
+            (double minGap, double maxGap) = VideoFrameGapsMs(path);
+            Check("timestamps-regular", minGap >= 33.3 / 2 && maxGap <= 33.4 * 1.5, $"decoded frame spacing {minGap:0.0}–{maxGap:0.0} ms in the final file (30 FPS = 33.3 ms; a jump at a fragment boundary would show here)");
             Check("fragmented-recording", Mp4Inspector.Inspect(LastFragmentedPath!) is { IsComplete: true, IsFragmented: true } s1 && s1.CompleteFragments >= 5, Mp4Inspector.Inspect(LastFragmentedPath!).CompleteFragments + " fragments while recording");
             Check("progressive-final", Mp4Inspector.Inspect(path) is { IsComplete: true, IsFragmented: false } s2 && s2.Boxes.Select(b => b.Type).SequenceEqual(["ftyp", "moov", "mdat"]), string.Join(" ", Mp4Inspector.Inspect(path).Boxes.Select(b => b.Type)));
             File.Delete(LastFragmentedPath!);

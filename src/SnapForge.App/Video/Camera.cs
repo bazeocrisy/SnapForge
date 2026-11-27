@@ -718,8 +718,9 @@ internal sealed unsafe class MediaFoundationCameraSource : ICameraSource
                 }
 
                 int defaultPitch = layout == Layout.Rgb32 ? Width * 4 : layout == Layout.Yuy2 ? Width * 2 : Width;
-                // RGB formats without MF_MT_DEFAULT_STRIDE are bottom-up in Media Foundation.
-                int pitch = Mf.GetInt32(current, Mf.MT_DEFAULT_STRIDE) ?? (layout == Layout.Rgb32 ? -defaultPitch : defaultPitch);
+                // Contiguous buffers without MF_MT_DEFAULT_STRIDE: top-down, no row padding (as measured for the
+                // reader's RGB32 output on CI run 106). Buffers with IMF2DBuffer report their own pitch.
+                int pitch = Mf.GetInt32(current, Mf.MT_DEFAULT_STRIDE) ?? defaultPitch;
                 return (layout, pitch);
             }
             finally

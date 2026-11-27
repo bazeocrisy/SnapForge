@@ -204,8 +204,31 @@ public sealed class RecordingFaultTests : IDisposable
             }
         }
 
-        Assert.DoesNotContain("max gap 2", Timestamps(path), StringComparison.Ordinal); // no 200+ ms hole in the file
-        Assert.True(Regex.IsMatch(Timestamps(path), @"max gap (3[0-9]|4[0-9]) ms"), diag);
+        // Timestamps. The recording file is fragmented MP4 written by Media Foundation without fragment start times
+        // (tfdt); the Windows reader mis-times its later fragments (CI run 106: 134 / 234 ms "gaps" at a fragment
+        // boundary although the writer got 33 ms steps). What is stored must be exact, and the file the app keeps —
+        // converted to progressive MP4 when the recording is completed — must decode with regular timestamps.
+        Mp4TimingReport stored = Mp4Timing.Read(path);
+        uint video = stored.Tracks.First(t => t.Value.Handler == "vide").Key;
+        uint timescale = stored.Tracks[video].Timescale;
+        int storedSamples = stored.Fragments.Where(f => f.TrackId == video).Sum(f => f.Samples);
+        long storedMs = stored.Fragments.Where(f => f.TrackId == video).Sum(f => f.TotalDuration) * 1000 / timescale;
+        string final = Path.ChangeExtension(path, ".final.mp4");
+        Mp4Defragmenter.Convert(path, final);
+        diag += $"; stored: {storedSamples} samples, {storedMs} ms; fragmented as decoded: {Timestamps(path)}; final: {Timestamps(final)}";
+        Assert.Equal(writes.Count, storedSamples);
+        Assert.True(Math.Abs(storedMs - (writes.Count * 1000L / 30)) <= 1, diag);
+        Assert.DoesNotContain("max gap 2", Timestamps(final), StringComparison.Ordinal); // no 200+ ms hole in the file
+        Assert.True(Regex.IsMatch(Timestamps(final), @"max gap (3[0-9]|4[0-9]) ms"), diag);
+        Core.Imaging.PixelBuffer f0 = VideoAnalysis.DecodeFrame(final, 0) ?? throw new InvalidOperationException("no frame in the final file");
+        foreach ((int x, int y) in probes)
+        {
+            int o1 = ((y * width) + x) * 4, o2 = ((y * f0.Width) + x) * 4;
+            for (int c = 0; c < 3; c++)
+            {
+                Assert.True(Math.Abs(r.FirstFrame!.Pixels[o1 + c] - f0.Pixels[o2 + c]) < 60, diag);
+            }
+        }
     }
 
     [Fact]
@@ -296,6 +319,90 @@ public sealed class RecordingFaultTests : IDisposable
         int top = ((8 * frame.Width) + 32) * 4, bottom = ((56 * frame.Width) + 32) * 4;
         Assert.True(frame.Pixels[top + 2] > 180 && frame.Pixels[top] < 80, "top row is not red");
         Assert.True(frame.Pixels[bottom] > 180 && frame.Pixels[bottom + 2] < 80, "bottom row is not blue");
+    }
+
+    [Theory]
+    [InlineData(640, 360)]
+    [InlineData(1000, 562)]
+    public unsafe void Encoder_keeps_every_row_for_heights_that_are_not_a_multiple_of_16(int width, int height)
+    {
+        // Decodes to NV12 with no video processing and reads the Y plane directly: tells the encoder side (rows
+        // stored correctly) apart from the RGB32 read-back (CI run 106: sheared rows at 640×360 / 1000×562).
+        string path = Path.Combine(_dir, $"rows-{width}x{height}.mp4");
+        uint[] px = new uint[width * height];
+        for (int y = 0; y < height; y++)
+        {
+            uint v = (uint)(y * 255 / (height - 1));
+            Array.Fill(px, 0xFF000000u | (v << 16) | (v << 8) | v, y * width, width);
+        }
+
+        using (var writer = new Mp4Writer(path, new VideoStreamFormat(width, height, 30, 4_000_000), withAudio: false, fragmented: false, EncoderInput.SystemMemory, 0))
+        {
+            fixed (uint* p = px)
+            {
+                for (int f = 0; f < 15; f++)
+                {
+                    writer.WriteFrame((byte*)p, width * 4, f * 333_333L, 333_333L);
+                }
+            }
+
+            writer.Complete();
+        }
+
+        nint reader = Mf.CreateSourceReader(path, 0);
+        try
+        {
+            Mf.SetStreamSelection(reader, Mf.MF_SOURCE_READER_ALL_STREAMS, false);
+            Mf.SetStreamSelection(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, true);
+            nint t = Mf.CreateMediaType();
+            Mf.SetGuid(t, Mf.MT_MAJOR_TYPE, Mf.MediaType_Video);
+            Mf.SetGuid(t, Mf.MT_SUBTYPE, Mf.VideoFormat_NV12);
+            Mf.SetCurrentMediaType(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, t);
+            Com.Release(ref t);
+            nint current = Mf.GetCurrentMediaType(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM);
+            ulong size = Mf.GetUInt64(current, Mf.MT_FRAME_SIZE) ?? 0;
+            Com.Release(ref current);
+            int codedHeight = (int)(size & 0xFFFFFFFF);
+            Assert.True(Mf.ReadSample(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, out _, out nint sample) && sample != 0);
+            nint buffer = Mf.ConvertToContiguousBuffer(sample);
+            try
+            {
+                byte* y0 = Mf.LockRows(buffer, width, codedHeight, out int pitch, out bool locked2D);
+                try
+                {
+                    string diag = $"coded {(int)(size >> 32)}x{codedHeight}, pitch {pitch}, 2D {locked2D}";
+                    foreach (int row in new[] { 4, height / 4, height / 2, 3 * height / 4, height - 5 })
+                    {
+                        int expected = 16 + ((row * 255 / (height - 1)) * 219 / 255);
+                        int actual = y0[((long)row * pitch) + (width / 2)];
+                        Assert.True(Math.Abs(actual - expected) <= 12, $"row {row}: Y {actual}, expected {expected}; {diag}");
+                    }
+                }
+                finally
+                {
+                    Mf.UnlockRows(buffer, locked2D);
+                }
+            }
+            finally
+            {
+                Com.Release(ref buffer);
+                Com.Release(ref sample);
+            }
+        }
+        finally
+        {
+            Com.Release(ref reader);
+        }
+
+        // And the RGB32 read-back used everywhere else now matches too.
+        Core.Imaging.PixelBuffer frame = VideoAnalysis.DecodeFrame(path, 0) ?? throw new InvalidOperationException("no frame");
+        Assert.Equal(height, frame.Height);
+        foreach (int row in new[] { 4, height / 2, height - 5 })
+        {
+            int expected = row * 255 / (height - 1);
+            int actual = frame.Pixels[(((row * frame.Width) + (width / 2)) * 4) + 1];
+            Assert.True(Math.Abs(actual - expected) <= 16, $"RGB row {row}: G {actual}, expected {expected}");
+        }
     }
 
     [Fact]

@@ -192,7 +192,7 @@ internal static unsafe class VideoAnalysis
                     nint buffer = Mf.ConvertToContiguousBuffer(sample);
                     try
                     {
-                        byte* data = LockDecodedRows(buffer, h, out int stride, out bool locked2D);
+                        byte* data = LockDecodedRows(buffer, w, h, out int stride, out bool locked2D);
                         try
                         {
                             var pixels = new byte[w * h * 4];
@@ -233,18 +233,24 @@ internal static unsafe class VideoAnalysis
     }
 
     /// <summary>
-    /// Locks a decoded RGB32 frame for reading top row first. The reader's colour converter may deliver RGB32
-    /// bottom-up (a negative pitch); a plain <c>IMFMediaBuffer::Lock</c> then returns the rows bottom row first, so the
-    /// picture read row by row was upside down (positions were never checked before: only solid colours and luma).
-    /// IMF2DBuffer::Lock2D gives scanline 0 = top row and the signed pitch; buffers without it are read as before
-    /// (contiguous, top-down, length / height bytes per row). Unlock with <see cref="Mf.UnlockRows"/>.
+    /// Locks a decoded RGB32 frame for reading rows top row first, with the real row pitch.
+    /// <para>The H.264 decoder works on whole 16-row macroblocks: for a height that is not a multiple of 16 (360,
+    /// 562 …) its output — and the RGB32 buffer converted from it — holds the padded height (368, 576 …) while the
+    /// media type reports the visible size. The pitch used to be computed as buffer length ÷ visible height
+    /// (e.g. 368 × 2560 ÷ 360 = 2616 bytes instead of 2560), which sheared every row: row y was read from row
+    /// ≈ y × 1.022 and shifted sideways (CI run 106: 640×360 and 1000×562 decoded wrong, multiples of 16 fine).</para>
+    /// <para>IMF2DBuffer::Lock2D gives scanline 0 and the signed pitch when the buffer offers it. Otherwise the buffer
+    /// is contiguous, which by definition means no padding inside a row: pitch = width × 4, rows top-down, the visible
+    /// picture being the first <paramref name="height"/> rows (the padding rows come last).</para>
+    /// Unlock with <see cref="Mf.UnlockRows"/>.
     /// </summary>
-    internal static byte* LockDecodedRows(nint buffer, int height, out int pitch, out bool locked2D)
+    internal static byte* LockDecodedRows(nint buffer, int width, int height, out int pitch, out bool locked2D)
     {
         byte* scan0 = Mf.LockRows(buffer, 1, height, out pitch, out locked2D);
         if (!locked2D)
         {
-            pitch = Mf.GetBufferLength(buffer) / Math.Max(1, height);
+            int length = Mf.GetBufferLength(buffer);
+            pitch = (long)width * 4 * height <= length ? width * 4 : length / Math.Max(1, height);
         }
 
         return scan0;

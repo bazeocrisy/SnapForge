@@ -316,6 +316,28 @@ internal static partial class VideoSelfTest
         return (new StudioOverlayResult(result, Math.Round(inside, 4), [.. others.Select(o => Math.Round(o, 4))], Math.Round(green, 4), $"{lw}x{lh} at {layout.X},{layout.Y} of {w}x{h}"), Math.Round(studioGreen, 4), studioError);
     }
 
+    /// <summary>Smallest and largest step between consecutive decoded video timestamps (ms).</summary>
+    private static (double Min, double Max) VideoFrameGapsMs(string path)
+    {
+        var times = new List<long>();
+        nint reader = VideoAnalysis.OpenDecoding(path, video: true, audio: false);
+        try
+        {
+            while (Interop.Mf.ReadSample(reader, Interop.Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, out long ts, out nint sample) && sample != 0)
+            {
+                times.Add(ts);
+                Interop.Com.Release(ref sample);
+            }
+        }
+        finally
+        {
+            Interop.Com.Release(ref reader);
+        }
+
+        var gaps = times.Zip(times.Skip(1), (a, b) => (b - a) / 10_000.0).ToList();
+        return gaps.Count == 0 ? (0, 0) : (Math.Round(gaps.Min(), 1), Math.Round(gaps.Max(), 1));
+    }
+
     /// <summary>Full red with blue or green: the SYNTHETIC camera's magenta / yellow (the test screen is lime: no red).</summary>
     private static bool Synthetic(byte b, byte g, byte r) => r > 180 && (b > 150 || g > 150);
 
