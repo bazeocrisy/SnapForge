@@ -4,7 +4,7 @@
         xmlns:editor="clr-namespace:SnapForge.App.Editor"
         xmlns:views="clr-namespace:SnapForge.App.Views"
         Title="SnapForge"
-        Width="1280" Height="820" MinWidth="900" MinHeight="560"
+        Width="1280" Height="820" MinWidth="760" MinHeight="480"
         WindowStartupLocation="CenterScreen"
         Background="{DynamicResource BackgroundBrush}"
         Foreground="{DynamicResource TextBrush}"
@@ -159,7 +159,11 @@
                         <MenuItem x:Name="CloseCaptureMenu" Header="Close capture" InputGestureText="Ctrl+W" Click="OnCloseCapture" />
                         <Separator />
                         <MenuItem Header="Se_ttings…" InputGestureText="Ctrl+," Click="OnSettings" />
-                        <MenuItem Header="E_xit SnapForge" Click="OnExit" />
+                        <Separator />
+                        <MenuItem x:Name="CloseWindowMenu" Header="Close _window" InputGestureText="Alt+F4" Click="OnCloseWindow"
+                                  ToolTip="Closes this window. SnapForge keeps running in the notification area so hotkeys and the QuickDock keep working." />
+                        <MenuItem x:Name="ExitMenu" Header="E_xit SnapForge" Click="OnExit"
+                                  ToolTip="Quits SnapForge completely: saves your edits, stops hotkeys, the QuickDock and the notification-area icon." />
                     </MenuItem>
                     <MenuItem Header="_Edit" SubmenuOpened="OnMenuOpened">
                         <MenuItem x:Name="UndoMenu" Header="_Undo" InputGestureText="Ctrl+Z" Click="OnUndo" />

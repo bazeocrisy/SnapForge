@@ -1862,6 +1862,9 @@ public partial class MainWindow : Window
 
     private void OnPrivacyInfo(object sender, RoutedEventArgs e) => App.ShowPrivacyNotice(this);
 
+    /// <summary>SF-008: File → Close window hides the window; SnapForge keeps running (unless that is turned off).</summary>
+    private void OnCloseWindow(object sender, RoutedEventArgs e) => Close();
+
     private void OnGettingStarted(object sender, RoutedEventArgs e) => App.ShowWelcome(this);
 
     private void OnAbout(object sender, RoutedEventArgs e) => MessageBox.Show(this,

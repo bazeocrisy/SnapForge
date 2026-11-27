@@ -1,3 +1,4 @@
+using SnapForge.Core;
 using System.IO;
 using System.IO.MemoryMappedFiles;
 using System.Reflection;
@@ -53,7 +54,35 @@ internal sealed record InstanceInfo(string Build, string ExePath)
     /// <summary>All identity lines for Help → About and diagnostics.</summary>
     public static string Describe() =>
         $"Version: {ProductVersion}\nBuild: {BuildNumber} ({Architecture})\nCommit: {Commit}\n" +
-        (Branch is { } b ? $"Branch: {b}\n" : string.Empty) + $"Status: {Channel}";
+        (Branch is { } b ? $"Branch: {b}\n" : string.Empty) + $"Status: {Channel}\n" +
+        $"Installation: {InstallationKind(Environment.ProcessPath)}\n" +
+        $"Data profile: {(ProductInfo.Profile is { } p ? p + " (isolated test profile)" : "normal")}\nData folder: {ProductInfo.DataRoot}";
+
+    /// <summary>SF-014: how this copy was installed, so testers can tell builds apart.</summary>
+    public static string InstallationKind(string? exePath)
+    {
+        if (string.IsNullOrEmpty(exePath))
+        {
+            return "unknown";
+        }
+
+        string dir = Path.GetDirectoryName(Path.GetFullPath(exePath)) ?? string.Empty;
+        static bool Under(string path, Environment.SpecialFolder folder)
+        {
+            string root = Environment.GetFolderPath(folder);
+            return root.Length > 0 && path.StartsWith(root.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
+        }
+
+        if (Under(dir, Environment.SpecialFolder.ProgramFiles))
+        {
+            return "installed for all users (Program Files)";
+        }
+
+        string perUser = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), "Programs");
+        return dir.StartsWith(perUser + "\\", StringComparison.OrdinalIgnoreCase)
+            ? "older per-user installation (AppData\\Local\\Programs) — replace it with the current installer"
+            : "portable (not installed)";
+    }
 
     private static string? Metadata(string key) =>
         typeof(InstanceInfo).Assembly.GetCustomAttributes<AssemblyMetadataAttribute>().FirstOrDefault(a => a.Key == key)?.Value;

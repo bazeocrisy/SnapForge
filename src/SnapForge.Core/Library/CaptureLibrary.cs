@@ -102,7 +102,7 @@ public sealed partial class CaptureLibrary
         File.Exists(Path.Combine(CaptureFolder(id), CaptureFormat.ManifestFile)) || File.Exists(Path.Combine(VideoFolder(id), VideoManifestFile));
 
     public static string DefaultRoot() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductInfo.Name, "Library");
+        Path.Combine(ProductInfo.DataRoot, "Library");
 
     public CaptureRecord? Find(Guid id)
     {

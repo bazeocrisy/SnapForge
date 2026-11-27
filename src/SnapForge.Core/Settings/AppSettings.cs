@@ -204,7 +204,7 @@ public sealed record AppSettings
     public string EffectiveLibraryPath => string.IsNullOrWhiteSpace(LibraryPath) ? CaptureLibrary.DefaultRoot() : LibraryPath;
 
     public static string DefaultPath() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductInfo.Name, "settings.json");
+        Path.Combine(ProductInfo.DataRoot, "settings.json");
 
     public IEnumerable<(string Action, HotkeyGesture? Gesture)> HotkeyAssignments() =>
         Presets.Select(p => ($"Preset: {p.Name}", p.Hotkey))

@@ -16,6 +16,29 @@ public partial class App : Application
 #pragma warning restore CA1001
 {
     private const string InstanceName = "SnapForge-SingleInstance-7c1d";
+
+    /// <summary>Single-instance key: one SnapForge per Windows session and data profile.</summary>
+    private static string InstanceKey => ProductInfo.Profile is null ? InstanceName : $"{InstanceName}-p-{ProductInfo.Profile}";
+
+    /// <summary>Removes <c>--profile &lt;name&gt;</c> from the arguments and selects that (or SNAPFORGE_PROFILE's) profile.</summary>
+    internal static string[] ApplyProfile(string[] raw)
+    {
+        var rest = new List<string>(raw.Length);
+        string? profile = Environment.GetEnvironmentVariable(ProductInfo.ProfileVariable);
+        for (int i = 0; i < raw.Length; i++)
+        {
+            if (raw[i] == "--profile")
+            {
+                profile = i + 1 < raw.Length ? raw[++i] : throw new ArgumentException("--profile needs a name.");
+                continue;
+            }
+
+            rest.Add(raw[i]);
+        }
+
+        ProductInfo.UseProfile(string.IsNullOrWhiteSpace(profile) ? null : profile.Trim());
+        return [.. rest];
+    }
     private static ShellIntegration? _shell;
     private static CaptureWindow? _captureWindow;
     private static CaptureWidget? _widget;
@@ -36,47 +59,63 @@ public partial class App : Application
     protected override void OnStartup(StartupEventArgs e)
     {
         base.OnStartup(e);
+        Interop.WorkAreaGuard.Install(); // FA-003: keep every window's title bar and frame on screen
 
-        if (e.Args.Length >= 2 && e.Args[0] is "--video-selftest" or "--video-record-until-killed" or "--video-recover" or "--video-benchmark")
+        // Isolated data profile (--profile <name> or SNAPFORGE_PROFILE): separate settings, Library, logs, temp files
+        // and single-instance key; no global hotkeys and no Windows start-up entry. Used for testing.
+        string[] args;
+        try
         {
+            args = ApplyProfile(e.Args);
+        }
+        catch (ArgumentException ex)
+        {
+            MessageBox.Show(ex.Message, ProductInfo.Name, MessageBoxButton.OK, MessageBoxImage.Error);
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            Shutdown(Video.VideoSelfTest.Run(e.Args));
+            Shutdown(2);
             return;
         }
 
-        if (e.Args.Length >= 2 && e.Args[0] == "--feature-selftest")
+        if (args.Length >= 2 && args[0] is "--video-selftest" or "--video-record-until-killed" or "--video-recover" or "--video-benchmark")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            Shutdown(FeatureSelfTest.Run(e.Args[1]));
+            Shutdown(Video.VideoSelfTest.Run(args));
             return;
         }
 
-        if (e.Args.Length >= 2 && e.Args[0] == "--drop-target")
+        if (args.Length >= 2 && args[0] == "--feature-selftest")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            DropTargetMode.Run(this, e.Args[1]);
+            Shutdown(FeatureSelfTest.Run(args[1]));
             return;
         }
 
-        if (e.Args.Length >= 2 && e.Args[0] == "--video-probe")
+        if (args.Length >= 2 && args[0] == "--drop-target")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            Shutdown(Video.VideoProbe.Run(e.Args[1]));
+            DropTargetMode.Run(this, args[1]);
             return;
         }
 
-        if (e.Args.Length >= 3 && e.Args[0] == "--benchmark-startup")
+        if (args.Length >= 2 && args[0] == "--video-probe")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            _ = StartupBenchmark.RunAsync(e.Args[1], e.Args[2]).ContinueWith(t => Dispatcher.Invoke(() => Shutdown(t.Result)), TaskScheduler.Default);
+            Shutdown(Video.VideoProbe.Run(args[1]));
             return;
         }
 
-        if (e.Args.Length >= 1 && e.Args[0] is "--self-test" or "--screenshots")
+        if (args.Length >= 3 && args[0] == "--benchmark-startup")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
-            string output = e.Args.Length >= 2 ? e.Args[1] : Path.Combine(Environment.CurrentDirectory, e.Args[0] == "--self-test" ? "snapforge-self-test.txt" : "snapforge-screenshots");
-            int code = e.Args[0] == "--self-test" ? SelfTest.Run(output) : ScreenshotTour.Run(output);
+            _ = StartupBenchmark.RunAsync(args[1], args[2]).ContinueWith(t => Dispatcher.Invoke(() => Shutdown(t.Result)), TaskScheduler.Default);
+            return;
+        }
+
+        if (args.Length >= 1 && args[0] is "--self-test" or "--screenshots")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            string output = args.Length >= 2 ? args[1] : Path.Combine(Environment.CurrentDirectory, args[0] == "--self-test" ? "snapforge-self-test.txt" : "snapforge-screenshots");
+            int code = args[0] == "--self-test" ? SelfTest.Run(output) : ScreenshotTour.Run(output);
             Shutdown(code);
             return;
         }
@@ -84,18 +123,18 @@ public partial class App : Application
         // Single instance: a second launch of the SAME build brings the running SnapForge to the front. A different
         // build (e.g. a newer download while an older copy runs in the notification area) is reported instead of
         // silently handing over to the old copy, and can replace it.
-        _instanceMutex = new Mutex(initiallyOwned: true, $@"Local\{InstanceName}", out bool first);
-        _activateSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceName}-activate");
-        _exitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceName}-exit");
+        _instanceMutex = new Mutex(initiallyOwned: true, $@"Local\{InstanceKey}", out bool first);
+        _activateSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceKey}-activate");
+        _exitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceKey}-exit");
         if (!first && !TakeOverFromRunningInstance())
         {
             Shutdown(0);
             return;
         }
 
-        _instanceInfo = InstanceInfo.Publish($@"Local\{InstanceName}-info", InstanceInfo.Current());
-        ThreadPool.RegisterWaitForSingleObject(_activateSignal, (_, _) => Dispatcher.BeginInvoke(() => MainShell?.BringToFront()), null, Timeout.Infinite, executeOnlyOnce: false);
-        ThreadPool.RegisterWaitForSingleObject(_exitSignal, (_, _) => Dispatcher.BeginInvoke(() => _ = ExitAsync()), null, Timeout.Infinite, executeOnlyOnce: true);
+        _instanceInfo = InstanceInfo.Publish($@"Local\{InstanceKey}-info", InstanceInfo.Current());
+        ThreadPool.RegisterWaitForSingleObject(_activateSignal, (_, _) => Dispatcher.BeginInvoke(ShowPrimaryWindow), null, Timeout.Infinite, executeOnlyOnce: false);
+        ThreadPool.RegisterWaitForSingleObject(_exitSignal, (_, _) => Dispatcher.BeginInvoke(() => _ = ExitAsync()), null, Timeout.Infinite, executeOnlyOnce: false);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 
         AppServices services;
@@ -115,14 +154,15 @@ public partial class App : Application
         // Leftover drag-and-drop copies from a previous session (e.g. after a crash) are removed in the background.
         _ = Task.Run(CaptureDragDrop.Sweep);
 
+        // FA-001 / SF-003: the Editor/Library shell is created (it owns the capture tray and autosave) but is shown
+        // only when the user asks for it. Windows startup (--background) shows the notification-area icon and, if
+        // enabled, the QuickDock only. A normal launch shows ONE compact window: the capture panel (or the Editor
+        // if the user chose that in Settings), or on the very first launch the welcome window instead.
         var window = new MainWindow(services);
         MainWindow = window;
         window.RestoreToolSettings();
-        bool background = e.Args.Contains(StartupRegistration.BackgroundArgument);
-        if (!background)
-        {
-            window.Show();
-        }
+        bool background = args.Contains(StartupRegistration.BackgroundArgument);
+        StartedInBackground = background;
 
         // The library is indexed after the window is up, so start-up time does not grow with the library size.
         _ = services.StartIndexingAsync().ContinueWith(_ => RecoverInterruptedRecordings(services), TaskScheduler.Default);
@@ -137,26 +177,50 @@ public partial class App : Application
         services.SettingsChanged += (_, _) => Current.Dispatcher.BeginInvoke(() => ApplyWidget(services));
         ApplyWidget(services);
         Video.RecordingController.ActiveChanged += (_, _) => _widget?.UpdateRecordButton();
+        if (background)
+        {
+            // Started with Windows: notification-area icon and the enabled dock only — no window, welcome or modal.
+            return;
+        }
+
         if (_widget is not null && !services.Settings.WidgetIntroShown)
         {
-            // First start with the widget: open it briefly so the user sees where it lives.
+            // First deliberate start with the dock: open it briefly so the user sees where it lives.
             _widget.Dispatcher.BeginInvoke(() => _widget?.Peek(TimeSpan.FromSeconds(6)), DispatcherPriority.ApplicationIdle);
             services.UpdateSettings(s => s with { WidgetIntroShown = true });
         }
 
-        if (services.Settings.ShowCaptureWindowOnStart)
-        {
-            ShowCaptureWindow();
-        }
-
         if (!services.Settings.PrivacyNoticeShown)
         {
+            // First launch: the welcome window is the only window; it offers to open the capture panel.
             window.Dispatcher.BeginInvoke(() =>
             {
-                ShowWelcome(window);
                 services.UpdateSettings(s => s with { PrivacyNoticeShown = true });
+                ShowWelcome(null, afterClose: ShowPrimaryWindow);
             }, DispatcherPriority.ApplicationIdle);
+            return;
         }
+
+        ShowPrimaryWindow();
+    }
+
+    /// <summary>True when this process was started by Windows at sign-in (tests and diagnostics).</summary>
+    internal static bool StartedInBackground { get; private set; }
+
+    /// <summary>
+    /// Opens the one window a deliberate launch shows: the capture panel by default, or the Editor when the user
+    /// turned "Open the capture panel when SnapForge starts" off. Used at start-up and when a second launch of the
+    /// same build hands over to this one.
+    /// </summary>
+    internal static void ShowPrimaryWindow()
+    {
+        if (AppServices.Current is { } services && !services.Settings.ShowCaptureWindowOnStart)
+        {
+            MainShell?.BringToFront();
+            return;
+        }
+
+        ShowCaptureWindow();
     }
 
     /// <summary>
@@ -504,6 +568,11 @@ public partial class App : Application
 
     internal static async Task ExitAsync()
     {
+        if (Video.RecordingController.IsActive && !ConfirmExitWhileRecording())
+        {
+            return;
+        }
+
         if (MainShell is { } main && !await main.CloseForRealAsync().ConfigureAwait(true))
         {
             return;
@@ -512,6 +581,12 @@ public partial class App : Application
         _captureWindow?.Close();
         Current.Shutdown();
     }
+
+    /// <summary>A running recording is never stopped without the user's consent (SF-008 / SF-014).</summary>
+    internal static bool ConfirmExitWhileRecording() =>
+        MessageBox.Show(
+            "A recording is in progress.\n\nStop the recording, save it to the Library and exit SnapForge?",
+            ProductInfo.Name, MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) == MessageBoxResult.Yes;
 
     internal static void NotifyOnce(string title, string text)
     {
@@ -525,14 +600,14 @@ public partial class App : Application
     internal static void NotifyBalloon(string title, string text, bool warning = false) => _shell?.ShowBalloon(title, text, warning);
 
     /// <summary>First-launch welcome / Help → Getting started (offline).</summary>
-    internal static void ShowWelcome(Window? owner)
+    internal static void ShowWelcome(Window? owner, Action? afterClose = null)
     {
         AppServices? services = AppServices.Current;
         string root = services?.Library.Root ?? "(not opened)";
         string capture = services?.Settings.CaptureHotkey is { } ch ? Views.CaptureWindow.FriendlyGesture(ch) : "the Capture button";
         string record = services?.Settings.Video.RecordHotkey?.ToString() ?? "the Record button";
         Dialogs.WelcomeWindow.ShowFor(owner, root, capture, record,
-            services is null ? null : () => _ = CaptureWithOptionsAsync(services.Settings.Capture));
+            services is null ? null : () => _ = CaptureWithOptionsAsync(services.Settings.Capture), afterClose);
     }
 
     internal static void ShowPrivacyNotice(Window? owner)
@@ -561,6 +636,12 @@ public partial class App : Application
     {
         if (_shell is null || AppServices.Current is not { } services)
         {
+            return;
+        }
+
+        if (ProductInfo.Profile is not null)
+        {
+            // Isolated test profiles never take global hotkeys away from the user's normal SnapForge.
             return;
         }
 
@@ -604,10 +685,10 @@ public partial class App : Application
 
         Add("_Capture", () => _ = CaptureWithOptionsAsync(AppServices.Current!.Settings.Capture), bold: true);
         Add("Capture _panel…", ShowCaptureWindow);
-        Add("Show capture _widget", ShowWidget);
+        Add("Show _QuickDock", ShowWidget);
         if (AppServices.Current?.Settings.Widget.Enabled == true)
         {
-            Add("_Hide capture widget", () => AppServices.Current?.UpdateSettings(s => s with { Widget = s.Widget with { Enabled = false } }));
+            Add("_Hide QuickDock", () => AppServices.Current?.UpdateSettings(s => s with { Widget = s.Widget with { Enabled = false } }));
         }
         menu.Items.Add(new Separator());
         Add("Open _Editor", () => { MainShell?.BringToFront(); MainShell?.ShowEditorWorkspace(); });
@@ -637,7 +718,7 @@ public partial class App : Application
     {
         try
         {
-            string dir = Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductInfo.Name, "logs");
+            string dir = Path.Combine(ProductInfo.DataRoot, "logs");
             Directory.CreateDirectory(dir);
             string path = Path.Combine(dir, $"error-{DateTime.Now:yyyyMMdd-HHmmss}.txt");
             File.WriteAllText(path, $"{DateTime.Now:O}\n{Environment.OSVersion}\n{exception}");

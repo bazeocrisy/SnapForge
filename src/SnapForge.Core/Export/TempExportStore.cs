@@ -33,7 +33,7 @@ public sealed class TempExportStore
     public string Root { get; }
 
     public static string DefaultRoot() =>
-        Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData), ProductInfo.Name, "Temp", "Drag");
+        Path.Combine(ProductInfo.DataRoot, "Temp", "Drag");
 
     /// <summary>Creates a new, empty, uniquely named folder for one drag operation.</summary>
     public string NewSession(DateTime utcNow)

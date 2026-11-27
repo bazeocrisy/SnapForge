@@ -71,6 +71,11 @@ public partial class SettingsWindow : Window
         StartupStatus.Text = registered && !StartupPointsHere()
             ? "The startup entry points to a different copy of SnapForge.exe. Turn this off and on again to use this copy."
             : "Per-user setting (no administrator rights). Turn it off here or in Windows Settings → Apps → Startup.";
+        if (Core.ProductInfo.Profile is not null)
+        {
+            StartupBox.IsEnabled = false;
+            StartupStatus.Text = "Not available in an isolated test profile (it would start a test copy with Windows).";
+        }
     }
 
     private static bool SafeStartupEnabled()
