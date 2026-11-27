@@ -191,7 +191,8 @@ public sealed class RecordingFaultTests : IDisposable
         string diag = $"layout {l.X},{l.Y} {l.Width}x{l.Height}; frame {frame.Width}x{frame.Height}; share inside {inside:0.00}, " +
             $"TL {SyntheticShare(frame, 0, 0, l.Width, l.Height):0.00} TR {SyntheticShare(frame, frame.Width - l.Width, 0, l.Width, l.Height):0.00} " +
             $"BL {SyntheticShare(frame, 0, frame.Height - l.Height, l.Width, l.Height):0.00} BR {SyntheticShare(frame, frame.Width - l.Width, frame.Height - l.Height, l.Width, l.Height):0.00}; " +
-            $"centre pixel BGRA {Px(frame, l.X + (l.Width / 2), l.Y + (l.Height / 2))}; written {r.FramesWritten}, captured {r.FramesCaptured}, repeated {r.FramesRepeated}, dropped {r.FramesDropped}";
+            $"centre pixel BGRA {Px(frame, l.X + (l.Width / 2), l.Y + (l.Height / 2))}; written {r.FramesWritten}, captured {r.FramesCaptured}, repeated {r.FramesRepeated}, dropped {r.FramesDropped}; " +
+            $"overlay frames {composite.FramesWithOverlay}, camera running {camera.IsRunning}, camera sequence {camera.FrameSequence}, lost {camera.LostReason}; first-frame centre {(r.FirstFrame is { } ff ? Px(ff, l.X + (l.Width / 2), l.Y + (l.Height / 2)) : "none")}; {Timestamps(path)}";
         Assert.True(inside > 0.9, diag);
         Assert.True(opposite < 0.05, diag);
     }
@@ -214,7 +215,7 @@ public sealed class RecordingFaultTests : IDisposable
         (long durationMs, int w, int h, bool _, int samples) = RecordingRecovery.Probe(path);
         Assert.Equal(640, w);
         Assert.Equal(360, h);
-        string diag = $"probe {durationMs} ms / {samples} samples; result {r.DurationMs} ms, written {r.FramesWritten}, captured {r.FramesCaptured}, repeated {r.FramesRepeated}, dropped {r.FramesDropped}, end {r.EndReason}";
+        string diag = $"probe {durationMs} ms / {samples} samples; result {r.DurationMs} ms, written {r.FramesWritten}, captured {r.FramesCaptured}, repeated {r.FramesRepeated}, dropped {r.FramesDropped}, end {r.EndReason}; {Timestamps(path)}";
         Assert.True(durationMs is >= 2700 and <= 3300, diag);
         Assert.True(Math.Abs(samples - (durationMs * 30 / 1000)) <= 2, diag);
         Assert.False(camera.IsRunning); // the recorder released the camera
@@ -282,6 +283,30 @@ public sealed class RecordingFaultTests : IDisposable
     }
 
     /// <summary>Share of pixels in a rectangle that look like the SYNTHETIC camera (full red: magenta or yellow).</summary>
+    /// <summary>First and last video sample presentation times (ms) and the largest gap, for CI diagnostics.</summary>
+    private static string Timestamps(string path)
+    {
+        var times = new List<long>();
+        nint reader = Mf.CreateSourceReader(path, 0);
+        try
+        {
+            Mf.SetStreamSelection(reader, Mf.MF_SOURCE_READER_ALL_STREAMS, false);
+            Mf.SetStreamSelection(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, true);
+            while (Mf.ReadSample(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, out long ts, out nint sample) && sample != 0)
+            {
+                times.Add(ts / 10_000);
+                Com.Release(ref sample);
+            }
+        }
+        finally
+        {
+            Com.Release(ref reader);
+        }
+
+        long maxGap = times.Zip(times.Skip(1), (a, b) => b - a).DefaultIfEmpty(0).Max();
+        return $"samples {times.Count}: first {string.Join(",", times.Take(4))} … last {string.Join(",", times.TakeLast(3))}; max gap {maxGap} ms";
+    }
+
     private static string Px(Core.Imaging.PixelBuffer f, int x, int y)
     {
         int o = ((Math.Clamp(y, 0, f.Height - 1) * f.Width) + Math.Clamp(x, 0, f.Width - 1)) * 4;
