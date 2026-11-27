@@ -1,0 +1,2 @@
+# Byte-exact fixtures: manifests hold SHA-256 hashes of these files, so never convert line endings.
+* -text -diff

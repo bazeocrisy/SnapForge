@@ -1,0 +1,16 @@
+{
+  "format": "snapforge.capture",
+  "version": 1,
+  "id": "5d1f1e16-babc-4751-899b-5c9aee361adf",
+  "createdUtc": "2026-11-20T09:32:00.0000000Z",
+  "modifiedUtc": "2026-11-27T18:21:01.5211708Z",
+  "width": 32,
+  "height": 24,
+  "annotationCount": 1,
+  "redactionCount": 0,
+  "containsUnsanitizedRedactions": false,
+  "sanitizedUtc": null,
+  "baseSha256": "19f8c13700a1c86dcbc32e91bc28abda542eeccb6afbe4c942325a4c96e442ac",
+  "annotationsSha256": "0fca7c9e05d4afb2285d9631c4fd3a7462afb807e178604be1426be194178b04",
+  "generator": "SnapForge 1.0.0.0"
+}
