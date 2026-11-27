@@ -1,0 +1,62 @@
+# Website PR #2 — handoff for the independent review gate
+
+Branch `claude/website` → `main`, **draft PR #2**. Not merged, not deployed, no release published, no software
+branch modified. Commit and CI evidence: see [Test evidence](#test-evidence).
+
+## Owner decisions applied
+
+| Decision | Where |
+|---|---|
+| SnapForge is the official product name | Site-wide; About → "Name and trademarks"; [BRANDING.md](BRANDING.md) (no trademark registration or clearance claimed; clearance checks unresolved) |
+| Orange aperture logo is the official branding | Site logo, favicon, Open Graph image; [BRANDING.md](BRANDING.md) — app-icon migration kept separate, not in this PR |
+| Windows 11 x64 is the initial supported platform | Download → System requirements; Support FAQ; About; structured data `operatingSystem: Windows 11` |
+| GitHub Pages hosting | `.github/workflows/website.yml` (manual, owner-gated deploy only) |
+| No deployment or release authorised | Deploy needs merge + Pages enabled + `WEBSITE_DEPLOY_APPROVED=true` + manual run; nothing publishes releases |
+| Donations optional, hidden until verified | `config.json → donations` (all unset) |
+
+## Review corrections (owner's list)
+
+| # | Request | Done |
+|---|---|---|
+| 1 | Remove `__pycache__`/`.pyc`; ignore rules | Removed `website/__pycache__/build.cpython-313.pyc`; `website/.gitignore` ignores `__pycache__/`, `*.py[cod]`, `tests/node_modules/`, `test-output/`. CI runs Python with `-B`. (Kept inside `website/` so this PR adds no root `.gitignore` that would collide with the software branches' own.) |
+| 2 | Generated vs source; CI detects stale output | Sources moved to `src/` + `static/`; `public/` is generated **entirely** (deleted and rebuilt). README table lists each path as source / generated / tool / tests / evidence. `build.py --check` fails on any differing, missing or extra file; unit test edits a generated page and adds a stray file and checks both are caught; build refuses to delete an unrelated folder |
+| 3 | `ownerApproved` is not proof; verify the real release | `tools/verify-release.py` (read-only) checks the GitHub Release (published, not draft/pre-release, page and date), **exact asset name**, upload state, download URL, size, GitHub digest, the **downloaded bytes** (count + SHA-256), ZIP integrity, inner `SHA256SUMS.txt`, package file list, and the **signing claim** (unsigned → no Authenticode signature present; signed → signature present and `Get-AuthenticodeSignature` = Valid with matching signer, Windows only). Writes `release-verification.json`; the build refuses a release unless that record matches `config.json` field for field. Workflow `website-release-verify.yml` runs it on Windows and uploads the record (no commits, no publishing). 13 verifier tests against a fake GitHub |
+| 4 | Security reporting; operational private channel before launch | `config.json → security.privateReporting`; Support page shows real private-reporting instructions only when verified, otherwise says it is not set up and asks for no public details; the build refuses to show a release while unverified; [LAUNCH-CHECKLIST.md §C](LAUNCH-CHECKLIST.md#c-private-vulnerability-reporting-required-before-launch) has the enable-and-test procedure |
+| 5 | Name documentation vs trademark clearance | [BRANDING.md](BRANDING.md); About page: "official name … not a registered trademark, and no trademark registration or clearance is claimed" |
+| 6 | Windows 10/11 discrepancy | Site: Windows 11 x64 only; Windows 10/Arm "not supported at launch". The development branches' README still says "Windows 10 and 11" — **not changed here** (software branches untouched); listed as launch step A4 |
+| 7 | MIT, notices, requirements, source availability vs the real package | Package contents, notices-included and `SHA256SUMS.txt` statements come **only** from the verification record; otherwise "will be listed once verified". Requirements say development builds are self-contained and release requirements are confirmed at verification. Source: "developed in public on GitHub; until the first release the code is on development branches under review". MIT text on About is the repository `LICENSE` verbatim |
+| 8 | Firefox and WebKit tests | CI job **Browser tests** installs Chromium, Firefox and WebKit for the pinned Playwright 1.63.0 and runs every check (including axe-core) in all three with `--require-all`. Locally only Chromium exists; Firefox/WebKit are reported **NOT TESTED** there |
+| 9 | Manual keyboard and screen-reader acceptance | [MANUAL-ACCEPTANCE.md](MANUAL-ACCEPTANCE.md): keyboard (K-01…10), zoom/reflow/spacing/motion/contrast themes/no-JS (Z-01…07), NVDA+Firefox, Narrator+Edge, VoiceOver iOS, TalkBack (S-01…12), results table. **Not yet run** |
+| 10 | App icon migration separate | [BRANDING.md](BRANDING.md) documents the target logo and what the separate icon task needs; no software branch touched |
+
+## Test evidence
+
+Commit under test: **`6fa37fa`** (this document and its CI update are added in a follow-up commit, which changes
+documentation only).
+
+| Check | Where it ran | Result |
+|---|---|---|
+| `build.py --check` (generated output up to date + site validation) | Local (Linux) | **Pass** — 11 pages, 4 external links |
+| Unit tests (20: build gates, stale-output detection, verifier) | Local (Linux, Python 3.13) | **Pass 20/20** (signed-claim Windows path skipped off Windows by design) |
+| Browser checks, unconfigured site | Local, **Chromium 158** only | **Pass, 0 failures, 0 axe violations** (`test-evidence/unconfigured-results.json`); Firefox, WebKit: **NOT TESTED** (not installed locally) |
+| Browser checks, configured with a **test-only** verified release and donation links (never committed) | Local, Chromium | **Pass, 0 failures** (`test-evidence/configured-results.json`) |
+| CI: Website workflow (build check, unit tests, Chromium + Firefox + WebKit) | GitHub Actions, ubuntu-latest | *see the CI section below* |
+| Release verifier against a **real** GitHub Release | — | **Not possible**: no release exists (none authorised). Exercised against a local fake of the GitHub API only |
+| Signed-release validation with `Get-AuthenticodeSignature` | — | **Not run** (no signed build exists) |
+| Private reporting operational | — | **Not verified** (owner setting; see LAUNCH-CHECKLIST §C) |
+| Manual keyboard / screen-reader acceptance | — | **Not run** (procedure provided) |
+| Real phones, Lighthouse, deployed site | — | **Not tested** |
+
+### CI
+
+Pending: CI on 6fa37fa was still running when this file was committed; results are added in the next commit.
+
+## Open items for the owner
+
+1. Enable and test private vulnerability reporting (LAUNCH-CHECKLIST §C); enable Issues.
+2. Merge Milestone 3 before deploying, so the repository shows the code (LAUNCH-CHECKLIST A1).
+3. Update the software README/docs to the official name and Windows 11 x64 target (separate PR on the software branches).
+4. Trademark search / naming clearance (BRANDING.md) — not done, not claimed.
+5. H.264/AAC distribution licensing before screen recording is released (stated on About).
+6. App-icon migration to the aperture logo — separate task.
+7. Run MANUAL-ACCEPTANCE.md.
