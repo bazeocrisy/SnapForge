@@ -605,6 +605,16 @@ public class GateBUiTests
 
     private static async Task SlowDrag(int x1, int y1, int x2, int y2, bool cancelWithRightClick = false, int hoverMs = 0)
     {
+        // Harness precondition: every point of the gesture is on the screen. Windows clamps the pointer to the
+        // screen edge, so an off-screen destination silently drops somewhere else (DEF-RC2-06).
+        PixelRect screen = PhysicalPlacement.Layout().VirtualBounds;
+        int endX = x2 + (hoverMs > 0 ? 12 : 1), endY = y2 + (hoverMs > 0 ? 36 : 1);
+        foreach ((int px, int py) in new[] { (x1, y1), (x2, y2), (endX, endY) })
+        {
+            Assert.True(px >= screen.X && px < screen.Right && py >= screen.Y && py < screen.Bottom,
+                $"test harness: drag point {px},{py} is outside the screen {screen.X},{screen.Y} {screen.Width}x{screen.Height}");
+        }
+
         lock (Trace)
         {
             Trace.Clear();
@@ -671,8 +681,6 @@ public class GateBUiTests
         if (hoverMs > 0)
         {
             // A person often pauses over the target, then adjusts the position a little before letting go.
-            // (DEF-RC2-DND-01: a tooltip of the drag source opened during the pause, just below the pointer;
-            // the adjustment moved the pointer onto it.)
             Thread.Sleep(hoverMs);
             Log($"after {hoverMs} ms over the target; window under {x2},{y2}: {NativeInput.WindowAt(x2, y2)}");
             for (int i = 1; i <= 4; i++)
@@ -698,6 +706,31 @@ public class GateBUiTests
         Log($"after up; dragging={CaptureDragDrop.IsDragging}");
     }
 
+    /// <summary>
+    /// Places a drop target with its top-left near (<paramref name="x"/>, <paramref name="y"/>) physical pixels, moved
+    /// as needed so the WHOLE window lies inside the primary monitor's work area. The CI display is 1024×768: targets
+    /// placed relative to a tile used to extend past the right edge, the pointer was then clamped to x = 1023 where
+    /// another window (the runner's console) was found, the target got DragLeave and no drop (DEF-RC2-06).
+    /// </summary>
+    private static void PlaceTarget(Window target, int x, int y)
+    {
+        MonitorInfo m = PhysicalPlacement.Layout().Monitors[0];
+        PixelRect work = m.WorkArea;
+        int w = (int)Math.Ceiling(target.Width * m.DpiScale), h = (int)Math.Ceiling(target.Height * m.DpiScale);
+        x = Math.Clamp(x, work.X, work.Right - w);
+        y = Math.Clamp(y, work.Y, work.Bottom - h);
+        target.Left = x / m.DpiScale;
+        target.Top = y / m.DpiScale;
+    }
+
+    /// <summary>Harness precondition: Windows finds <paramref name="target"/> at the drop point (nothing on top of it).</summary>
+    private static void AssertTargetIsUnder(Window target, int x, int y)
+    {
+        nint expected = new WindowInteropHelper(target).Handle;
+        Assert.True(NativeInput.RootWindowAt(x, y) == expected,
+            $"test harness: at {x},{y} Windows finds {NativeInput.WindowAt(x, y)}, not the drop target 0x{expected:X}");
+    }
+
     private static (int X, int Y) Centre(FrameworkElement e)
     {
         Point p = e.PointToScreen(new Point(e.ActualWidth / 2, e.ActualHeight / 2));
@@ -717,12 +750,12 @@ public class GateBUiTests
             await Task.Delay(300);
             FrameworkElement tile = w.TrayTileElement(rec.Id)!;
             (int tx, int ty) = Centre(tile);
-            target.Left = (tx + 260) / PhysicalPlacement.Layout().Monitors[0].DpiScale;
-            target.Top = (ty - 300) / PhysicalPlacement.Layout().Monitors[0].DpiScale;
+            PlaceTarget(target, tx + 260, ty - 300);
             target.Show();
             await Task.Delay(300);
             (int dx, int dy) = Centre(target);
             PixelRect targetBounds = PhysicalPlacement.GetBounds(target)!.Value;
+            AssertTargetIsUnder(target, dx, dy);
 
             await SlowDrag(tx, ty, dx, dy);
             await WaitFor(() => target.Files is not null, 10, () => $"{TraceText()} | target 0x{new WindowInteropHelper(target).Handle:X} bounds {targetBounds.X},{targetBounds.Y} {targetBounds.Width}x{targetBounds.Height}");
@@ -752,9 +785,7 @@ public class GateBUiTests
             await WaitFor(() => w.DragOutButton.IsEnabled && w.DragOutButton.IsVisible);
             await Task.Delay(300);
             (int bx, int by) = Centre(w.DragOutButton);
-            double dpi = PhysicalPlacement.Layout().Monitors[0].DpiScale;
-            target.Left = (bx - 300) / dpi;
-            target.Top = (by + 150) / dpi;
+            PlaceTarget(target, bx - 300, by + 150);
             target.Show();
             await Task.Delay(300);
             (int dx, int dy) = Centre(target);
@@ -983,7 +1014,7 @@ public class GateBUiTests
         }
     });
 
-    // ------------------------------------------------------------------ DEF-RC2-DND-01
+    // ------------------------------------------------------------------ DEF-RC2-06
 
     /// <summary>
     /// Real-mouse drags of <paramref name="count"/> Library captures into a drop target, <paramref name="repeats"/>
@@ -1014,17 +1045,16 @@ public class GateBUiTests
                 await Task.Delay(200);
                 FrameworkElement tileElement = w.LibraryPane.TileElement(services.Library.Records[0].Id)!;
                 (int tx, int ty) = Centre(tileElement);
-                var target = new DropTarget
-                {
-                    Left = (tx + 250) / PhysicalPlacement.Layout().Monitors[0].DpiScale,
-                    Top = (ty + 120) / PhysicalPlacement.Layout().Monitors[0].DpiScale,
-                };
+                var target = new DropTarget();
+                PlaceTarget(target, tx + 250, ty + 120);
                 target.Show();
                 try
                 {
                     await Task.Delay(300);
                     (int dx, int dy) = Centre(target);
                     PixelRect b = PhysicalPlacement.GetBounds(target)!.Value;
+                    AssertTargetIsUnder(target, dx, dy);
+                    AssertTargetIsUnder(target, dx + 12, dy + 36); // the adjusted release point
                     await SlowDrag(tx, ty, dx, dy, hoverMs: hoverMs);
                     var sw = Stopwatch.StartNew();
                     while (target.Files is null && sw.ElapsedMilliseconds < 3000)
@@ -1052,33 +1082,14 @@ public class GateBUiTests
     }
 
     /// <summary>
-    /// DEF-RC2-DND-01 mechanism, with the fix switched off: during the modal OLE loop WPF sees no mouse moves, so the
-    /// tile's tooltip opens mid-drag (just below the pointer); moving onto it makes OLE treat the tooltip as the
-    /// window under the pointer — the real target gets DragLeave and no Drop. Documents why the fix exists.
+    /// DEF-RC2-06 regression: single and multi-item Library drags, three times each, with a pause and an
+    /// adjustment over the target before release — every drag delivers every file, flattened and intact.
     /// </summary>
-    [Fact]
-    public void DEF_RC2_DND_01_without_tooltip_suppression_a_tooltip_opens_mid_drag_and_takes_the_drop() => UiThread.Run(async () =>
-    {
-        CaptureDragDrop.SuppressToolTipsDuringDrag = false;
-        try
-        {
-            (string[]? files, string trace) = (await LibraryDragsAsync(3, hoverMs: 1500, repeats: 1))[0];
-            Assert.True(trace.Contains("tooltip opened during the drag", StringComparison.Ordinal), "no tooltip opened during the drag: " + trace);
-            Assert.True(files is null, "the drop was delivered although a tooltip opened under the pointer: " + trace);
-        }
-        finally
-        {
-            CaptureDragDrop.SuppressToolTipsDuringDrag = true;
-        }
-    });
-
-    /// <summary>DEF-RC2-DND-01 fix: with a pause and an adjustment over the target, every drag delivers every file.</summary>
     [Theory]
     [InlineData(1)]
     [InlineData(3)]
-    public void DEF_RC2_DND_01_library_drags_with_a_pause_over_the_target_deliver_every_file_repeatedly(int count) => UiThread.Run(async () =>
+    public void DEF_RC2_06_library_drags_with_a_pause_over_the_target_deliver_every_file_repeatedly(int count) => UiThread.Run(async () =>
     {
-        Assert.True(CaptureDragDrop.SuppressToolTipsDuringDrag);
         List<(string[]? Files, string Trace)> drags = await LibraryDragsAsync(count, hoverMs: 1500, repeats: 3);
         foreach ((string[]? files, string trace) in drags)
         {
@@ -1086,7 +1097,6 @@ public class GateBUiTests
             Assert.Equal(count, files!.Length);
             Assert.Equal(count, files.Select(Path.GetFileName).Distinct(StringComparer.OrdinalIgnoreCase).Count());
             Assert.All(files, f => Assert.Equal((80, 60), (Decode(f).Width, Decode(f).Height)));
-            Assert.DoesNotContain("tooltip opened during the drag", trace, StringComparison.Ordinal);
         }
     });
 
@@ -1113,12 +1123,12 @@ public class GateBUiTests
             await Task.Delay(200);
             FrameworkElement tileElement = w.LibraryPane.TileElement(services.Library.Records[0].Id)!;
             (int tx, int ty) = Centre(tileElement);
-            target.Left = (tx + 250) / PhysicalPlacement.Layout().Monitors[0].DpiScale;
-            target.Top = (ty + 120) / PhysicalPlacement.Layout().Monitors[0].DpiScale;
+            PlaceTarget(target, tx + 250, ty + 120);
             target.Show();
             await Task.Delay(300);
             (int dx, int dy) = Centre(target);
             PixelRect targetBounds = PhysicalPlacement.GetBounds(target)!.Value;
+            AssertTargetIsUnder(target, dx, dy);
 
             await SlowDrag(tx, ty, dx, dy);
             await WaitFor(() => target.Files is not null, 10, () => $"{TraceText()} | target 0x{new WindowInteropHelper(target).Handle:X} bounds {targetBounds.X},{targetBounds.Y} {targetBounds.Width}x{targetBounds.Height}");

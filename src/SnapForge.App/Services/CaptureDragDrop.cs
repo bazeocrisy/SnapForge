@@ -1,7 +1,6 @@
 using System.Collections.Specialized;
 using System.IO;
 using System.Windows;
-using System.Windows.Controls;
 using System.Windows.Threading;
 using SnapForge.App.Rendering;
 using SnapForge.Core.Export;
@@ -50,29 +49,6 @@ internal static class CaptureDragDrop
     /// <summary>True while the modal OLE drag loop runs (tests use it as a watchdog signal).</summary>
     internal static bool IsDragging { get; private set; }
 
-    /// <summary>
-    /// Tooltips are not opened while a SnapForge drag runs. During the modal OLE loop WPF no longer sees mouse
-    /// moves, so the drag source's hover timer keeps running and its tooltip can open mid-drag; a tooltip is a
-    /// topmost window, and if it lies under the pointer OLE treats it as the window there — the real target gets
-    /// DragLeave and the drop is lost (intermittent CI failures of the multi-selection drag, runs 111–125; see
-    /// DEFECT-REGISTER DEF-RC2-DND-01). Internal switch so a test can demonstrate the mechanism.
-    /// </summary>
-    internal static bool SuppressToolTipsDuringDrag { get; set; } = true;
-
-    private static readonly bool ToolTipSuppressionRegistered = RegisterToolTipSuppression();
-
-    private static bool RegisterToolTipSuppression()
-    {
-        EventManager.RegisterClassHandler(typeof(FrameworkElement), FrameworkElement.ToolTipOpeningEvent, new ToolTipEventHandler((_, e) =>
-        {
-            if (IsDragging && SuppressToolTipsDuringDrag)
-            {
-                e.Handled = true; // cancels the opening
-            }
-        }));
-        return true;
-    }
-
     /// <summary>Test hook: called with the effect the target chose when the OLE drag loop has ended.</summary>
     internal static Action<DragDropEffects>? AfterDragHook { get; set; }
 
@@ -89,7 +65,6 @@ internal static class CaptureDragDrop
             return DragDropEffects.None;
         }
 
-        _ = ToolTipSuppressionRegistered;
         var data = new LazyCaptureFiles(items, settings ?? new DragDropSettings(), Store);
         LastDrag = data;
         BeforeDragHook?.Invoke(data);
