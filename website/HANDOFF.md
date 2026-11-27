@@ -31,12 +31,12 @@ branch modified. Commit and CI evidence: see [Test evidence](#test-evidence).
 
 ## Test evidence
 
-Commit under test: **`6fa37fa`** (this document and its CI update are added in a follow-up commit, which changes
-documentation only).
+Code commit: **`6fa37fa`**. Documentation-only follow-ups: `8f6e2c2` (this handoff) and the commit adding these CI
+results. CI evidence is from **`8f6e2c2`**, whose site, build and tests are identical to `6fa37fa`.
 
 | Check | Where it ran | Result |
 |---|---|---|
-| `build.py --check` (generated output up to date + site validation) | Local (Linux) | **Pass** — 11 pages, 4 external links |
+| `build.py --check` (generated output up to date + site validation) | Local (Linux) | **Pass** — 11 pages, 3 external links (GitHub repository, Issues, GitHub privacy statement) |
 | Unit tests (20: build gates, stale-output detection, verifier) | Local (Linux, Python 3.13) | **Pass 20/20** (signed-claim Windows path skipped off Windows by design) |
 | Browser checks, unconfigured site | Local, **Chromium 158** only | **Pass, 0 failures, 0 axe violations** (`test-evidence/unconfigured-results.json`); Firefox, WebKit: **NOT TESTED** (not installed locally) |
 | Browser checks, configured with a **test-only** verified release and donation links (never committed) | Local, Chromium | **Pass, 0 failures** (`test-evidence/configured-results.json`) |
@@ -49,7 +49,21 @@ documentation only).
 
 ### CI
 
-Pending: CI on 6fa37fa was still running when this file was committed; results are added in the next commit.
+Website workflow on `8f6e2c2` — push run [46012220610](https://github.com/bazeocrisy/SnapForge/actions/runs/46012220610)
+and pull-request run [46012227470](https://github.com/bazeocrisy/SnapForge/actions/runs/46012227470): **success**.
+
+| Job | Result |
+|---|---|
+| Build is up to date and valid | **Pass**: `build.py --check` reported "OK: website/public is up to date and valid (11 pages)", and unit tests ran 20 / OK |
+| Browser tests (Chromium, Firefox, WebKit) | **Pass**: "ALL CHECKS PASSED" with `--require-all`, so all three engines ran. Engines from Playwright 1.63.0: Chrome for Testing 153.0.8010.12, Firefox 155.0, WebKit 26.6 (Ubuntu runner). 11 pages × 3 viewports per engine, axe-core in every engine, plus the keyboard, menu, 404 and no-JS checks. Results and screenshots are in artifact `website-browser-tests-8f6e2c2…` ([15203888776](https://github.com/bazeocrisy/SnapForge/actions/runs/46012220610/artifacts/15203888776), kept 30 days) |
+| Deploy to GitHub Pages | **Skipped**, as designed: it runs only by hand from `main` with owner approval |
+
+The CI runs on `6fa37fa` (46012082355, 46012092495) passed the build/unit-test job. Their browser job was
+**cancelled**, not failed: the workflow cancels an in-progress run on the same branch when a newer commit
+(`8f6e2c2`) is pushed.
+
+WebKit here is Playwright's Linux build of the Safari engine. It is not Safari on macOS or iOS, which still need
+the manual checks in MANUAL-ACCEPTANCE.md.
 
 ## Open items for the owner
 
