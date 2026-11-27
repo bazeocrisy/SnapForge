@@ -825,6 +825,19 @@ internal sealed unsafe class ScreenRecorder : IDisposable
                     _hooks?.BeforeVideoWrite?.Invoke(_framesWritten);
                     fixed (byte* p = item.Buffer.Data)
                     {
+                        // Constant frame rate from t = 0: if the first frame arrives after the first slot (slow first
+                        // poll, a camera's first frame, JIT on a busy PC) or a frame was dropped because the queue was
+                        // full, this picture is repeated into the empty slots. Without it the file had a leading gap /
+                        // holes: fewer samples than duration × FPS (CI run 96, camera-only: 90 samples in 3.2 s).
+                        long next = _framesWritten == 0 ? 0 : _lastVideoEnd;
+                        while (next + (item.Duration / 2) < item.Time)
+                        {
+                            WriteFrameWithFallback(p, item with { Time = next });
+                            next += item.Duration;
+                            Interlocked.Increment(ref _framesWritten);
+                            Interlocked.Increment(ref _framesRepeated);
+                        }
+
                         WriteFrameWithFallback(p, item);
                     }
 

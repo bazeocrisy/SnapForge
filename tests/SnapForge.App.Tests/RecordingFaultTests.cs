@@ -212,6 +212,67 @@ public sealed class RecordingFaultTests : IDisposable
         Assert.False(camera.IsRunning); // the recorder released the camera
     }
 
+    [Fact]
+    public unsafe void Decoded_frames_are_read_top_row_first()
+    {
+        // Regression (CI run 96): the decoder's RGB32 can be bottom-up; frames were read upside down.
+        string path = Path.Combine(_dir, "orientation.mp4");
+        uint[] px = new uint[64 * 64];
+        for (int i = 0; i < px.Length; i++)
+        {
+            px[i] = i < 32 * 64 ? 0xFFFF0000u : 0xFF0000FFu; // top red, bottom blue
+        }
+
+        using (var writer = new Mp4Writer(path, new VideoStreamFormat(64, 64, 30, 1_000_000), withAudio: false, fragmented: false, EncoderInput.SystemMemory, 0))
+        {
+            fixed (uint* p = px)
+            {
+                for (int f = 0; f < 30; f++)
+                {
+                    writer.WriteFrame((byte*)p, 64 * 4, f * 333_333L, 333_333L);
+                }
+            }
+
+            writer.Complete();
+        }
+
+        Core.Imaging.PixelBuffer frame = VideoAnalysis.DecodeFrame(path, 500) ?? throw new InvalidOperationException("no frame");
+        int top = ((8 * frame.Width) + 32) * 4, bottom = ((56 * frame.Width) + 32) * 4;
+        Assert.True(frame.Pixels[top + 2] > 180 && frame.Pixels[top] < 80, "top row is not red");
+        Assert.True(frame.Pixels[bottom] > 180 && frame.Pixels[bottom + 2] < 80, "bottom row is not blue");
+    }
+
+    [Fact]
+    public void Late_first_frame_still_gives_a_constant_frame_rate_from_zero()
+    {
+        // Regression (CI run 96): a first frame placed after slot 0 left a leading gap (fewer samples than duration × FPS).
+        string path = Path.Combine(_dir, "late-start.mp4");
+        int iteration = 0;
+        var hooks = new RecorderHooks { CaptureIteration = () => Thread.Sleep(Interlocked.Increment(ref iteration) == 1 ? 300 : 0) };
+        var camera = new SyntheticCameraSource(320, 180, 30);
+        camera.Start();
+        using (ScreenRecorder rec = ScreenRecorder.Create(new CameraFrameSource(camera, mirror: false), [], Options, path, hooks))
+        {
+            rec.Start();
+            Thread.Sleep(2000);
+            Assert.True(rec.Stop().Finalized);
+        }
+
+        (long durationMs, int _, int _, bool _, int samples) = RecordingRecovery.Probe(path);
+        Assert.InRange(samples, (int)(durationMs * 30 / 1000) - 2, (int)(durationMs * 30 / 1000) + 2);
+        nint reader = VideoAnalysis.OpenDecoding(path, video: true, audio: false);
+        try
+        {
+            Assert.True(Mf.ReadSample(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, out long first, out nint sample) && sample != 0);
+            Com.Release(ref sample);
+            Assert.InRange(first / 10_000.0, 0, 1);
+        }
+        finally
+        {
+            Com.Release(ref reader);
+        }
+    }
+
     /// <summary>Share of pixels in a rectangle that look like the SYNTHETIC camera (full red: magenta or yellow).</summary>
     internal static double SyntheticShare(Core.Imaging.PixelBuffer frame, int x0, int y0, int w, int h)
     {

@@ -173,8 +173,9 @@ internal interface ICameraSource : IDisposable
     void Stop();
 
     /// <summary>
-    /// Gives the newest frame whose time is not after <paramref name="notAfter100ns"/> (or the oldest one kept if all are
-    /// newer) to <paramref name="use"/>, under the frame lock. Returns false when there is no frame.
+    /// Gives the newest frame whose time is not after <paramref name="notAfter100ns"/> to <paramref name="use"/>, under
+    /// the frame lock — or the newest frame if none is that old or the qualifying one is more than 500 ms behind the
+    /// newest (clock mismatch can never hide the camera). Returns false only when there is no frame at all.
     /// </summary>
     bool WithFrame(long notAfter100ns, CameraFrameAction use);
 }
@@ -183,6 +184,10 @@ internal interface ICameraSource : IDisposable
 internal sealed class CameraFrameRing
 {
     private const int Slots = 4;
+
+    /// <summary>A frame older than the newest by more than this is never preferred (500 ms).</summary>
+    internal const long MaxStaleness100ns = 5_000_000;
+
     private readonly Lock _gate = new();
     private readonly byte[]?[] _data = new byte[Slots][];
     private readonly long[] _time = new long[Slots];
@@ -247,7 +252,7 @@ internal sealed class CameraFrameRing
         ArgumentNullException.ThrowIfNull(use);
         lock (_gate)
         {
-            int best = -1, oldest = -1;
+            int best = -1, newest = -1;
             for (int i = 0; i < Slots; i++)
             {
                 if (!_valid[i])
@@ -260,13 +265,16 @@ internal sealed class CameraFrameRing
                     best = i;
                 }
 
-                if (oldest < 0 || _time[i] < _time[oldest])
+                if (newest < 0 || _time[i] > _time[newest])
                 {
-                    oldest = i;
+                    newest = i;
                 }
             }
 
-            int pick = best >= 0 ? best : oldest;
+            // No frame old enough (the camera runs ahead of the screen time, e.g. a clock offset): use the newest one
+            // rather than hiding the camera. Bounded staleness: if the qualifying frame is far behind the newest,
+            // the clocks disagree and the newest picture is used too.
+            int pick = best >= 0 && _time[newest] - _time[best] <= MaxStaleness100ns ? best : newest;
             if (pick < 0)
             {
                 return false;

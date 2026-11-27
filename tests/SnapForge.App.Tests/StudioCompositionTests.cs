@@ -255,8 +255,14 @@ public unsafe class StudioCompositionTests
 
         Assert.Equal(200, Pick(250));
         Assert.Equal(300, Pick(long.MaxValue));
-        Assert.Equal(100, Pick(50)); // all newer: the oldest one kept
+        Assert.Equal(300, Pick(50)); // all newer (camera clock ahead): the newest one, never nothing
         Assert.Equal(3, ring.Sequence);
+
+        // Bounded staleness: a qualifying frame more than 500 ms behind the newest is not used.
+        byte[] late = ring.Rent(2, 2);
+        late[0] = 9;
+        ring.Commit(300 + CameraFrameRing.MaxStaleness100ns + 1000);
+        Assert.Equal(300 + CameraFrameRing.MaxStaleness100ns + 1000, Pick(400));
         ring.Clear();
         Assert.False(ring.WithFrame(long.MaxValue, (_, _, _, _) => { }));
     }

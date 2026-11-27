@@ -83,15 +83,14 @@ internal static unsafe class VideoExporter
                             nint buffer = Mf.ConvertToContiguousBuffer(sample);
                             try
                             {
-                                byte* data = Mf.LockBuffer(buffer, out _, out int length);
+                                byte* data = VideoAnalysis.LockDecodedRows(buffer, info.Height, out int stride, out bool locked2D);
                                 try
                                 {
-                                    int stride = length / info.Height;
-                                    writer.WriteFrame(data, stride, outTs.Value, frameDuration);
+                                    writer.WriteFrame(data, stride, outTs.Value, frameDuration); // stride may be negative (bottom-up)
                                 }
                                 finally
                                 {
-                                    Mf.UnlockBuffer(buffer);
+                                    Mf.UnlockRows(buffer, locked2D);
                                 }
                             }
                             finally
@@ -235,11 +234,10 @@ internal static unsafe class VideoExporter
         nint buffer = Mf.ConvertToContiguousBuffer(sample);
         try
         {
-            byte* data = Mf.LockBuffer(buffer, out _, out int length);
+            byte* data = VideoAnalysis.LockDecodedRows(buffer, h, out int stride, out bool locked2D);
             try
             {
                 var pixels = new byte[w * h * 4];
-                int stride = length / h;
                 for (int y = 0; y < h; y++)
                 {
                     new ReadOnlySpan<byte>(data + ((long)y * stride), w * 4).CopyTo(pixels.AsSpan(y * w * 4));
@@ -254,7 +252,7 @@ internal static unsafe class VideoExporter
             }
             finally
             {
-                Mf.UnlockBuffer(buffer);
+                Mf.UnlockRows(buffer, locked2D);
             }
         }
         finally
