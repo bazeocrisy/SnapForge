@@ -234,7 +234,7 @@ internal static unsafe class VideoAnalysis
     }
 
     /// <summary>Opens a file with decoding to RGB32 video / 16-bit PCM audio.</summary>
-    private static nint OpenDecoding(string path, bool video, bool audio)
+    internal static nint OpenDecoding(string path, bool video, bool audio)
     {
         nint attrs = Mf.CreateAttributes(1);
         nint reader;

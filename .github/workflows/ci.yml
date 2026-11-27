@@ -2,7 +2,7 @@ name: CI
 
 on:
   push:
-    branches: [main, "claude/**"]
+    branches: [main, "claude/**", "release/**"]
   pull_request:
     branches: [main]
   workflow_dispatch:
@@ -32,6 +32,7 @@ jobs:
     timeout-minutes: 30
     outputs:
       artifact: ${{ steps.names.outputs.artifact }}
+      packages: SnapForge-${{ steps.pkg.outputs.version }}-packages-${{ github.sha }}
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -110,6 +111,34 @@ jobs:
         with:
           name: ${{ steps.names.outputs.artifact }}
           path: artifacts/portable/SnapForge
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Release packages (portable ZIP + per-user installer) with SHA-256
+        id: pkg
+        shell: pwsh
+        run: |
+          $version = ([xml](Get-Content Directory.Build.props)).Project.PropertyGroup.Version | Where-Object { $_ } | Select-Object -First 1
+          $fileVersion = "1.0.0.$env:GITHUB_RUN_NUMBER"
+          $out = "artifacts/release"
+          New-Item -ItemType Directory -Force $out | Out-Null
+          $zip = "$out/SnapForge-$version-win-x64-portable.zip"
+          Compress-Archive -Path artifacts/portable/SnapForge/* -DestinationPath $zip -CompressionLevel Optimal
+          $iscc = (Get-Command iscc.exe -ErrorAction SilentlyContinue).Source
+          if (-not $iscc) { $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1 }
+          if (-not $iscc) { choco install innosetup --version=6.4.3 -y --no-progress | Out-Null; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc /Qp "/DAppVersion=$version" "/DFileVersion=$fileVersion" "/DSourceDir=$PWD\artifacts\portable\SnapForge" "/DOutputDir=$PWD\$out" installer\SnapForge.iss
+          if ($LASTEXITCODE -ne 0) { throw "Installer build failed" }
+          Get-ChildItem $out -File | Sort-Object Name | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } | Tee-Object -Variable sums
+          $sums | Out-File -Encoding ascii "$out/SHA256SUMS.txt"
+          "### Release candidate packages ($version, build $env:GITHUB_RUN_NUMBER)`n" + (($sums | ForEach-Object { "    $_" }) -join "`n") | Out-File -Append $env:GITHUB_STEP_SUMMARY
+          "version=$version" | Out-File -Append $env:GITHUB_OUTPUT
+
+      - name: Upload release-candidate packages (not a public release)
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: SnapForge-${{ steps.pkg.outputs.version }}-packages-${{ github.sha }}
+          path: artifacts/release
           retention-days: 30
           if-no-files-found: error
 
@@ -353,3 +382,75 @@ jobs:
         run: dotnet test tests/SnapForge.Core.Tests/SnapForge.Core.Tests.csproj -c Release --logger "console;verbosity=normal"
       - name: Compile Windows projects (cross-targeting check)
         run: dotnet build SnapForge.sln -c Release
+
+  installer:
+    name: Installer — install, upgrade, run, uninstall (keeps user data)
+    needs: windows
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - name: Download the release-candidate packages
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: ${{ needs.windows.outputs.packages }}
+          path: packages
+
+      - name: Verify package checksums
+        shell: pwsh
+        working-directory: packages
+        run: |
+          foreach ($line in Get-Content SHA256SUMS.txt) {
+            $expected, $name = $line -split '\s+', 2
+            if ((Get-FileHash $name -Algorithm SHA256).Hash -ne $expected) { throw "MISMATCH $name" }
+            Write-Output "OK  $name"
+          }
+
+      - name: Hide every .NET installation (the installed app must be self-contained)
+        shell: pwsh
+        run: |
+          foreach ($p in "$env:ProgramFiles\dotnet", "${env:ProgramFiles(x86)}\dotnet") { if (Test-Path $p) { Rename-Item $p "$p-hidden-for-test" } }
+
+      - name: Install (per-user, silent), run self-test, upgrade over itself, uninstall
+        shell: pwsh
+        working-directory: packages
+        env:
+          DOTNET_ROOT: C:\does-not-exist
+        run: |
+          $setup = (Get-ChildItem *-setup.exe | Select-Object -First 1).FullName
+          $app = Join-Path $env:LOCALAPPDATA "Programs\SnapForge"
+          $data = Join-Path $env:LOCALAPPDATA "SnapForge"
+          $shortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\SnapForge.lnk"
+          function Run([string]$setupArgs) { $p = Start-Process -FilePath $setup -ArgumentList $setupArgs -Wait -PassThru; if ($p.ExitCode -ne 0) { throw "setup $setupArgs exited $($p.ExitCode)" } }
+
+          # A pre-existing capture Library that must survive install, upgrade and uninstall.
+          New-Item -ItemType Directory -Force "$data\Library\captures\keep-me" | Out-Null
+          Set-Content "$data\Library\captures\keep-me\marker.txt" "user data"
+
+          Run '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /LOG=install1.log'
+          if (-not (Test-Path "$app\SnapForge.exe")) { throw "SnapForge.exe not installed" }
+          if (-not (Test-Path $shortcut)) { throw "Start menu shortcut missing" }
+          Write-Output "PASS installed to $app (no administrator rights requested: PrivilegesRequired=lowest)"
+          $v = (Get-Item "$app\SnapForge.exe").VersionInfo
+          Write-Output "PASS file version $($v.FileVersion), product version $($v.ProductVersion)"
+          $uninstallKey = Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq 'SnapForge' }
+          if (-not $uninstallKey) { throw "No per-user Apps & features entry" }
+          Write-Output "PASS Apps & features entry: $((Get-ItemProperty $uninstallKey.PSPath).DisplayVersion)"
+
+          $report = Join-Path $env:RUNNER_TEMP "installed-self-test.txt"
+          $p = Start-Process -FilePath "$app\SnapForge.exe" -ArgumentList '--self-test', "`"$report`"" -Wait -PassThru
+          Get-Content $report
+          if ($p.ExitCode -ne 0) { throw "Installed app self-test failed" }
+          Write-Output "PASS installed app self-test (no .NET installed)"
+
+          Run '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /LOG=install2.log'
+          if (-not (Test-Path "$app\SnapForge.exe")) { throw "Upgrade removed the program" }
+          if (-not (Test-Path "$data\Library\captures\keep-me\marker.txt")) { throw "Upgrade touched the Library" }
+          Write-Output "PASS upgrade/reinstall over the existing installation; Library intact"
+
+          $uninst = Get-ChildItem $app -Filter "unins*.exe" | Select-Object -First 1
+          $p = Start-Process -FilePath $uninst.FullName -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
+          Start-Sleep -Seconds 3
+          if (Test-Path "$app\SnapForge.exe") { throw "Uninstall left SnapForge.exe" }
+          if (Test-Path $shortcut) { throw "Uninstall left the Start menu shortcut" }
+          if (-not (Test-Path "$data\Library\captures\keep-me\marker.txt")) { throw "UNINSTALL DELETED USER DATA" }
+          Write-Output "PASS uninstall removed the program and shortcut and kept the capture Library"

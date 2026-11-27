@@ -130,17 +130,15 @@
         <Border Grid.Row="0" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="10,6">
             <DockPanel LastChildFill="False">
                 <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" VerticalAlignment="Center" Margin="2,0,8,0">
-                    <Border Width="26" Height="26" CornerRadius="7">
-                        <Border.Background>
-                            <LinearGradientBrush StartPoint="0,0" EndPoint="1,1">
-                                <GradientStop Color="#FF9A4D" Offset="0" />
-                                <GradientStop Color="#F0561D" Offset="1" />
-                            </LinearGradientBrush>
-                        </Border.Background>
-                        <Path Data="M6,10 V6 H10 M16,6 H20 V10 M20,16 V20 H16 M10,20 H6 V16" Stroke="White" StrokeThickness="2"
-                              StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
-                              Width="26" Height="26" Stretch="None" HorizontalAlignment="Left" VerticalAlignment="Top" />
-                    </Border>
+                    <!-- Official SnapForge mark: orange aperture in capture brackets on a navy tile (branding/snapforge-icon-small.svg). -->
+                    <Viewbox Width="26" Height="26" AutomationProperties.Name="SnapForge logo">
+                        <Canvas Width="32" Height="32">
+                            <Rectangle Canvas.Left="0.5" Canvas.Top="0.5" Width="31" Height="31" RadiusX="7" RadiusY="7" Fill="#0B1220" />
+                            <Path Data="M5,10 V7 Q5,5 7,5 H10 M22,5 H25 Q27,5 27,7 V10 M27,22 V25 Q27,27 25,27 H22 M10,27 H7 Q5,27 5,25 V22"
+                                  Stroke="#F97316" StrokeThickness="2.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                            <Ellipse Canvas.Left="10.4" Canvas.Top="10.4" Width="11.2" Height="11.2" Stroke="#F97316" StrokeThickness="2.6" />
+                        </Canvas>
+                    </Viewbox>
                     <TextBlock Text="SnapForge" FontSize="14" FontWeight="SemiBold" Margin="8,0,0,1" VerticalAlignment="Center" />
                 </StackPanel>
 
