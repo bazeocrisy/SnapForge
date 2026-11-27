@@ -29,6 +29,20 @@ failure.
 | DEF-RC-08 | Low | Tests | GIF encoder timing unit test under CI coverage instrumentation | 30 frames 640×360 < 3 s | 3.19 s in CI run 79 (coverage on) | Same cause as DEF-RC-04 | next commit | Core test bound 30 s; new `gif-encoder-performance` feature self-test enforces < 3 s on the packaged build | CI runs 82, 83: Core tests pass; self-test 282 / 295 ms |
 | DEF-RC-09 | Medium | ACC | Dialog buttons with access keys (e.g. OCR window "_Copy text", scrolling capture "_Auto-scroll") | Label shows "Copy text" with Alt+C | Literal underscore shown, no Alt shortcut (found in the CI run 82 website screenshot) | Button templates' ContentPresenter lacked RecognizesAccessKey | `748eedb` | CI screenshot of the OCR window (visual); MA-ACC-01 keyboard check | CI run 83 screenshot shows "Copy text"; keyboard check pending (MA-ACC-01) |
 
+## rc.2 — forensic audit findings and owner observations
+
+The 24 audit findings (FA-001 … FA-024), the owner's observations (SF-001 … SF-015) and QA items are tracked one by
+one, with the change, tests, reproduction class and status, in [FORENSIC-REMEDIATION.md](FORENSIC-REMEDIATION.md).
+
+## rc.2 — defects found while integrating and testing
+
+| ID | Severity | Area | Symptom | Cause | Fix | Evidence |
+|---|---|---|---|---|---|---|
+| DEF-RC2-01 | Medium | FA-003 | Work-area guard did not move test windows (CI runs 89, 90) | The `Loaded` class handler was not raised for plain `Window` instances in the test host; WPF also re-applied its own size | Guard also attaches through a 500 ms scan of the app's windows and drives WPF's own Left/Top/Width/Height (DIPs) before falling back to `SetWindowPos`; tests attach explicitly so other UI tests keep their placement | `WindowingTests` on the final CI run |
+| DEF-RC2-02 | Low | FA-009 | Drag test found 2 files in the session folder | New active/dropped retention markers live in the session folder | Test ignores SnapForge's own markers and asserts they are never offered to the drop target | `Drag_data_offers_only_flattened_redacted_images…` |
+| DEF-RC2-03 | Low | SF-005 | Redesigned capture panel 384 DIP tall vs. an estimated ≤ 380 | Estimate made without Windows rendering | Bound set to ≤ 420 DIP (still compact) | `Capture_panel_is_compact_and_marks_unavailable_modes` |
+| DEF-RC2-04 | High | FA-007 | `MoveTo` no longer deletes the source (by design), so the old App flow would have left two Libraries silently | Core API change | New `RelocateLibraryAsync` flow with explicit, confirmed, verified cleanup | `FA007_…` App tests |
+
 ## Defects from earlier milestones (closed)
 
 | Source | Count | Status |

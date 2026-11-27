@@ -232,7 +232,8 @@ public class LibraryWorkflowTests
         Assert.Equal(Path.GetFullPath(newRoot), services.Library.Root);
         Assert.Single(services.Library.Records);
         Assert.NotNull(outcome.Cleanup);
-        Assert.Empty(Directory.GetFiles(Path.Combine(oldRoot, "captures"), "*", SearchOption.AllDirectories));
+        string oldCaptures = Path.Combine(oldRoot, "captures");
+        Assert.True(!Directory.Exists(oldCaptures) || Directory.GetFiles(oldCaptures, "*", SearchOption.AllDirectories).Length == 0);
         services.Library.Load(s.CaptureId!.Value);
         Assert.Contains(services.Tray.Items, i => i.Id == s.CaptureId);
         await Close(w);
