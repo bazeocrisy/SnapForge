@@ -2,7 +2,7 @@
         xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
         xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
         Title="SnapForge Capture"
-        Width="760" SizeToContent="Height" ResizeMode="CanMinimize"
+        Width="500" SizeToContent="Height" ResizeMode="CanMinimize"
         WindowStartupLocation="Manual"
         Background="{DynamicResource SurfaceBrush}"
         Foreground="{DynamicResource TextBrush}"
@@ -10,10 +10,10 @@
         UseLayoutRounding="True"
         Icon="../Assets/SnapForge.ico">
     <!--
-        Compact horizontal capture control panel (milestone 3). Functional arrangement follows the owner's reference:
-        menus; left mode rail; Selection / Effects / Share; option switches; large round Capture button with the
-        hotkey beneath; Presets and Open Editor in the footer. SnapForge's own branding, icons and wording.
-        Anything not implemented is disabled and says "Not available yet".
+        SnapForge capture panel (SF-005 redesign). Top: menus, then the SnapForge mark and segmented tabs (Image / Video;
+        All-in-One is shown but not available yet). Middle: option cards ("What to capture" chips, "After capture",
+        "Options"). Bottom: one full-width rectangular primary action with its global hotkey on a key cap beside it,
+        then presets and links. Anything not implemented is disabled and its tooltip says why.
     -->
     <DockPanel>
         <Menu DockPanel.Dock="Top" x:Name="PanelMenu" Padding="6,2">
@@ -34,7 +34,9 @@
                 <MenuItem Header="Open _Library" Click="OnOpenLibrary" />
                 <Separator />
                 <MenuItem x:Name="TopmostMenu" Header="Keep capture panel on _top" IsCheckable="True" Click="OnToggleTopmost" />
-                <MenuItem x:Name="WidgetMenu" Header="Show capture _widget" Click="OnToggleWidget" ToolTip="Shows the capture widget at the top centre of the screen and opens it" />
+                <MenuItem x:Name="WidgetMenu" Header="Show _QuickDock" Click="OnToggleWidget" ToolTip="Shows QuickDock at the top centre of the screen and opens it" />
+                <MenuItem x:Name="DockKeyboardMenu" Header="Open QuickDock with _keyboard" Click="OnDockKeyboard"
+                          ToolTip="Opens QuickDock for keyboard use: Tab or arrow keys move between buttons, Enter runs one, Esc closes it and returns to this window" />
             </MenuItem>
             <MenuItem Header="_Help">
                 <MenuItem Header="_Keyboard shortcuts" Click="OnShortcuts" />
@@ -42,196 +44,237 @@
             </MenuItem>
         </Menu>
 
-        <!-- Footer: presets, add preset, reset feedback, open editor/library -->
-        <DockPanel DockPanel.Dock="Bottom" Margin="12,0,12,6">
+        <!-- Header: SnapForge mark, segmented navigation, reset -->
+        <Grid DockPanel.Dock="Top" Margin="12,4,10,6">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="Auto" />
+                <ColumnDefinition Width="*" />
+                <ColumnDefinition Width="Auto" />
+            </Grid.ColumnDefinitions>
+            <!-- The SnapForge mark (navy tile, orange aperture) — same artwork as the main window header. -->
+            <Viewbox Width="22" Height="22" VerticalAlignment="Center" AutomationProperties.Name="SnapForge logo">
+                <Canvas Width="32" Height="32">
+                    <Rectangle Canvas.Left="0.5" Canvas.Top="0.5" Width="31" Height="31" RadiusX="7" RadiusY="7" Fill="#0B1220" />
+                    <Path Data="{StaticResource BrandApertureMark}" Stroke="#F97316" StrokeThickness="2.6" StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" />
+                </Canvas>
+            </Viewbox>
+            <Border Grid.Column="1" HorizontalAlignment="Left" Margin="10,0,0,0" Padding="2" CornerRadius="8"
+                    Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1">
+                <StackPanel x:Name="ModeTabs" Orientation="Horizontal" AutomationProperties.Name="Capture type">
+                    <RadioButton x:Name="ImageMode" GroupName="CaptureKind" Style="{StaticResource SegmentTab}" Content="Image" Tag="{StaticResource IconImageMode}"
+                                 IsChecked="True" ToolTip="Screenshots: choose what to capture and what happens afterwards" AutomationProperties.Name="Image"
+                                 AutomationProperties.HelpText="Screenshot options" Checked="OnKindChanged" />
+                    <RadioButton x:Name="VideoMode" GroupName="CaptureKind" Style="{StaticResource SegmentTab}" Content="Video" Tag="{StaticResource IconVideoMode}"
+                                 ToolTip="Screen recording (MP4)" AutomationProperties.Name="Video" AutomationProperties.HelpText="Screen recording options" Checked="OnKindChanged" />
+                    <RadioButton x:Name="AllInOneMode" GroupName="CaptureKind" Style="{StaticResource SegmentTab}" Content="All-in-One" Tag="{StaticResource IconAllInOne}"
+                                 IsEnabled="False" ToolTip="All-in-One (choose image or video after selecting) — Not available yet"
+                                 AutomationProperties.Name="All-in-One (Not available yet)" />
+                </StackPanel>
+            </Border>
+            <Button x:Name="ResetButton" Grid.Column="2" Style="{StaticResource ToolbarButton}" Padding="5" MinHeight="28" VerticalAlignment="Center" Click="OnReset"
+                    AutomationProperties.Name="Reset capture options" AutomationProperties.HelpText="Restores the default capture options; you can undo it" ToolTip="Reset capture options">
+                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconReset}" Width="18" Height="18" Stretch="Uniform" />
+            </Button>
+        </Grid>
+
+        <!-- Footer: presets, add preset, reset feedback, Library / Editor -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="10,0,10,6">
             <StackPanel Orientation="Horizontal" DockPanel.Dock="Left">
-                <Button x:Name="PresetsButton" Click="OnPresetsMenu" AutomationProperties.Name="Presets" ToolTip="Capture with a preset, or manage presets">
+                <Button x:Name="PresetsButton" Style="{StaticResource ToolbarButton}" Padding="8,3" MinHeight="28" Click="OnPresetsMenu"
+                        AutomationProperties.Name="Presets" AutomationProperties.HelpText="Capture with a preset, or manage presets" ToolTip="Capture with a preset, or manage presets">
                     <StackPanel Orientation="Horizontal">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconSettings}" Width="20" Height="20" Stretch="Uniform" />
-                        <TextBlock Text="Presets" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconPresets}" Width="16" Height="16" Stretch="Uniform" />
+                        <TextBlock Text="Presets" Margin="6,0,2,0" VerticalAlignment="Center" />
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="10" Height="10" Stretch="Uniform" />
                     </StackPanel>
                 </Button>
-                <Button x:Name="AddPresetButton" Click="OnSavePreset" AutomationProperties.Name="Save current settings as a preset" ToolTip="Save current settings as a preset">
-                    <StackPanel Orientation="Horizontal">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconPlus}" Width="18" Height="18" Stretch="Uniform" />
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="12" Height="12" Stretch="Uniform" />
-                    </StackPanel>
+                <Button x:Name="AddPresetButton" Style="{StaticResource ToolbarButton}" Padding="5,3" MinHeight="28" Click="OnSavePreset"
+                        AutomationProperties.Name="Save current settings as a preset" ToolTip="Save current settings as a preset">
+                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconPlus}" Width="16" Height="16" Stretch="Uniform" />
                 </Button>
-                <TextBlock x:Name="ResetNotice" VerticalAlignment="Center" Margin="10,0,0,0" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Visibility="Collapsed">
+                <TextBlock x:Name="ResetNotice" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Visibility="Collapsed">
                     <Run Text="Options reset." />
                     <Hyperlink Click="OnUndoReset" Foreground="{DynamicResource AccentBrush}">Undo</Hyperlink>
                 </TextBlock>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">
-                <Button Style="{StaticResource LinkButton}" Click="OnOpenLibrary" AutomationProperties.Name="Open Library">
+                <Button Style="{StaticResource LinkButton}" Click="OnOpenLibrary" AutomationProperties.Name="Open Library" ToolTip="Open the Library">
                     <StackPanel Orientation="Horizontal">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconLibrary}" Width="18" Height="18" Stretch="Uniform" />
-                        <TextBlock Text="Open Library" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconLibrary}" Width="16" Height="16" Stretch="Uniform" />
+                        <TextBlock Text="Library" Margin="5,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
-                <Button Style="{StaticResource LinkButton}" Click="OnOpenEditor" AutomationProperties.Name="Open SnapForge Editor">
+                <Button Style="{StaticResource LinkButton}" Click="OnOpenEditor" AutomationProperties.Name="Open SnapForge Editor" ToolTip="Open the SnapForge Editor">
                     <StackPanel Orientation="Horizontal">
-                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconEditor}" Width="18" Height="18" Stretch="Uniform" />
-                        <TextBlock Text="Open SnapForge Editor" Margin="6,0,0,0" VerticalAlignment="Center" />
+                        <Path Style="{StaticResource IconPath}" Data="{StaticResource IconEditor}" Width="16" Height="16" Stretch="Uniform" />
+                        <TextBlock Text="Editor" Margin="5,0,0,0" VerticalAlignment="Center" />
                     </StackPanel>
                 </Button>
             </StackPanel>
         </DockPanel>
 
-        <Grid Margin="10,4,12,4">
-            <Grid.ColumnDefinitions>
-                <ColumnDefinition Width="84" />
-                <ColumnDefinition Width="*" />
-                <ColumnDefinition Width="150" />
-            </Grid.ColumnDefinitions>
-
-            <!-- Mode rail -->
-            <StackPanel x:Name="ModeRail" Grid.Column="0" VerticalAlignment="Top" AutomationProperties.Name="Capture mode">
-                <RadioButton x:Name="AllInOneMode" GroupName="CaptureKind" Style="{StaticResource RailButton}" Content="All-in-One" Tag="{StaticResource IconAllInOne}"
-                             IsEnabled="False" ToolTip="All-in-One — Not available yet" AutomationProperties.Name="All-in-One (Not available yet)" />
-                <RadioButton x:Name="ImageMode" GroupName="CaptureKind" Style="{StaticResource RailButton}" Content="Image" Tag="{StaticResource IconImageMode}"
-                             IsChecked="True" ToolTip="Image capture" AutomationProperties.Name="Image" Checked="OnKindChanged" />
-                <RadioButton x:Name="VideoMode" GroupName="CaptureKind" Style="{StaticResource RailButton}" Content="Video" Tag="{StaticResource IconVideoMode}"
-                             ToolTip="Screen recording (MP4)" AutomationProperties.Name="Video" Checked="OnKindChanged" />
+        <!-- Primary action: full width, hotkey on a key cap beside it -->
+        <DockPanel DockPanel.Dock="Bottom" Margin="12,6,12,6">
+            <StackPanel DockPanel.Dock="Right" Orientation="Horizontal" Margin="10,0,0,0" VerticalAlignment="Center">
+                <Path x:Name="HotkeyWarningIcon" Style="{StaticResource IconPath}" Data="{StaticResource IconWarning}" Width="14" Height="14" Stretch="Uniform"
+                      Stroke="{DynamicResource WarningBrush}" Margin="0,0,4,0" Visibility="Collapsed" VerticalAlignment="Center" />
+                <Border x:Name="HotkeyCap" Style="{StaticResource KeyCap}">
+                    <TextBlock x:Name="HotkeyText" FontSize="12" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="110" />
+                </Border>
             </StackPanel>
-
-            <!-- Settings card -->
-            <Border Grid.Column="1" Background="{DynamicResource SurfaceRaisedBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="10" Padding="14,10" Margin="6,0,10,0">
-                <Grid>
-                <Grid x:Name="ImageOptions">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="170" />
-                        <ColumnDefinition Width="22" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <Label Grid.Row="0" Content="_Selection:" Target="{Binding ElementName=SelectionButton}" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Padding="0,0,10,0" />
-                    <Button x:Name="SelectionButton" Grid.Row="0" Grid.Column="1" Style="{StaticResource DropdownButton}" Margin="0,3" Click="OnSelectionMenu"
-                            AutomationProperties.Name="Selection" ToolTip="What to capture">
-                        <DockPanel>
-                            <Path DockPanel.Dock="Right" Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="14" Height="14" Stretch="Uniform" />
-                            <TextBlock x:Name="SelectionText" Text="Region" VerticalAlignment="Center" />
-                        </DockPanel>
-                    </Button>
-
-                    <Label Grid.Row="1" Content="Effe_cts:" Target="{Binding ElementName=EffectsButton}" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Padding="0,0,10,0" />
-                    <Button x:Name="EffectsButton" Grid.Row="1" Grid.Column="1" Style="{StaticResource DropdownButton}" Margin="0,3" IsEnabled="False"
-                            AutomationProperties.Name="Effects: None (Not available yet)" ToolTip="Effects — Not available yet">
-                        <DockPanel>
-                            <Path DockPanel.Dock="Right" Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="14" Height="14" Stretch="Uniform" />
-                            <TextBlock Text="None" VerticalAlignment="Center" />
-                        </DockPanel>
-                    </Button>
-
-                    <Label Grid.Row="2" Content="S_hare:" Target="{Binding ElementName=ShareButton}" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Padding="0,0,10,0" />
-                    <Button x:Name="ShareButton" Grid.Row="2" Grid.Column="1" Style="{StaticResource DropdownButton}" Margin="0,3" IsEnabled="False"
-                            AutomationProperties.Name="Share: None (Not available yet)"
-                            ToolTip="Share destinations — Not available yet. Use the Copy to Clipboard and Save to Library switches.">
-                        <DockPanel>
-                            <Path DockPanel.Dock="Right" Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="14" Height="14" Stretch="Uniform" />
-                            <TextBlock Text="None" VerticalAlignment="Center" />
-                        </DockPanel>
-                    </Button>
-
-                    <!-- Switches -->
-                    <StackPanel Grid.Column="3" Grid.RowSpan="4" VerticalAlignment="Top">
-                        <CheckBox x:Name="PreviewBox" Content="Preview in Editor" Click="OnOptionChanged" Margin="0,1" />
-                        <CheckBox x:Name="CopyBox" Content="Copy to Clipboard" Click="OnOptionChanged" Margin="0,1" />
-                        <CheckBox x:Name="SaveBox" Content="Save to Library" Click="OnOptionChanged" Margin="0,1"
-                                  ToolTip="Off = capture without history: nothing is written to disk unless you export it." />
-                        <CheckBox x:Name="CursorBox" Content="Cursor" Click="OnOptionChanged" Margin="0,1" ToolTip="Include the mouse pointer in the image" />
-                        <DockPanel Margin="0,1">
-                            <Button x:Name="DelayMenuButton" DockPanel.Dock="Right" Click="OnDelayMenu" Padding="4,2" Margin="2,0,0,0"
-                                    AutomationProperties.Name="Choose delay" ToolTip="Choose the delay">
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronRight}" Width="14" Height="14" Stretch="Uniform" />
-                            </Button>
-                            <CheckBox x:Name="DelayBox" Content="Time Delay" Click="OnDelayToggled" AutomationProperties.Name="Time Delay" />
-                        </DockPanel>
-                    </StackPanel>
-                </Grid>
-
-                <!-- Video options (milestone V1) -->
-                <Grid x:Name="VideoOptions" Visibility="Collapsed">
-                    <Grid.ColumnDefinitions>
-                        <ColumnDefinition Width="Auto" />
-                        <ColumnDefinition Width="170" />
-                        <ColumnDefinition Width="22" />
-                        <ColumnDefinition Width="*" />
-                    </Grid.ColumnDefinitions>
-                    <Grid.RowDefinitions>
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="Auto" />
-                        <RowDefinition Height="*" />
-                    </Grid.RowDefinitions>
-
-                    <Label Grid.Row="0" Content="_Record:" Target="{Binding ElementName=VideoSourceButton}" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Padding="0,0,10,0" />
-                    <Button x:Name="VideoSourceButton" Grid.Row="0" Grid.Column="1" Style="{StaticResource DropdownButton}" Margin="0,3" Click="OnVideoSourceMenu"
-                            AutomationProperties.Name="Record" ToolTip="What to record">
-                        <DockPanel>
-                            <Path DockPanel.Dock="Right" Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="14" Height="14" Stretch="Uniform" />
-                            <TextBlock x:Name="VideoSourceText" Text="Region" VerticalAlignment="Center" />
-                        </DockPanel>
-                    </Button>
-
-                    <Label Grid.Row="1" Content="_Frame rate:" Target="{Binding ElementName=FrameRateButton}" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Padding="0,0,10,0" />
-                    <Button x:Name="FrameRateButton" Grid.Row="1" Grid.Column="1" Style="{StaticResource DropdownButton}" Margin="0,3" Click="OnFrameRateMenu"
-                            AutomationProperties.Name="Frame rate" ToolTip="Frames per second">
-                        <DockPanel>
-                            <Path DockPanel.Dock="Right" Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="14" Height="14" Stretch="Uniform" />
-                            <TextBlock x:Name="FrameRateText" Text="30 FPS" VerticalAlignment="Center" />
-                        </DockPanel>
-                    </Button>
-
-                    <Label Grid.Row="2" Content="_Quality:" Target="{Binding ElementName=QualityButton}" Foreground="{DynamicResource TextBrush}" VerticalAlignment="Center" Padding="0,0,10,0" />
-                    <Button x:Name="QualityButton" Grid.Row="2" Grid.Column="1" Style="{StaticResource DropdownButton}" Margin="0,3" Click="OnQualityMenu"
-                            AutomationProperties.Name="Quality" ToolTip="MP4 (H.264 + AAC) quality">
-                        <DockPanel>
-                            <Path DockPanel.Dock="Right" Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="14" Height="14" Stretch="Uniform" />
-                            <TextBlock x:Name="QualityText" Text="Standard" VerticalAlignment="Center" />
-                        </DockPanel>
-                    </Button>
-
-                    <StackPanel Grid.Column="3" Grid.RowSpan="4" VerticalAlignment="Top">
-                        <CheckBox x:Name="SystemAudioBox" Content="System audio" Click="OnVideoOptionChanged" Margin="0,1" ToolTip="Record the sound your PC plays" />
-                        <CheckBox x:Name="MicBox" Content="Microphone" Click="OnVideoOptionChanged" Margin="0,1" ToolTip="Record your microphone (choose the device in Settings → Recording)" />
-                        <CheckBox x:Name="VideoCursorBox" Content="Cursor" Click="OnVideoOptionChanged" Margin="0,1" ToolTip="Show the mouse pointer in the recording" />
-                        <DockPanel Margin="0,1">
-                            <Button x:Name="CountdownMenuButton" DockPanel.Dock="Right" Click="OnCountdownMenu" Padding="4,2" Margin="2,0,0,0"
-                                    AutomationProperties.Name="Choose countdown" ToolTip="Choose the countdown">
-                                <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronRight}" Width="14" Height="14" Stretch="Uniform" />
-                            </Button>
-                            <CheckBox x:Name="CountdownBox" Content="Countdown" Click="OnVideoOptionChanged" AutomationProperties.Name="Countdown" />
-                        </DockPanel>
-                    </StackPanel>
-                </Grid>
-                </Grid>
-            </Border>
-
-            <!-- Capture -->
-            <Grid Grid.Column="2">
-                <Button x:Name="ResetButton" HorizontalAlignment="Right" VerticalAlignment="Top" Padding="4" Margin="0,-4,-6,0" Click="OnReset"
-                        AutomationProperties.Name="Reset capture options" ToolTip="Reset capture options">
-                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconReset}" Width="18" Height="18" Stretch="Uniform" />
-                </Button>
-                <StackPanel VerticalAlignment="Center" Margin="0,4,0,0">
-                    <Button x:Name="CaptureButton" Style="{StaticResource RoundCaptureButton}" Width="96" Height="96" Click="OnCapture"
-                            IsDefault="True" AutomationProperties.Name="Capture">
-                        <TextBlock x:Name="CaptureButtonText" Text="Capture" FontSize="17" FontWeight="SemiBold" Foreground="{DynamicResource AccentForegroundBrush}" />
-                    </Button>
-                    <StackPanel Orientation="Horizontal" HorizontalAlignment="Center" Margin="0,8,0,0">
-                        <Path x:Name="HotkeyWarningIcon" Style="{StaticResource IconPath}" Data="{StaticResource IconWarning}" Width="14" Height="14" Stretch="Uniform"
-                              Stroke="{DynamicResource WarningBrush}" Margin="0,0,4,0" Visibility="Collapsed" />
-                        <TextBlock x:Name="HotkeyText" FontSize="12" TextAlignment="Center" TextWrapping="Wrap" MaxWidth="150" />
-                    </StackPanel>
+            <Button x:Name="CaptureButton" Style="{StaticResource PrimaryActionButton}" Click="OnCapture" IsDefault="True"
+                    AutomationProperties.Name="Capture" AutomationProperties.HelpText="Captures with the options above (Enter)">
+                <StackPanel Orientation="Horizontal">
+                    <Path x:Name="CaptureButtonIcon" Data="{StaticResource BrandApertureMark}" Stroke="{DynamicResource AccentForegroundBrush}" StrokeThickness="1.8"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" Width="18" Height="18" Stretch="Uniform" Margin="0,0,8,0" VerticalAlignment="Center" />
+                    <TextBlock x:Name="CaptureButtonText" Text="Capture" VerticalAlignment="Center" Foreground="{DynamicResource AccentForegroundBrush}" />
                 </StackPanel>
+            </Button>
+        </DockPanel>
+
+        <Grid Margin="12,0,12,0">
+            <!-- Image options -->
+            <Grid x:Name="ImageOptions">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="236" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Style="{StaticResource PanelCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardHeading}" Text="What to capture" />
+                        <UniformGrid x:Name="TargetChips" Columns="2" AutomationProperties.Name="What to capture">
+                            <RadioButton x:Name="RegionChip" GroupName="ImageTarget" Style="{StaticResource ModeChip}" Content="Region" Tag="{StaticResource IconRegion}" Checked="OnTargetChecked"
+                                         ToolTip="Drag to select an area" AutomationProperties.Name="Region" AutomationProperties.HelpText="Drag to select an area" />
+                            <RadioButton x:Name="WindowChip" GroupName="ImageTarget" Style="{StaticResource ModeChip}" Content="Window" Tag="{StaticResource IconWindow}" Checked="OnTargetChecked"
+                                         ToolTip="Click a window" AutomationProperties.Name="Window" AutomationProperties.HelpText="Click a window" />
+                            <RadioButton x:Name="ActiveWindowChip" GroupName="ImageTarget" Style="{StaticResource ModeChip}" Content="Active window" Tag="{StaticResource IconActiveWindow}" Checked="OnTargetChecked"
+                                         ToolTip="The window you were using (no clicking)" AutomationProperties.Name="Active window" AutomationProperties.HelpText="The window you were using (no clicking)" />
+                            <RadioButton x:Name="DisplayChip" GroupName="ImageTarget" Style="{StaticResource ModeChip}" Content="Display" Tag="{StaticResource IconScreen}" Checked="OnTargetChecked"
+                                         ToolTip="Click a display" AutomationProperties.Name="Display" AutomationProperties.HelpText="Click a display" />
+                            <RadioButton x:Name="FullScreenChip" GroupName="ImageTarget" Style="{StaticResource ModeChip}" Content="Full screen" Tag="{StaticResource IconAllScreens}" Checked="OnTargetChecked"
+                                         ToolTip="Every display" AutomationProperties.Name="Full screen" AutomationProperties.HelpText="Every display" />
+                            <RadioButton x:Name="ScrollingChip" GroupName="ImageTarget" Style="{StaticResource ModeChip}" Content="Scrolling" Tag="{StaticResource IconScrolling}" Checked="OnTargetChecked"
+                                         ToolTip="Select the area that scrolls; SnapForge scrolls it and stitches one tall image. Starts from the Capture button (the global hotkey keeps the last other choice)."
+                                         AutomationProperties.Name="Scrolling" AutomationProperties.HelpText="Select the area that scrolls; SnapForge stitches one tall image" />
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardHeading}" Text="After capture" />
+                        <CheckBox x:Name="PreviewBox" Content="Preview in Editor" Click="OnOptionChanged" Margin="0,2" ToolTip="Open the capture in the Editor" />
+                        <CheckBox x:Name="CopyBox" Content="Copy to Clipboard" Click="OnOptionChanged" Margin="0,2" ToolTip="Put the image on the clipboard" />
+                        <CheckBox x:Name="SaveBox" Content="Save to Library" Click="OnOptionChanged" Margin="0,2"
+                                  ToolTip="Off = capture without history: nothing is written to disk unless you export it." />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="2" Grid.ColumnSpan="3" Style="{StaticResource PanelCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardHeading}" Text="Options" />
+                        <WrapPanel>
+                            <CheckBox x:Name="CursorBox" Content="Cursor" Click="OnOptionChanged" Margin="0,0,14,0" VerticalAlignment="Center" ToolTip="Include the mouse pointer in the image" />
+                            <StackPanel Orientation="Horizontal" Margin="0,0,10,0">
+                                <CheckBox x:Name="DelayBox" Content="Time Delay" Click="OnDelayToggled" AutomationProperties.Name="Time Delay" VerticalAlignment="Center"
+                                          ToolTip="Wait before capturing (a countdown is shown)" />
+                                <Button x:Name="DelayMenuButton" Style="{StaticResource ToolbarButton}" Click="OnDelayMenu" Padding="3,1" MinHeight="24" Margin="2,0,0,0"
+                                        AutomationProperties.Name="Choose delay" ToolTip="Choose the delay">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronRight}" Width="14" Height="14" Stretch="Uniform" />
+                                </Button>
+                            </StackPanel>
+                            <Button x:Name="EffectsButton" Style="{StaticResource DropdownButton}" MinHeight="26" Padding="8,2,4,2" Margin="0,0,6,0" IsEnabled="False"
+                                    AutomationProperties.Name="Effects: None (Not available yet)" ToolTip="Effects — Not available yet">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Effects: None" VerticalAlignment="Center" FontSize="12" />
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="12" Height="12" Stretch="Uniform" Margin="4,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="ShareButton" Style="{StaticResource DropdownButton}" MinHeight="26" Padding="8,2,4,2" IsEnabled="False"
+                                    AutomationProperties.Name="Share: None (Not available yet)"
+                                    ToolTip="Share destinations — Not available yet. Use the Copy to Clipboard and Save to Library switches.">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock Text="Share: None" VerticalAlignment="Center" FontSize="12" />
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="12" Height="12" Stretch="Uniform" Margin="4,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
+            </Grid>
+
+            <!-- Video options (milestone V1) -->
+            <Grid x:Name="VideoOptions" Visibility="Collapsed">
+                <Grid.ColumnDefinitions>
+                    <ColumnDefinition Width="236" />
+                    <ColumnDefinition Width="8" />
+                    <ColumnDefinition Width="*" />
+                </Grid.ColumnDefinitions>
+                <Grid.RowDefinitions>
+                    <RowDefinition Height="Auto" />
+                    <RowDefinition Height="8" />
+                    <RowDefinition Height="Auto" />
+                </Grid.RowDefinitions>
+
+                <Border Style="{StaticResource PanelCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardHeading}" Text="What to record" />
+                        <UniformGrid x:Name="SourceChips" Columns="2" AutomationProperties.Name="What to record">
+                            <RadioButton x:Name="VideoRegionChip" GroupName="VideoSource" Style="{StaticResource ModeChip}" Content="Region" Tag="{StaticResource IconRegion}" Checked="OnSourceChecked"
+                                         ToolTip="Drag to select the area to record" AutomationProperties.Name="Record a region" AutomationProperties.HelpText="Drag to select the area to record" />
+                            <RadioButton x:Name="VideoWindowChip" GroupName="VideoSource" Style="{StaticResource ModeChip}" Content="Window" Tag="{StaticResource IconWindow}" Checked="OnSourceChecked"
+                                         ToolTip="Click the window to record" AutomationProperties.Name="Record a window" AutomationProperties.HelpText="Click the window to record" />
+                            <RadioButton x:Name="VideoDisplayChip" GroupName="VideoSource" Style="{StaticResource ModeChip}" Content="Display" Tag="{StaticResource IconScreen}" Checked="OnSourceChecked"
+                                         ToolTip="Click the display to record" AutomationProperties.Name="Record a display" AutomationProperties.HelpText="Click the display to record" />
+                        </UniformGrid>
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Column="2" Style="{StaticResource PanelCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardHeading}" Text="Audio" />
+                        <CheckBox x:Name="SystemAudioBox" Content="System audio" Click="OnVideoOptionChanged" Margin="0,2" ToolTip="Record the sound your PC plays" />
+                        <CheckBox x:Name="MicBox" Content="Microphone" Click="OnVideoOptionChanged" Margin="0,2" ToolTip="Record your microphone (choose the device in Settings → Recording)" />
+                    </StackPanel>
+                </Border>
+
+                <Border Grid.Row="2" Grid.ColumnSpan="3" Style="{StaticResource PanelCard}">
+                    <StackPanel>
+                        <TextBlock Style="{StaticResource CardHeading}" Text="Options" />
+                        <WrapPanel>
+                            <Button x:Name="FrameRateButton" Style="{StaticResource DropdownButton}" MinHeight="26" Padding="8,2,4,2" Margin="0,0,6,0" Click="OnFrameRateMenu"
+                                    AutomationProperties.Name="Frame rate" ToolTip="Frames per second">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="FrameRateText" Text="30 FPS" VerticalAlignment="Center" FontSize="12" />
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="12" Height="12" Stretch="Uniform" Margin="4,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                            <Button x:Name="QualityButton" Style="{StaticResource DropdownButton}" MinHeight="26" Padding="8,2,4,2" Margin="0,0,12,0" Click="OnQualityMenu"
+                                    AutomationProperties.Name="Quality" ToolTip="MP4 (H.264 + AAC) quality">
+                                <StackPanel Orientation="Horizontal">
+                                    <TextBlock x:Name="QualityText" Text="Standard" VerticalAlignment="Center" FontSize="12" />
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronDown}" Width="12" Height="12" Stretch="Uniform" Margin="4,0,0,0" />
+                                </StackPanel>
+                            </Button>
+                            <CheckBox x:Name="VideoCursorBox" Content="Cursor" Click="OnVideoOptionChanged" Margin="0,0,12,0" VerticalAlignment="Center" ToolTip="Show the mouse pointer in the recording" />
+                            <StackPanel Orientation="Horizontal">
+                                <CheckBox x:Name="CountdownBox" Content="Countdown" Click="OnVideoOptionChanged" AutomationProperties.Name="Countdown" VerticalAlignment="Center"
+                                          ToolTip="Count down before recording starts" />
+                                <Button x:Name="CountdownMenuButton" Style="{StaticResource ToolbarButton}" Click="OnCountdownMenu" Padding="3,1" MinHeight="24" Margin="2,0,0,0"
+                                        AutomationProperties.Name="Choose countdown" ToolTip="Choose the countdown">
+                                    <Path Style="{StaticResource IconPath}" Data="{StaticResource IconChevronRight}" Width="14" Height="14" Stretch="Uniform" />
+                                </Button>
+                            </StackPanel>
+                        </WrapPanel>
+                    </StackPanel>
+                </Border>
             </Grid>
         </Grid>
     </DockPanel>

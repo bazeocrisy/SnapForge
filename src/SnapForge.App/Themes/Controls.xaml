@@ -691,36 +691,6 @@
         <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
     </Style>
 
-    <!-- Large circular capture button. -->
-    <Style x:Key="RoundCaptureButton" TargetType="Button">
-        <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
-        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
-        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
-        <Setter Property="Cursor" Value="Hand" />
-        <Setter Property="Template">
-            <Setter.Value>
-                <ControlTemplate TargetType="Button">
-                    <Grid>
-                        <Ellipse x:Name="Ring" Stroke="{DynamicResource TextBrush}" StrokeThickness="2" Margin="-5" Visibility="Collapsed" />
-                        <Ellipse x:Name="Disc" Fill="{TemplateBinding Background}" />
-                        <ContentPresenter RecognizesAccessKey="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
-                    </Grid>
-                    <ControlTemplate.Triggers>
-                        <Trigger Property="IsMouseOver" Value="True">
-                            <Setter TargetName="Disc" Property="Fill" Value="{DynamicResource AccentHoverBrush}" />
-                        </Trigger>
-                        <Trigger Property="IsPressed" Value="True">
-                            <Setter TargetName="Disc" Property="Opacity" Value="0.85" />
-                        </Trigger>
-                        <Trigger Property="IsKeyboardFocused" Value="True">
-                            <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
-                        </Trigger>
-                    </ControlTemplate.Triggers>
-                </ControlTemplate>
-            </Setter.Value>
-        </Setter>
-    </Style>
-
     <!-- Vertical mode rail item (icon above label). Disabled items stay visible with a tooltip. -->
     <Style x:Key="RailButton" TargetType="RadioButton">
         <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
@@ -757,4 +727,160 @@
     </Style>
 
     <Geometry x:Key="IconShield">M12,3 L19,6 V11 C19,15.5 16,19 12,21 C8,19 5,15.5 5,11 V6 Z M9,12 L11,14 L15,10</Geometry>
+
+    <!-- ================================================================== capture panel and QuickDock (SF-005) -->
+
+    <!-- SnapForge aperture mark (capture brackets around an aperture ring), 32-unit space; branding/snapforge-icon-small.svg. -->
+    <Geometry x:Key="BrandApertureMark">M5,10 V7 Q5,5 7,5 H10 M22,5 H25 Q27,5 27,7 V10 M27,22 V25 Q27,27 25,27 H22 M10,27 H7 Q5,27 5,25 V22 M16,10.4 A5.6,5.6 0 1 1 15.99,10.4 Z</Geometry>
+    <Geometry x:Key="IconActiveWindow">M3.5,5 H20.5 V19 H3.5 Z M3.5,9 H20.5 M9,14 L11,16 L15,12</Geometry>
+    <Geometry x:Key="IconScrolling">M6.5,3.5 H17.5 V20.5 H6.5 Z M12,8.5 V15.5 M9.8,10.5 L12,8.3 L14.2,10.5 M9.8,13.5 L12,15.7 L14.2,13.5</Geometry>
+    <Geometry x:Key="IconRecordDot">M12,6.5 A5.5,5.5 0 1 1 11.99,6.5 Z</Geometry>
+    <Geometry x:Key="IconChevronLeft">M14,7 L9,12 L14,17</Geometry>
+    <Geometry x:Key="IconStop">M7,7 H17 V17 H7 Z</Geometry>
+    <Geometry x:Key="IconPresets">M4,7 H20 M4,17 H20 M9,4.5 V9.5 M15,14.5 V19.5</Geometry>
+    <Geometry x:Key="IconExtractText">M4,8 V5 H8 M16,5 H20 V8 M20,16 V19 H16 M8,19 H4 V16 M8.5,9 H15.5 M12,9 V15.5</Geometry>
+
+    <!-- Rounded section card used by the capture panel ("What to capture", "After capture", "Options"). -->
+    <Style x:Key="PanelCard" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1" />
+        <Setter Property="CornerRadius" Value="8" />
+        <Setter Property="Padding" Value="10,6,10,8" />
+    </Style>
+
+    <!-- Small caption at the top of a panel card. -->
+    <Style x:Key="CardHeading" TargetType="TextBlock">
+        <Setter Property="FontSize" Value="11" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        <Setter Property="Margin" Value="0,0,0,4" />
+    </Style>
+
+    <!-- Segmented navigation tab (icon + label, Tag = icon geometry); the selected tab is raised with an accent underline. -->
+    <Style x:Key="SegmentTab" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{DynamicResource MutedTextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="13" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Grid>
+                        <Border x:Name="Bd" Background="Transparent" CornerRadius="6" Padding="10,4,12,4">
+                            <StackPanel Orientation="Horizontal">
+                                <Path x:Name="Icon" Style="{StaticResource IconPath}" Data="{TemplateBinding Tag}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,6,0" />
+                                <ContentPresenter RecognizesAccessKey="True" VerticalAlignment="Center" />
+                            </StackPanel>
+                        </Border>
+                        <Border x:Name="Underline" Height="2" CornerRadius="1" VerticalAlignment="Bottom" Margin="10,0" Background="{DynamicResource AccentBrush}" Visibility="Collapsed" />
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource SurfaceRaisedBrush}" />
+                            <Setter TargetName="Underline" Property="Visibility" Value="Visible" />
+                            <Setter TargetName="Icon" Property="Stroke" Value="{DynamicResource AccentBrush}" />
+                            <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Choice chip (icon + label, Tag = icon geometry) for "What to capture" / "What to record". -->
+    <Style x:Key="ModeChip" TargetType="RadioButton">
+        <Setter Property="Foreground" Value="{DynamicResource TextBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="12" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="Margin" Value="2" />
+        <Setter Property="MinHeight" Value="28" />
+        <Setter Property="FocusVisualStyle" Value="{StaticResource FocusVisual}" />
+        <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="RadioButton">
+                    <Border x:Name="Bd" Background="{DynamicResource BackgroundBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="1" CornerRadius="6" Padding="7,3">
+                        <StackPanel Orientation="Horizontal">
+                            <Path x:Name="Icon" Style="{StaticResource IconPath}" Data="{TemplateBinding Tag}" Width="16" Height="16" Stretch="Uniform" Margin="0,0,6,0" />
+                            <ContentPresenter RecognizesAccessKey="True" VerticalAlignment="Center" />
+                        </StackPanel>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource HoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsChecked" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentSubtleBrush}" />
+                            <Setter TargetName="Bd" Property="BorderBrush" Value="{DynamicResource AccentBrush}" />
+                            <Setter TargetName="Icon" Property="Stroke" Value="{DynamicResource AccentBrush}" />
+                            <Setter Property="FontWeight" Value="SemiBold" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Full-width rectangular primary action (capture panel "Capture" / "Open Studio…"). Keyboard focus draws a ring. -->
+    <Style x:Key="PrimaryActionButton" TargetType="Button">
+        <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+        <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+        <Setter Property="FontFamily" Value="{StaticResource UiFont}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="FontWeight" Value="SemiBold" />
+        <Setter Property="MinHeight" Value="38" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Grid>
+                        <Border x:Name="Ring" BorderBrush="{DynamicResource TextBrush}" BorderThickness="2" CornerRadius="10" Margin="-3" Visibility="Collapsed" />
+                        <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8" Padding="14,6">
+                            <ContentPresenter RecognizesAccessKey="True" HorizontalAlignment="Center" VerticalAlignment="Center" />
+                        </Border>
+                    </Grid>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.85" />
+                        </Trigger>
+                        <Trigger Property="IsKeyboardFocused" Value="True">
+                            <Setter TargetName="Ring" Property="Visibility" Value="Visible" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter Property="Opacity" Value="0.38" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- Key cap showing a hotkey next to the primary action. -->
+    <Style x:Key="KeyCap" TargetType="Border">
+        <Setter Property="Background" Value="{DynamicResource BackgroundBrush}" />
+        <Setter Property="BorderBrush" Value="{DynamicResource BorderBrush}" />
+        <Setter Property="BorderThickness" Value="1,1,1,2" />
+        <Setter Property="CornerRadius" Value="5" />
+        <Setter Property="Padding" Value="7,3" />
+        <Setter Property="VerticalAlignment" Value="Center" />
+    </Style>
 </ResourceDictionary>
