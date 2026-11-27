@@ -60,6 +60,10 @@ PC-only part (devices, hardware encoders, 4K displays) or a V2/V3 part (webcam, 
 4. Recovery could discard a finished video if stopped between conversion and manifest (fixed; unit test).
 5. Backup wrote video metadata under `captures/` (fixed before commit; test).
 6. Dark-theme styling of toolbar toggles, player and microphone picker (fixed; screenshots).
+7. Skipped frame slots on real screens, found by the long benchmarks: with 0 frames dropped, 1080p30 screen recordings
+   contained only ~83 % of duration × FPS frames (120 min: 179 277 of 216 000) because a slot between two polls was left
+   empty instead of repeating the previous picture. Fixed in the capture loop (skipped slots repeat the previous frame);
+   the per-commit self-test now checks `screen-constant-frame-rate` on the real screen (CI: 151 frames for 5033 ms).
 
 ## 4. Deviations and decisions for the reviewer
 
@@ -83,16 +87,17 @@ See §7 (filled from the final CI run). Then follow VIDEO-ACCEPTANCE.md on a Win
 
 ## 7. Final build
 
-* **Code commit `ed4815da1775eaf058258753c03d0de51de31ceb`** — CI run
-  [45911438628](https://github.com/bazeocrisy/SnapForge/actions/runs/45911438628): build 0 warnings / 0 errors;
+* **Code commit `7899691b60c78cc5f315849142f7dd636f74fc86`** — CI run
+  [45940688992](https://github.com/bazeocrisy/SnapForge/actions/runs/45940688992): build 0 warnings / 0 errors;
   **Core tests 191/191**, **Windows app tests 55/55**; portable build without .NET: checksums verified, self-test PASS,
-  video probe, **video self-test PASS (13/13)**, **crash-recovery PASS**, screenshot tour PASS; Library benchmarks PASS.
-  Later commits on the branch change documentation only.
-* **Portable build (zip):** [SnapForge-portable-win-x64-dev-ed4815d…](https://github.com/bazeocrisy/SnapForge/actions/runs/45911438628/artifacts/15160347121)
-  (GitHub sign-in needed to download; kept 30 days). Help → About shows commit `ed4815da…` and branch `claude/video-v1`.
-* **`SnapForge.exe` SHA-256:** `b96a4b96713cf3067346a5559a98ff12f89edf21bdd3c864d6cea5956c98d9d0`
+  video probe, **video self-test PASS (14/14, incl. `screen-constant-frame-rate`)**, **crash-recovery PASS** (8.7 s
+  recovered), screenshot tour PASS; Library benchmarks PASS. Later commits on the branch change documentation only.
+* **Portable build (zip):** [SnapForge-portable-win-x64-dev-7899691…](https://github.com/bazeocrisy/SnapForge/actions/runs/45940688992/artifacts/15172851723)
+  (GitHub sign-in needed to download; kept 30 days, until 2026-12-27). Help → About shows commit `7899691b…` and branch
+  `claude/video-v1`.
+* **`SnapForge.exe` SHA-256:** `50d6740d45a3b36a0e31ea40e518554e4e7c21ec1556ae56363c614ca5d1b9d6`
   (all files: `SHA256SUMS.txt` in the zip; verify with `Get-FileHash .\SnapForge.exe`).
-* **Sample MP4s:** artifact `video-samples-<commit>` of the same run (VIDEO-TEST-RESULTS.md §5 lists hashes from run 45910436639).
+* **Sample MP4s:** artifact `video-samples-7899691…` of the same run (VIDEO-TEST-RESULTS.md §5 lists hashes from run 45910436639).
 * Unsigned development build: Windows SmartScreen will warn (More info → Run anyway), as with Milestone 3.
 * Only one SnapForge runs at a time: exit the Milestone 3 copy from the notification area first, or accept the
   take-over prompt. Both builds share the same Library; the Milestone 3 build will not show videos (by design).

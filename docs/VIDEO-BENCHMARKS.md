@@ -2,7 +2,7 @@
 
 **Status: finished** (1080p30 incl. 120 min, 1080p60, 1440p measured; 4K partly — see below) — workflow *Video benchmarks*, run
 [45910273309](https://github.com/bazeocrisy/SnapForge/actions/runs/45910273309) on commit `fccffbe` (same recorder
-code as the final build `ed4815d`; later commits changed UI styling, the encoder label and documentation). Each
+code as build `ed4815d`; the final build `7899691` adds the frame-slot fix in footnote ¹). Each
 configuration's JSON is uploaded as artifact `video-bench-<label>`. Rows below come from the job logs.
 
 ## Method
@@ -77,7 +77,7 @@ screen. GPU load: not measurable (no GPU).
 
 ## Per-commit self-test (for comparison)
 
-| Measurement (CI self-test, commit `ed4815d`) | Result |
+| Measurement (CI self-test, commit `ed4815d`; `7899691` adds real-screen constant frame rate: 151 frames for 5033 ms) | Result |
 |---|---|
 | 640×360 · 30 FPS · 12 s synthetic | A/V error max 0.07 ms, drift 0.05 ms/min; CPU 3.8 %; peak private memory 175 MB; encode latency 33 ms |
 | 1280×720 · 60 FPS · 5 s synthetic | 0 dropped frames; A/V error 0.02 ms; CPU 19.6 %; peak private memory 507 MB |
