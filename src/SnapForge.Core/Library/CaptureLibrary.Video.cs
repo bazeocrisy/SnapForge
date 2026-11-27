@@ -18,6 +18,9 @@ public sealed record InterruptedRecording(Guid Id, string VideoPath, DateTime St
 /// a folder that SnapForge versions without video never read, so an older version cannot list, open or rewrite a
 /// video (it neither sees nor touches them). Each folder holds <c>video.mp4</c>, <c>thumb.sfpx</c>, <c>meta.json</c>
 /// (same metadata as images: title, tags, folder, favorite, trash) and <c>video.json</c>, the manifest, written last.
+/// The manifest records the MP4's size and (since FA-008) its streamed SHA-256 (<c>videoSha256</c>, an additive field:
+/// the format version stays 1, so older versions still read it). Indexing checks only the size; the hash is checked
+/// by <see cref="VerifyIntegrity"/>, backup, restore, relocation and <see cref="ExportVideo"/>.
 /// While recording, the folder holds a <c>recording.inprogress</c> marker and no manifest: the item is not listed,
 /// and if the app stops before completing, the folder is reported by <see cref="InterruptedRecordings"/>.
 /// </summary>
@@ -80,6 +83,10 @@ public sealed partial class CaptureLibrary
             WriteMeta(dir, new CaptureMetadata { Title = title?.Trim() is { Length: > 0 } t ? t : DefaultVideoTitle(createdUtc) });
         }
 
+        // FA-008: a streamed SHA-256 of the final MP4 (never loaded whole) lets backup, restore, relocation and export
+        // detect any modification, including same-length ones. Startup indexing still checks only the length.
+        (string videoSha256, long videoBytes) = AtomicFile.HashFile(video);
+
         var manifest = new JsonObject
         {
             ["format"] = VideoFormatId,
@@ -96,7 +103,8 @@ public sealed partial class CaptureLibrary
             ["container"] = "mp4",
             ["videoCodec"] = "h264",
             ["audioCodec"] = info.HasAudio ? "aac" : null,
-            ["videoBytes"] = new FileInfo(video).Length,
+            ["videoBytes"] = videoBytes,
+            ["videoSha256"] = videoSha256,
             ["layout"] = layout,
             ["generator"] = $"{ProductInfo.Name} {typeof(CaptureLibrary).Assembly.GetName().Version}",
         };
