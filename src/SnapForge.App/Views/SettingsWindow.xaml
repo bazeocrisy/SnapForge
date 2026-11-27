@@ -129,6 +129,8 @@
                 <TextBlock FontSize="12" TextWrapping="Wrap" Text="Restores every preference to its default (hotkeys, capture options, presets, widget, recording, appearance). Your captures and the Library location are kept." />
                 <WrapPanel Margin="0,6,0,0">
                     <Button Content="Reset all preferences…" Click="OnResetPreferences" Margin="0,0,6,6" />
+                    <Button x:Name="DeleteMyDataButton" Content="Delete my SnapForge data…" Click="OnDeleteMyData" Margin="0,0,6,6"
+                            ToolTip="Permanently deletes YOUR captures, recordings, settings, logs and temporary files (only for this Windows user), then exits SnapForge. Asks twice." />
                 </WrapPanel>
             </StackPanel>
         </ScrollViewer>

@@ -1,14 +1,23 @@
 ; SnapForge installer (Inno Setup 6). Built by CI from the same files as the portable ZIP:
-;   iscc /DAppVersion=1.0.0-rc.1 /DFileVersion=1.0.0.123 /DSourceDir=..\artifacts\portable\SnapForge /DOutputDir=..\artifacts\installer installer\SnapForge.iss
+;   iscc /DAppVersion=1.0.0-rc.2 /DFileVersion=1.0.0.123 /DSourceDir=..\artifacts\portable\SnapForge /DOutputDir=..\artifacts\installer installer\SnapForge.iss
 ;
-; Design decisions (see docs/INSTALLATION.md):
-; * Per-user install into %LOCALAPPDATA%\Programs\SnapForge — no administrator rights, no UAC prompt.
-; * Upgrades install over the previous version (same AppId); settings and the capture Library are untouched because
-;   they live in %LOCALAPPDATA%\SnapForge, not in the program folder.
-; * Uninstall NEVER deletes captures silently: the uninstaller asks, defaulting to "keep", and asks a second time
-;   before removing %LOCALAPPDATA%\SnapForge. A Library moved elsewhere is never touched (the user chose that folder).
-; * A running SnapForge is detected through its single-instance mutex and must be closed first (no forced kill:
-;   it could be recording).
+; Design decisions (FA-002 / SF-002; see docs/INSTALLATION.md):
+; * System-wide install for all users into the native 64-bit Program Files folder ({autopf} in 64-bit admin mode =
+;   C:\Program Files\SnapForge), registered under HKLM (Settings → Apps → Installed apps), all-users Start menu
+;   shortcut, optional all-users desktop shortcut. Administrator approval (UAC) is needed for install, repair and
+;   uninstall only; SnapForge itself always runs as a standard user and never asks for elevation.
+; * Program Files keeps its default protected permissions: no [Dirs]/[Files] Permissions entries, so the program files
+;   are never writable by standard users.
+; * All mutable data (settings, Library, recordings, logs, temporary drag copies) stays in each user's own profile
+;   (%LOCALAPPDATA%\SnapForge). The elevated setup/uninstaller never reads, moves or deletes any user's data, and never
+;   touches HKEY_CURRENT_USER (under elevation with different administrator credentials that would be the wrong
+;   account). Deleting your own data is a standard-user action inside SnapForge (Settings → Delete my SnapForge data).
+; * Older per-user installations (1.0.0-rc.1 and earlier, %LOCALAPPDATA%\Programs\SnapForge) are not searched for or
+;   removed here (setup runs as an administrator and must not touch other profiles). SnapForge itself detects the
+;   older copy of the signed-in user on first start and offers to remove it (data kept) — see LegacyInstallMigration.
+; * A running SnapForge in this session (Local\ mutex) or any other session (Global\ mutex) must be exited first. Setup
+;   never kills it: it could be recording.
+; * Upgrades install over the previous version (same AppId); repair = run the same setup again.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0-dev"
@@ -37,16 +46,17 @@ VersionInfoVersion={#FileVersion}
 VersionInfoProductVersion={#FileVersion}
 VersionInfoProductTextVersion={#AppVersion}
 VersionInfoDescription=SnapForge Setup
-DefaultDirName={localappdata}\Programs\SnapForge
+DefaultDirName={autopf}\SnapForge
 DefaultGroupName=SnapForge
 DisableProgramGroupPage=yes
 DisableDirPage=auto
-PrivilegesRequired=lowest
+UsePreviousAppDir=yes
+PrivilegesRequired=admin
 PrivilegesRequiredOverridesAllowed=
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.26100
-AppMutex=Local\SnapForge-SingleInstance-7c1d
+AppMutex=Local\SnapForge-SingleInstance-7c1d,Global\SnapForge-Running-7c1d
 CloseApplications=no
 RestartApplications=no
 LicenseFile={#SourceDir}\LICENSE.txt
@@ -64,11 +74,11 @@ SetupLogging=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-SetupAppRunningError=SnapForge is running. Please exit it first: right-click the SnapForge icon in the notification area (next to the clock) and choose Exit SnapForge. If it is recording, stop the recording first.%n%nClick OK to continue, or Cancel to exit Setup.
-UninstallAppRunningError=SnapForge is running. Please exit it first: right-click the SnapForge icon in the notification area and choose Exit SnapForge.%n%nClick OK to continue, or Cancel to exit.
+SetupAppRunningError=SnapForge is running — in your session or in another user's session on this PC. Every user must exit it first: right-click the SnapForge icon in the notification area (next to the clock) and choose Exit SnapForge. If it is recording, stop the recording first. Setup never closes SnapForge by force.%n%nClick OK to check again, or Cancel to exit Setup.
+UninstallAppRunningError=SnapForge is running — in your session or in another user's session on this PC. Every user must exit it first (notification-area icon → Exit SnapForge).%n%nClick OK to check again, or Cancel to exit.
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Shortcuts:"; Flags: unchecked
+Name: "desktopicon"; Description: "Create a &desktop shortcut for all users"; GroupDescription: "Shortcuts:"; Flags: unchecked
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
@@ -78,16 +88,10 @@ Name: "{autoprograms}\SnapForge"; Filename: "{app}\SnapForge.exe"; Comment: "Cap
 Name: "{autodesktop}\SnapForge"; Filename: "{app}\SnapForge.exe"; Tasks: desktopicon; Comment: "Capture. Create. Share."
 
 [Run]
-Filename: "{app}\SnapForge.exe"; Description: "Start SnapForge now"; Flags: nowait postinstall skipifsilent
-
-[UninstallDelete]
-; Temporary drag-and-drop copies only (never captures).
-Type: filesandordirs; Name: "{localappdata}\SnapForge\Temp"
+; Started as the user who ran Setup (not as the administrator who approved it), and only when Setup is interactive.
+Filename: "{app}\SnapForge.exe"; Description: "Start SnapForge now"; Flags: nowait postinstall skipifsilent runasoriginaluser unchecked
 
 [Code]
-const
-  StartupRunKey = 'Software\Microsoft\Windows\CurrentVersion\Run';
-
 function InitializeSetup(): Boolean;
 var
   Version: TWindowsVersion;
@@ -102,31 +106,15 @@ begin
 end;
 
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
-var
-  DataDir, RunValue: String;
 begin
-  if CurUninstallStep = usPostUninstall then
+  if (CurUninstallStep = usPostUninstall) and not UninstallSilent() then
   begin
-    { "Launch SnapForge when I sign in" is a per-user Run value. Remove it only if it starts THIS installation
-      (a portable copy elsewhere keeps its own setting). }
-    if RegQueryStringValue(HKEY_CURRENT_USER, StartupRunKey, 'SnapForge', RunValue) then
-      if Pos(Lowercase(ExpandConstant('{app}')), Lowercase(RunValue)) > 0 then
-        RegDeleteValue(HKEY_CURRENT_USER, StartupRunKey, 'SnapForge');
-
-    DataDir := ExpandConstant('{localappdata}\SnapForge');
-    if DirExists(DataDir) and not UninstallSilent() then
-    begin
-      if MsgBox('SnapForge has been removed. Your captures, recordings and settings are still in:' + #13#10 + DataDir + #13#10#13#10 +
-                'Do you also want to DELETE your captures, recordings and settings?' + #13#10 +
-                '(Choose No to keep them. A Library you moved to another folder is never deleted.)',
-                mbConfirmation, MB_YESNO or MB_DEFBUTTON2) = IDYES then
-      begin
-        if MsgBox('This permanently deletes every capture and recording in ' + DataDir + '.' + #13#10#13#10 +
-                  'Are you sure?', mbError, MB_YESNO or MB_DEFBUTTON2) = IDYES then
-        begin
-          DelTree(DataDir, True, True, True);
-        end;
-      end;
-    end;
+    MsgBox('SnapForge has been removed from this PC.' + #13#10#13#10 +
+           'Captures, recordings and settings were NOT deleted. They belong to each Windows user and stay in that user''s ' +
+           'own folder (%LOCALAPPDATA%\SnapForge, or the Library location chosen in Settings).' + #13#10#13#10 +
+           'To delete your own data, reinstall or run the portable SnapForge and use Settings → Delete my SnapForge data, ' +
+           'or delete that folder yourself after making sure you have copies of anything you want to keep.' + #13#10 +
+           'If "Launch when I sign in" was on, Windows may still list SnapForge under Settings → Apps → Startup; you can turn it off there.',
+           mbInformation, MB_OK);
   end;
 end;

@@ -1,3 +1,4 @@
+using System.IO;
 using System.Windows;
 using System.Windows.Controls;
 using SnapForge.App.Interop;
@@ -129,5 +130,42 @@ public class WindowingTests
         Assert.Equal("installed for all users (Program Files)", Services.InstanceInfo.InstallationKind(
             System.IO.Path.Combine(Environment.GetFolderPath(Environment.SpecialFolder.ProgramFiles), "SnapForge", "SnapForge.exe")));
         Assert.Equal("portable (not installed)", Services.InstanceInfo.InstallationKind(@"D:\Tools\SnapForge\SnapForge.exe"));
+    }
+}
+
+/// <summary>FA-002: the per-user → system-wide migration only ever touches the user's own old per-user copy.</summary>
+public class LegacyInstallMigrationTests
+{
+    [Fact]
+    public void FA002_only_an_install_inside_the_users_Programs_folder_with_its_uninstaller_is_accepted()
+    {
+        string root = Path.Combine(Path.GetTempPath(), "sf-legacy-" + Guid.NewGuid().ToString("N"));
+        string programs = Path.Combine(root, "Local", "Programs");
+        string old = Path.Combine(programs, "SnapForge");
+        Directory.CreateDirectory(old);
+        try
+        {
+            Assert.Null(Services.LegacyInstallMigration.Validate(old, "1.0.0-rc.1", null, programs)); // no uninstaller yet
+            File.WriteAllText(Path.Combine(old, "unins000.exe"), "x");
+            var found = Services.LegacyInstallMigration.Validate(old, "1.0.0-rc.1", @"C:\Program Files\SnapForge\SnapForge.exe", programs);
+            Assert.NotNull(found);
+            Assert.Equal(Path.Combine(old, "unins000.exe"), found!.Uninstaller);
+
+            // Never: another folder, traversal out of Programs, or the running copy itself.
+            Assert.Null(Services.LegacyInstallMigration.Validate(@"C:\Windows\System32", null, null, programs));
+            Assert.Null(Services.LegacyInstallMigration.Validate(Path.Combine(programs, "..", "..", "Other"), null, null, programs));
+            Assert.Null(Services.LegacyInstallMigration.Validate(old, null, Path.Combine(old, "SnapForge.exe"), programs));
+        }
+        finally
+        {
+            Directory.Delete(root, recursive: true);
+        }
+    }
+
+    [Fact]
+    public void FA002_running_marker_is_visible_machine_wide_while_held()
+    {
+        Interop.RunningMarker.Hold();
+        Assert.True(Interop.RunningMarker.IsHeldAnywhere());
     }
 }

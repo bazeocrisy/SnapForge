@@ -111,6 +111,21 @@ public partial class App : Application
             return;
         }
 
+        if (args.Length >= 2 && args[0] == "--library-check")
+        {
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(LibraryCheck.Run(args));
+            return;
+        }
+
+        if (args.Length >= 1 && args[0] == "--migrate-per-user-install")
+        {
+            // Headless migration from the rc.1 per-user installation (CI and administrators): --yes skips the question.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            Shutdown(MigrateLegacyInstall(interactive: !args.Contains("--yes"), report: true));
+            return;
+        }
+
         if (args.Length >= 1 && args[0] is "--self-test" or "--screenshots")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -124,6 +139,7 @@ public partial class App : Application
         // build (e.g. a newer download while an older copy runs in the notification area) is reported instead of
         // silently handing over to the old copy, and can replace it.
         _instanceMutex = new Mutex(initiallyOwned: true, $@"Local\{InstanceKey}", out bool first);
+        Interop.RunningMarker.Hold(); // lets the system-wide (un)installer see SnapForge running in any session
         _activateSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceKey}-activate");
         _exitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceKey}-exit");
         if (!first && !TakeOverFromRunningInstance())
@@ -183,6 +199,8 @@ public partial class App : Application
             return;
         }
 
+        MigrateLegacyInstall(interactive: true, report: false);
+
         if (_widget is not null && !services.Settings.WidgetIntroShown)
         {
             // First deliberate start with the dock: open it briefly so the user sees where it lives.
@@ -202,6 +220,61 @@ public partial class App : Application
         }
 
         ShowPrimaryWindow();
+    }
+
+    /// <summary>
+    /// FA-002: if this copy is installed for all users and the signed-in user still has the older per-user copy
+    /// (1.0.0-rc.1), offer once to remove that old copy (captures and settings are kept). Returns a process exit code
+    /// for the headless mode: 0 = nothing to do or migrated, 1 = declined, 2 = failed.
+    /// </summary>
+    internal static int MigrateLegacyInstall(bool interactive, bool report)
+    {
+        string? exe = Environment.ProcessPath;
+        LegacyInstallMigration.LegacyInstall? old = exe is null ? null : LegacyInstallMigration.Find(exe);
+        bool installed = exe is not null && InstanceInfo.InstallationKind(exe).StartsWith("installed for all users", StringComparison.Ordinal);
+        if (old is null || !installed || (interactive && File.Exists(LegacyInstallMigration.DeclinedMarker)))
+        {
+            if (report)
+            {
+                Console.WriteLine(old is null ? "MIGRATION: no older per-user installation for this user" : "MIGRATION: this copy is not the system-wide installation; nothing done");
+            }
+
+            return 0;
+        }
+
+        if (interactive)
+        {
+            MessageBoxResult answer = MessageBox.Show(
+                $"SnapForge is now installed for all users in Program Files.\n\nAn older copy installed only for you (version {old.Version ?? "unknown"}) is still in:\n{old.Location}\n\n" +
+                "Remove the older copy now? Your captures, recordings and settings are kept — only the old program files and its Start menu entry are removed.",
+                ProductInfo.Name, MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.Yes);
+            if (answer != MessageBoxResult.Yes)
+            {
+                try
+                {
+                    Directory.CreateDirectory(ProductInfo.DataRoot);
+                    File.WriteAllText(LegacyInstallMigration.DeclinedMarker, DateTime.UtcNow.ToString("O", System.Globalization.CultureInfo.InvariantCulture));
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                }
+
+                return 1;
+            }
+        }
+
+        string? error = LegacyInstallMigration.Remove(old, exe!);
+        if (report)
+        {
+            Console.WriteLine(error is null ? $"MIGRATION: removed the per-user copy in {old.Location}; data kept" : $"MIGRATION FAILED: {error}");
+        }
+        else if (error is not null)
+        {
+            MessageBox.Show($"The older copy could not be removed:\n{error}\n\nYou can remove it in Settings → Apps → Installed apps (choose the SnapForge entry installed for you only). Your captures are not affected.",
+                ProductInfo.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        return error is null ? 0 : 2;
     }
 
     /// <summary>True when this process was started by Windows at sign-in (tests and diagnostics).</summary>
@@ -313,7 +386,37 @@ public partial class App : Application
             _instanceMutex.Dispose();
         }
 
+        if (DeleteDataOnExit)
+        {
+            DeleteDataRootNow();
+        }
+
         base.OnExit(e);
+    }
+
+    /// <summary>Set by Settings → Delete my SnapForge data: the data folder is deleted after everything is closed.</summary>
+    internal static bool DeleteDataOnExit { get; set; }
+
+    private static void DeleteDataRootNow()
+    {
+        string root = ProductInfo.DataRoot;
+        for (int attempt = 0; attempt < 5 && Directory.Exists(root); attempt++)
+        {
+            try
+            {
+                Directory.Delete(root, recursive: true);
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                Thread.Sleep(400); // a file may still be closing
+            }
+        }
+
+        if (Directory.Exists(root))
+        {
+            MessageBox.Show($"Some files could not be deleted (they may be open in another program):\n{root}\n\nDelete the folder yourself after closing other programs.",
+                ProductInfo.Name, MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
     }
 
     /// <summary>Runs a capture with the given options and hands the result to the Editor / Library / clipboard.</summary>

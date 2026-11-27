@@ -435,5 +435,45 @@ public partial class SettingsWindow : Window
         MessageBox.Show(this, "Preferences were reset to their defaults.", "Reset all preferences", MessageBoxButton.OK, MessageBoxImage.Information);
     }
 
+    /// <summary>
+    /// FA-002: data removal is an explicit standard-user action (the system-wide uninstaller never deletes user data).
+    /// Deletes this user's data folder (settings, Library at the default location, logs, temporary files) after two
+    /// confirmations, then exits. A Library in a custom folder is listed but not deleted.
+    /// </summary>
+    private void OnDeleteMyData(object sender, RoutedEventArgs e)
+    {
+        if (Video.RecordingController.IsActive)
+        {
+            MessageBox.Show(this, "Stop the recording first.", "Delete my SnapForge data", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        string dataRoot = Core.ProductInfo.DataRoot;
+        string library = _services.Library.Root;
+        bool customLibrary = !library.StartsWith(dataRoot.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
+        string libraryNote = customLibrary
+            ? $"\n\nYour Library is in a folder you chose and will NOT be deleted:\n{library}\nDelete it yourself if you want to."
+            : string.Empty;
+        if (MessageBox.Show(this,
+                $"Delete all of YOUR SnapForge data on this PC?\n\n{dataRoot}\n\nThis removes your settings, captures, recordings, logs and temporary files " +
+                $"(only for this Windows user) and then exits SnapForge. Backups and files you exported are not affected.{libraryNote}\n\nMake sure you have copies of anything you want to keep.",
+                "Delete my SnapForge data", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        int count = _services.Library.Records.Count;
+        if (MessageBox.Show(this,
+                customLibrary ? "Are you sure? Your settings, logs and temporary files will be deleted permanently." : $"Are you sure? {count} capture(s) and recording(s) will be deleted permanently. This cannot be undone.",
+                "Delete my SnapForge data", MessageBoxButton.YesNo, MessageBoxImage.Stop, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        App.DeleteDataOnExit = true;
+        Close();
+        _ = App.ExitAsync();
+    }
+
     private void OnClose(object sender, RoutedEventArgs e) => Close();
 }
