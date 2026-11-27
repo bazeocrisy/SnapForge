@@ -173,6 +173,8 @@
                                 <ContextMenu>
                                     <MenuItem Header="_Rename…" Click="OnRename" InputGestureText="F2" />
                                     <MenuItem Header="_Duplicate" Click="OnDuplicate" />
+                                    <MenuItem Header="_Combine images side by side" Tag="Horizontal" Click="OnCombine" />
+                                    <MenuItem Header="Combine images _stacked" Tag="Vertical" Click="OnCombine" />
                                     <MenuItem Header="Toggle _favorite" Click="OnToggleFavorite" />
                                     <MenuItem Header="_Tags…" Click="OnEditTags" />
                                     <MenuItem Header="Move to _folder…" Click="OnSetFolder" />

@@ -822,6 +822,42 @@ public partial class LibraryView : UserControl
         }, records.Count == 1 ? "Duplicated." : $"Duplicated {records.Count} captures.").ConfigureAwait(true);
     }
 
+    /// <summary>More → Combine images: the selected images (as exported: annotations and redactions applied) placed
+    /// side by side or stacked, in the order shown, as a new capture. The originals are not changed.</summary>
+    private async void OnCombine(object sender, RoutedEventArgs e)
+    {
+        List<CaptureRecord> records = [.. SelectedRecords().Where(r => !r.IsVideo && r.Damage is null)];
+        if (records.Count < 2)
+        {
+            _host?.SetStatus("Select two or more images to combine.");
+            return;
+        }
+
+        var direction = (sender as FrameworkElement)?.Tag as string == "Vertical" ? CombineDirection.Vertical : CombineDirection.Horizontal;
+        try
+        {
+            CaptureRecord created = await _services!.Writer.RunAsync(() =>
+            {
+                var parts = new List<PixelBuffer>();
+                foreach (CaptureRecord r in records)
+                {
+                    CaptureContent c = _services.Library.Load(r.Id);
+                    var doc = new EditorDocument(c.BaseImage, c.Annotations);
+                    parts.Add(ImageExporter.Flatten(doc.Image, doc.Annotations));
+                    doc.Discard();
+                }
+
+                PixelBuffer combined = ImageOps.Combine(parts, direction, 16, ArgbColor.White, CombineAlignment.Center);
+                return _services.Library.Create(new CaptureContent(combined, []), combined, DateTime.UtcNow, $"Combined ({records.Count} images)");
+            }).ConfigureAwait(true);
+            _host?.SetStatus($"Created \"{created.Title}\" ({created.Width} × {created.Height}).");
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or ArgumentException or UnauthorizedAccessException)
+        {
+            _host?.SetStatus($"The images could not be combined: {ex.Message}");
+        }
+    }
+
     private async void OnToggleFavorite(object sender, RoutedEventArgs e)
     {
         List<CaptureRecord> records = SelectedRecords();

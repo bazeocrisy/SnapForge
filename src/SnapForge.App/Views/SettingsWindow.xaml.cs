@@ -404,5 +404,31 @@ public partial class SettingsWindow : Window
 
     private void OnPrivacyNotice(object sender, RoutedEventArgs e) => App.ShowPrivacyNotice(this);
 
+    private void OnDeleteDragCopies(object sender, RoutedEventArgs e)
+    {
+        long before = CaptureDragDrop.Store.TotalBytes();
+        int removed = CaptureDragDrop.Store.DeleteAll(DateTime.UtcNow);
+        long after = CaptureDragDrop.Store.TotalBytes();
+        MessageBox.Show(this, $"Removed {removed} drag-and-drop folder(s), {(before - after) / 1024} KB." +
+            (after > 0 ? $"\n{after / 1024} KB are still in use by another app and will be removed later." : string.Empty) +
+            "\n\nFiles are deleted normally (not overwritten); apps you dropped them into keep their own copies.",
+            "Drag-and-drop copies", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void OnResetPreferences(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this, "Reset every SnapForge preference to its default?\n\nYour captures, recordings and the Library location are kept.",
+                "Reset all preferences", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        string? library = _services.Settings.LibraryPath;
+        _services.UpdateSettings(_ => new AppSettings { LibraryPath = library, PrivacyNoticeShown = true });
+        App.RegisterHotkeys(notifyOnFailure: true);
+        Load();
+        MessageBox.Show(this, "Preferences were reset to their defaults.", "Reset all preferences", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
     private void OnClose(object sender, RoutedEventArgs e) => Close();
 }

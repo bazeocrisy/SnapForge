@@ -118,6 +118,14 @@
                 <WrapPanel Margin="0,6,0,0">
                     <Button Content="Sanitize all captures with redactions…" Click="OnSanitizeAll" Margin="0,0,6,6" />
                     <Button Content="Show privacy &amp; storage notice" Click="OnPrivacyNotice" Margin="0,0,6,6" />
+                    <Button x:Name="DragCopiesButton" Content="Delete drag-and-drop copies now" Click="OnDeleteDragCopies" Margin="0,0,6,6"
+                            ToolTip="Copies made for drag-and-drop are kept for 24 hours so apps can finish reading them" />
+                </WrapPanel>
+
+                <TextBlock Text="RESET" Style="{StaticResource SectionHeader}" />
+                <TextBlock FontSize="12" TextWrapping="Wrap" Text="Restores every preference to its default (hotkeys, capture options, presets, widget, recording, appearance). Your captures and the Library location are kept." />
+                <WrapPanel Margin="0,6,0,0">
+                    <Button Content="Reset all preferences…" Click="OnResetPreferences" Margin="0,0,6,6" />
                 </WrapPanel>
             </StackPanel>
         </ScrollViewer>
