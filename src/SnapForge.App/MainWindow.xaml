@@ -273,8 +273,14 @@
 
                 <!-- Horizontal annotation toolbar -->
                 <Border Grid.Row="0" x:Name="ToolPalette" Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource BorderBrush}" BorderThickness="0,0,0,1" Padding="8,4" IsEnabled="False">
-                    <DockPanel LastChildFill="False">
-                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle">
+                    <!-- Tools wrap onto a second row on narrow windows; edit and output buttons always stay visible. -->
+                    <Grid>
+                        <Grid.ColumnDefinitions>
+                            <ColumnDefinition Width="*" />
+                            <ColumnDefinition Width="Auto" />
+                            <ColumnDefinition Width="Auto" />
+                        </Grid.ColumnDefinitions>
+                        <WrapPanel x:Name="ToolButtonsPanel" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle">
                             <RadioButton x:Name="SelectTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Select" Checked="OnToolChecked" ToolTip="Select and move (V)" AutomationProperties.Name="Select tool">
                                 <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconSelect}" /><TextBlock Text="Select" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
@@ -327,9 +333,9 @@
                             <RadioButton x:Name="CropTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Crop" Checked="OnToolChecked" ToolTip="Crop (C) — drag the area to keep" AutomationProperties.Name="Crop tool">
                                 <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconCrop}" /><TextBlock Text="Crop" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
-                        </StackPanel>
+                        </WrapPanel>
 
-                        <StackPanel DockPanel.Dock="Left" Orientation="Horizontal" Margin="6,0,0,0">
+                        <StackPanel Grid.Column="1" Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Top">
                             <Rectangle Style="{StaticResource Separator}" Height="32" />
                             <Button x:Name="UndoButton" Style="{StaticResource ToolbarButton}" Click="OnUndo" ToolTip="Undo (Ctrl+Z)" IsEnabled="False" AutomationProperties.Name="Undo">
                                 <Path Style="{StaticResource IconPath}" Data="{StaticResource IconUndo}" />
@@ -342,7 +348,7 @@
                             </Button>
                         </StackPanel>
 
-                        <StackPanel DockPanel.Dock="Right" Orientation="Horizontal">
+                        <StackPanel Grid.Column="2" Orientation="Horizontal" Margin="6,0,0,0" VerticalAlignment="Top">
                             <Button x:Name="DragOutButton" Style="{StaticResource ToolbarButton}" Cursor="SizeAll" IsEnabled="False"
                                     Click="OnDragOutClick" PreviewMouseLeftButtonDown="OnDragOutMouseDown" PreviewMouseMove="OnDragOutMouseMove"
                                     ToolTip="Drag this into Explorer, the desktop, Word, Outlook, Teams or a browser to copy the capture as an image (annotations applied, redactions burned in)"
@@ -368,7 +374,7 @@
                                 <Path Style="{StaticResource IconPath}" Data="{StaticResource IconPanel}" />
                             </ToggleButton>
                         </StackPanel>
-                    </DockPanel>
+                    </Grid>
                 </Border>
 
                 <!-- Privacy banners -->

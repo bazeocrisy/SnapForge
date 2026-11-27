@@ -41,6 +41,37 @@ public partial class ReleaseCandidateUiTests
         item.RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
     }
 
+    [Theory]
+    [InlineData(900)]  // MainWindow.MinWidth
+    [InlineData(1280)] // default width
+    public void Every_toolbar_control_stays_fully_visible_at_the_window_width(int width) => UiThread.Run(async () =>
+    {
+        // Regression (DEF-RC-07): adding Pen/Callout/Stamp pushed Undo/Redo/Delete off a 980-px window.
+        AppServices services = TestServices.Create();
+        MainWindow w = NewWindow(services);
+        try
+        {
+            w.Width = width;
+            w.LoadImage(TestImages.Gradient(320, 200), DateTime.Now);
+            await Task.Delay(300);
+            w.UpdateLayout();
+            var content = (FrameworkElement)w.Content;
+            var controls = new List<FrameworkElement> { w.UndoButton, w.RedoButton, w.DeleteButton, w.DragOutButton, w.CopyButton, w.SaveButton };
+            controls.AddRange(w.ToolButtonsPanel.Children.OfType<RadioButton>().Where(b => b.Visibility == Visibility.Visible));
+            Assert.True(controls.Count >= 18);
+            foreach (FrameworkElement c in controls)
+            {
+                Rect r = c.TransformToAncestor(content).TransformBounds(new Rect(0, 0, c.ActualWidth, c.ActualHeight));
+                Assert.True(c.ActualWidth > 0 && r.Left >= 0 && r.Right <= content.ActualWidth + 0.5,
+                    $"{c.Name} at {r} is outside the {content.ActualWidth}-px window content");
+            }
+        }
+        finally
+        {
+            await Close(w);
+        }
+    });
+
     [Fact]
     public void Image_menu_rotates_and_flips_the_capture_with_annotations_and_undo() => UiThread.Run(async () =>
     {
