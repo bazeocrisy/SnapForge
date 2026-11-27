@@ -236,7 +236,10 @@ jobs:
             }
           }
           "@
-          function Captioned($proc) { [Wins]::Captioned([uint32]$proc.Id) }
+          $log = Join-Path $env:RUNNER_TEMP 'startup-windows.log'
+          trap { "FAIL $_" | Tee-Object -FilePath $log -Append | Write-Output; break }
+          function Say([string]$m) { $m | Out-File $log -Append; Write-Output $m }
+          function Captioned($proc) { $l = [Wins]::Captioned([uint32]$proc.Id); "INFO pid $($proc.Id) captioned windows: [$($l -join ' | ')]" | Out-File $log -Append; $l }
           function Stop-Copy([string]$profile, $proc) {
             [System.Threading.EventWaitHandle]::OpenExisting("Local\SnapForge-SingleInstance-7c1d-p-$profile-exit").Set() | Out-Null
             if (-not $proc.WaitForExit(30000)) { $proc.Kill(); throw "copy did not exit" }
@@ -246,30 +249,30 @@ jobs:
           Start-Sleep -Seconds 8
           $w = @(Captioned $p)
           if ($w.Count -ne 0) { throw "Windows start-up showed windows: $($w -join ', ')" }
-          Write-Output "PASS start with Windows (--background): no window (notification-area icon and QuickDock only)"
+          Say "PASS start with Windows (--background): no window (notification-area icon and QuickDock only)"
           Stop-Copy 'ci-startup' $p
 
           $p = Start-Process .\SnapForge.exe -ArgumentList '--profile', 'ci-first' -PassThru
           Start-Sleep -Seconds 8
           $w = @(Captioned $p)
           if ($w.Count -ne 1 -or $w[0] -notlike 'Welcome*') { throw "first launch: expected only the welcome window, got: $($w -join ', ')" }
-          Write-Output "PASS first launch: exactly one window ($($w[0]))"
+          Say "PASS first launch: exactly one window ($($w[0]))"
           Stop-Copy 'ci-first' $p
 
           $p = Start-Process .\SnapForge.exe -ArgumentList '--profile', 'ci-first' -PassThru
           Start-Sleep -Seconds 8
           $w = @(Captioned $p)
           if ($w.Count -ne 1) { throw "normal launch: expected exactly one window, got: $($w -join ', ')" }
-          Write-Output "PASS normal launch: exactly one window ($($w[0]))"
+          Say "PASS normal launch: exactly one window ($($w[0]))"
           $second = Start-Process .\SnapForge.exe -ArgumentList '--profile', 'ci-first' -PassThru
           if (-not $second.WaitForExit(20000)) { throw "second launch of the same build did not hand over" }
           Start-Sleep -Seconds 2
           $w = @(Captioned $p)
           if ($w.Count -ne 1) { throw "after a second launch: expected one window, got: $($w -join ', ')" }
-          Write-Output "PASS second launch of the same build hands over; still one window ($($w[0]))"
+          Say "PASS second launch of the same build hands over; still one window ($($w[0]))"
           Stop-Copy 'ci-first' $p
-          if (Test-Path "$env:LOCALAPPDATA\SnapForge\settings.json") { Write-Output "INFO normal profile data exists from other steps" }
-          Write-Output "PASS isolated profiles wrote only to $env:LOCALAPPDATA\SnapForge-Profiles"
+          if (Test-Path "$env:LOCALAPPDATA\SnapForge\settings.json") { Say "INFO normal profile data exists from other steps" }
+          Say "PASS isolated profiles wrote only to $env:LOCALAPPDATA\SnapForge-Profiles"
 
       - name: Video capability probe (screen capture API, encoders, audio devices)
         if: always()
@@ -383,6 +386,13 @@ jobs:
           path: ${{ runner.temp }}/screenshots
           retention-days: 30
           if-no-files-found: warn
+
+      - name: Replay start-up window results (after the long screenshot output)
+        if: always()
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'startup-windows.log'
+          if (Test-Path $log) { Get-Content $log } else { Write-Output "no start-up log" }
 
   benchmarks:
     name: Library scale benchmarks (production durability)
@@ -589,8 +599,15 @@ jobs:
           if ((Setup $rc2 '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=rc2-install.log') -ne 0) { Get-Content rc2-install.log -Tail 40; throw "rc.2 install failed" }
           if (-not (Test-Path "$machine\SnapForge.exe")) { throw "rc.2 not in $machine" }
           if ((Get-Item "$machine\SnapForge.exe").VersionInfo.FileVersion -notmatch '^1\.0\.0\.') { throw "unexpected file version" }
-          $hklm = Get-ChildItem HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq 'SnapForge' }
-          if (-not $hklm) { throw "No machine-wide Installed apps entry (HKLM)" }
+          $appKey = '{6E0C3B1A-58A2-4E39-9F3B-0D6F4C1C7A51}_is1'
+          $hklm = @("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\$appKey", "HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall\$appKey") | Where-Object { Test-Path $_ } | ForEach-Object { Get-Item $_ } | Select-Object -First 1
+          if (-not $hklm) {
+            foreach ($root in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall', 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall') {
+              Get-ChildItem $root -ErrorAction SilentlyContinue | Where-Object { $_.PSChildName -like '*6E0C3B1A*' -or "$((Get-ItemProperty $_.PSPath -ErrorAction SilentlyContinue).DisplayName)" -like '*SnapForge*' } | ForEach-Object { Write-Output "found under ${root}: $($_.PSChildName)" }
+            }
+            Get-Content rc2-install.log -Tail 60
+            throw "No machine-wide Installed apps entry (HKLM)"
+          }
           if (-not (Test-Path $commonShortcut)) { throw "All-users Start menu shortcut missing" }
           Write-Output "PASS rc.2 installed for all users in $machine; HKLM entry $((Get-ItemProperty $hklm.PSPath).DisplayVersion); all-users Start menu shortcut"
 
@@ -672,6 +689,7 @@ jobs:
           while ((Test-Path "$machine\SnapForge.exe") -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 1 }
           if (Test-Path "$machine\SnapForge.exe") { throw "uninstall left SnapForge.exe" }
           if (Test-Path (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\SnapForge.lnk")) { throw "uninstall left the all-users shortcut" }
+          if (Test-Path $hklm.PSPath) { throw "uninstall left the Installed apps entry" }
           if (-not (Test-Path "$data\Library\keep-me\marker.txt")) { throw "UNINSTALL DELETED USER DATA" }
           if (-not (Test-Path 'C:\Users\sftest2\AppData\Local\SnapForge')) { throw "UNINSTALL DELETED THE SECOND USER'S DATA" }
           Write-Output "PASS uninstall removed program, entry and shortcut; both users' data kept"

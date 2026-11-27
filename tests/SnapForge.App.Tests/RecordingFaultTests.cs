@@ -169,6 +169,17 @@ public sealed class RecordingFaultTests : IDisposable
     }
 
     [Theory]
+    [InlineData(320, 240, 320 * 240 * 4, 1280)]
+    [InlineData(640, 360, 640 * 368 * 4, 2560)]
+    [InlineData(1000, 562, 1008 * 576 * 4, 4032)]
+    [InlineData(1000, 562, 1000 * 576 * 4, 4000)]
+    [InlineData(1000, 562, 1008 * 562 * 4, 4032)]
+    public void Contiguous_decoded_pitch_follows_macroblock_padding_of_width_and_height(int w, int h, int length, int pitch)
+    {
+        Assert.Equal(pitch, VideoAnalysis.ContiguousPitch(length, w, h));
+    }
+
+    [Theory]
     [InlineData(320, 240)]
     [InlineData(640, 352)]
     [InlineData(640, 360)]

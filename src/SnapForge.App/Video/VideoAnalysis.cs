@@ -233,6 +233,25 @@ internal static unsafe class VideoAnalysis
     }
 
     /// <summary>
+    /// Row pitch of a contiguous decoded RGB32 buffer. The decoder may pad the width as well as the height to whole
+    /// 16-pixel macroblocks (CI run 109: 1000×562 was delivered as 1008×576 — every probe matched a 4032-byte pitch),
+    /// so the pitch is inferred from which padded layout the buffer length matches exactly.
+    /// </summary>
+    internal static int ContiguousPitch(int length, int width, int height)
+    {
+        int pw = (width + 15) & ~15, ph = (height + 15) & ~15;
+        foreach ((int rowPixels, int rows) in new[] { (width, height), (width, ph), (pw, ph), (pw, height) })
+        {
+            if ((long)rowPixels * 4 * rows == length)
+            {
+                return rowPixels * 4;
+            }
+        }
+
+        return length / Math.Max(1, height); // unknown layout: the previous behaviour
+    }
+
+    /// <summary>
     /// Locks a decoded RGB32 frame for reading rows top row first, with the real row pitch.
     /// <para>The H.264 decoder works on whole 16-row macroblocks: for a height that is not a multiple of 16 (360,
     /// 562 …) its output — and the RGB32 buffer converted from it — holds the padded height (368, 576 …) while the
@@ -249,8 +268,7 @@ internal static unsafe class VideoAnalysis
         byte* scan0 = Mf.LockRows(buffer, 1, height, out pitch, out locked2D);
         if (!locked2D)
         {
-            int length = Mf.GetBufferLength(buffer);
-            pitch = (long)width * 4 * height <= length ? width * 4 : length / Math.Max(1, height);
+            pitch = ContiguousPitch(Mf.GetBufferLength(buffer), width, height);
         }
 
         return scan0;
