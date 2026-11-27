@@ -332,7 +332,12 @@ public class CaptureLibraryTests
         CaptureLibrary moved = lib.MoveTo(dir.Sub("new"));
         Assert.Equal(a.Id, Assert.Single(moved.Records).Id);
         moved.Load(a.Id);
-        Assert.Empty(Directory.GetDirectories(Path.Combine(dir.Sub("old"), "captures")));
+
+        // FA-007: the old copy is kept until the app calls DeleteSourceAfterVerifiedMove (was deleted at once).
+        Assert.Single(Directory.GetDirectories(Path.Combine(dir.Sub("old"), "captures")));
+        SourceCleanupResult cleanup = CaptureLibrary.DeleteSourceAfterVerifiedMove(Path.Combine(dir.Sub("new"), CaptureLibrary.RelocationJournalFile));
+        Assert.Empty(cleanup.LeftInPlace);
+        Assert.False(Directory.Exists(Path.Combine(dir.Sub("old"), "captures"))); // emptied folders are removed
 
         var other = CaptureLibrary.Open(dir.Sub("other"));
         Add(other, "x");

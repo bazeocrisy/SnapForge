@@ -226,7 +226,7 @@ public sealed partial class CaptureLibrary
                 // A manifest means the recording was completed; a marker left beside it (stopped between the two
                 // writes) is obsolete.
                 string marker = Path.Combine(dir, InProgressMarker);
-                if (File.Exists(marker))
+                if (File.Exists(marker) && !_inspectOnly)
                 {
                     File.Delete(marker);
                 }
@@ -316,33 +316,6 @@ public sealed partial class CaptureLibrary
         else
         {
             AtomicFile.OverwriteAndDelete(file);
-        }
-    }
-
-    /// <summary>Copies completed videos into another library root (used by <see cref="MoveTo"/>), streaming each file.</summary>
-    private void CopyVideosTo(string targetRoot)
-    {
-        string targetVideos = Path.Combine(targetRoot, VideosFolderName);
-        Directory.CreateDirectory(targetVideos);
-        foreach (string dir in Directory.EnumerateDirectories(VideosDirectory))
-        {
-            if (!File.Exists(Path.Combine(dir, VideoManifestFile)))
-            {
-                continue; // in-progress or abandoned recordings stay where they are
-            }
-
-            string dest = Path.Combine(targetVideos, Path.GetFileName(dir));
-            Directory.CreateDirectory(dest);
-
-            // Manifest last, as when recording: a copy interrupted midway is not listed as a complete video.
-            foreach (string file in Directory.EnumerateFiles(dir).OrderBy(f => Path.GetFileName(f) == VideoManifestFile ? 1 : 0))
-            {
-                AtomicFile.Write(Path.Combine(dest, Path.GetFileName(file)), s =>
-                {
-                    using FileStream src = File.OpenRead(file);
-                    src.CopyTo(s);
-                });
-            }
         }
     }
 }

@@ -42,6 +42,9 @@ public sealed partial class CaptureLibrary
     private readonly object _writeLock = new();
     private readonly Dictionary<Guid, CaptureRecord> _records = [];
 
+    /// <summary>Set for <see cref="OpenForInspection"/>: indexing reads only and never cleans up or recovers.</summary>
+    private bool _inspectOnly;
+
     private CaptureLibrary(string root)
     {
         Root = Path.GetFullPath(root);
@@ -94,9 +97,14 @@ public sealed partial class CaptureLibrary
     /// <summary>Raised once, after the first full index (on the indexing thread).</summary>
     public event EventHandler? Indexed;
 
-    /// <summary>Removes leftovers of interrupted writes and builds the index. Safe to call from a background thread.</summary>
+    /// <summary>
+    /// Completes or cleans up an interrupted restore (<see cref="RecoveredRestore"/>), removes leftovers of
+    /// interrupted writes and builds the index. Safe to call from a background thread.
+    /// </summary>
     public void CompleteOpen()
     {
+        RecoveredRestore = ResumeInterruptedRestore();
+
         // Capture folders first: their leftovers (which may hold pre-sanitize pixels) are overwritten before deletion.
         Reindex();
         AtomicFile.CleanupTemporaryFiles(Root);
@@ -129,16 +137,22 @@ public sealed partial class CaptureLibrary
             if (name.StartsWith(CreatingPrefix, StringComparison.Ordinal))
             {
                 // A capture whose creation never reached its commit point (the folder rename).
-                lock (_writeLock)
+                if (!_inspectOnly)
                 {
-                    SecureDeleteDirectory(dir);
+                    lock (_writeLock)
+                    {
+                        SecureDeleteDirectory(dir);
+                    }
                 }
             }
             else if (Guid.TryParse(name, out Guid id) && File.Exists(Path.Combine(dir, CaptureFormat.ManifestFile)))
             {
-                lock (_writeLock)
+                if (!_inspectOnly)
                 {
-                    RecoverCaptureFolder(dir);
+                    lock (_writeLock)
+                    {
+                        RecoverCaptureFolder(dir);
+                    }
                 }
 
                 found[id] = ReadRecord(id, dir);
@@ -479,160 +493,6 @@ public sealed partial class CaptureLibrary
         }
     }
 
-    /// <summary>Writes a backup ZIP of every capture (including the Trash) to <paramref name="zipPath"/>.</summary>
-    public int Backup(string zipPath)
-    {
-        int count = 0;
-        AtomicFile.Write(zipPath, stream =>
-        {
-            using var zip = new ZipArchive(stream, ZipArchiveMode.Create, leaveOpen: true);
-            zip.CreateEntry("snapforge-backup.json").Open().Using(s => JsonSerializer.Serialize(s, new JsonObject
-            {
-                ["format"] = "snapforge.backup",
-                ["version"] = 1,
-                ["createdUtc"] = CaptureFormat.Iso(DateTime.UtcNow),
-            }));
-            // Images only: the backup format predates video, and older versions must be able to restore it.
-            foreach (CaptureRecord r in Records.Where(r => r.Damage is null && !r.IsVideo))
-            {
-                foreach ((string name, byte[] data) in CaptureFormat.LegacyLayout(FolderOf(r.Id)))
-                {
-                    using Stream s = zip.CreateEntry($"captures/{r.Id:D}/{name}", CompressionLevel.NoCompression).Open();
-                    s.Write(data);
-                }
-
-                count++;
-            }
-        });
-        return count;
-    }
-
-    /// <summary>
-    /// Restores captures from a backup ZIP. Existing captures are never overwritten: a capture whose id already
-    /// exists is skipped. Entry names are strictly validated. Returns the number of captures restored.
-    /// </summary>
-    public int RestoreBackup(string zipPath)
-    {
-        using ZipArchive zip = ZipFile.OpenRead(zipPath);
-        if (zip.GetEntry("snapforge-backup.json") is null)
-        {
-            throw new InvalidDataException("This file is not a SnapForge library backup.");
-        }
-
-        var byCapture = new Dictionary<Guid, List<ZipArchiveEntry>>();
-        foreach (ZipArchiveEntry e in zip.Entries)
-        {
-            if (e.FullName == "snapforge-backup.json")
-            {
-                continue;
-            }
-
-            string[] parts = e.FullName.Split('/');
-            if (parts.Length != 3 || parts[0] != "captures" || !Guid.TryParse(parts[1], out Guid id) || !CaptureFormat.ContentFiles.Contains(parts[2], StringComparer.Ordinal))
-            {
-                throw new InvalidDataException($"Unexpected entry '{e.FullName}' in backup.");
-            }
-
-            (byCapture.TryGetValue(id, out var list) ? list : byCapture[id] = []).Add(e);
-        }
-
-        int restored = 0;
-        foreach (var (id, entries) in byCapture)
-        {
-            if (Find(id) is not null)
-            {
-                continue;
-            }
-
-            string staging = Path.Combine(Root, $".restore-{Guid.NewGuid():N}");
-            try
-            {
-                Directory.CreateDirectory(staging);
-                foreach (ZipArchiveEntry e in entries)
-                {
-                    using Stream s = e.Open();
-                    AtomicFile.Write(Path.Combine(staging, Path.GetFileName(e.FullName)), s.CopyTo);
-                }
-
-                AdoptStagedCapture(staging, keepIdIfFree: true, id);
-                restored++;
-            }
-            finally
-            {
-                if (Directory.Exists(staging))
-                {
-                    Directory.Delete(staging, recursive: true);
-                }
-            }
-        }
-
-        return restored;
-    }
-
-    /// <summary>
-    /// Copies the whole library to <paramref name="newRoot"/>, verifies every capture there, then removes the old
-    /// copy (overwriting files first). The target must not already contain captures. Returns the opened new library.
-    /// </summary>
-    public CaptureLibrary MoveTo(string newRoot)
-    {
-        string target = Path.GetFullPath(newRoot);
-        if (string.Equals(target.TrimEnd(Path.DirectorySeparatorChar), Root.TrimEnd(Path.DirectorySeparatorChar), StringComparison.OrdinalIgnoreCase))
-        {
-            return this;
-        }
-
-        if (target.StartsWith(Root + Path.DirectorySeparatorChar, StringComparison.OrdinalIgnoreCase))
-        {
-            throw new ArgumentException("The new location cannot be inside the current library.", nameof(newRoot));
-        }
-
-        string targetCaptures = Path.Combine(target, "captures");
-        string targetVideos = Path.Combine(target, VideosFolderName);
-        if ((Directory.Exists(targetCaptures) && Directory.EnumerateFileSystemEntries(targetCaptures).Any())
-            || (Directory.Exists(targetVideos) && Directory.EnumerateFileSystemEntries(targetVideos).Any()))
-        {
-            throw new IOException("The chosen folder already contains a SnapForge library. Choose an empty folder.");
-        }
-
-        Directory.CreateDirectory(targetCaptures);
-        foreach (string dir in Directory.EnumerateDirectories(CapturesDirectory))
-        {
-            string dest = Path.Combine(targetCaptures, Path.GetFileName(dir));
-            Directory.CreateDirectory(dest);
-            foreach (string file in Directory.EnumerateFiles(dir))
-            {
-                AtomicFile.Write(Path.Combine(dest, Path.GetFileName(file)), s =>
-                {
-                    using FileStream src = File.OpenRead(file);
-                    src.CopyTo(s);
-                });
-            }
-        }
-
-        CopyVideosTo(target);
-        CaptureLibrary moved = Open(target);
-        foreach (CaptureRecord r in Records.Where(r => r.Damage is null))
-        {
-            if (moved.Find(r.Id) is null)
-            {
-                throw new IOException($"Capture {r.Id} did not copy correctly; the original library was left unchanged.");
-            }
-
-            if (!r.IsVideo)
-            {
-                moved.Load(r.Id); // verifies hashes
-            }
-        }
-
-        DeletePermanently([.. Records.Select(r => r.Id)]);
-        foreach (string leftover in Directory.EnumerateDirectories(CapturesDirectory).Concat(Directory.EnumerateDirectories(VideosDirectory)))
-        {
-            Directory.Delete(leftover, recursive: true);
-        }
-
-        return moved;
-    }
-
     public static string DefaultTitle(DateTime createdUtc) =>
         "Capture " + createdUtc.ToLocalTime().ToString("yyyy-MM-dd HH.mm.ss", CultureInfo.InvariantCulture);
 
@@ -953,15 +813,4 @@ public sealed partial class CaptureLibrary
     }
 
     private void RaiseChanged(IReadOnlyCollection<Guid> ids) => Changed?.Invoke(this, new LibraryChangedEventArgs(ids));
-}
-
-internal static class StreamExtensions
-{
-    public static void Using(this Stream stream, Action<Stream> action)
-    {
-        using (stream)
-        {
-            action(stream);
-        }
-    }
 }
