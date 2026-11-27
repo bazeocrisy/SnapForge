@@ -1,4 +1,28 @@
-# SnapForge editable capture format — version 1
+# SnapForge editable capture format — versions 1 and 2
+
+> **rc.2 writes capture format version 2** (generation-based commits, FA-015/016). Version 1 folders (below) are still
+> read unchanged and are upgraded to version 2 the next time the capture is saved. `.sfcap` packages are still
+> written in the version 1 layout so every SnapForge version can import them. Builds before rc.2 show version 2
+> captures as damaged and leave them unchanged.
+
+## Version 2 (rc.2 and later)
+
+* Content files carry a generation number: `base.<gen>.sfpx`, `annotations.<gen>.json`, `thumb.<gen>.sfpx`
+  (an unchanged v1 base may stay referenced as `base.sfpx`).
+* A save writes and flushes the new generation's files, then atomically replaces `manifest.json`. The manifest is the
+  **single commit point**: it records `"version": 2`, `"generation": <n>` and a `"files"` object naming the base,
+  annotations and thumbnail of that generation, each with `sha256` and `bytes`.
+* After the commit, superseded generation files are overwritten with zeros and deleted. When the library is opened,
+  any SnapForge content file not referenced by the manifest (an uncommitted or superseded generation) is overwritten
+  and deleted; unknown files are left alone.
+* New captures are assembled in `captures/.creating-<id>` and published by one folder rename.
+* **Sanitize** commits a new generation whose base has the redactions burned in and whose annotations no longer
+  contain redaction masks or annotations hidden under them, then overwrites and deletes the previous generation; it
+  reports success only after that. An interruption leaves either the complete previous state or the complete
+  sanitized state.
+* Loading verifies every referenced file's size and SHA-256.
+
+The rest of this document describes **version 1**.
 
 Status: implemented in `SnapForge.Core/Storage` and `SnapForge.Core/Library`; covered by `CaptureFormatTests`
 and `CaptureLibraryTests`. All text files are UTF-8 JSON. All timestamps are ISO-8601 UTC.

@@ -1,5 +1,11 @@
 # Library video format (Milestone V1)
 
+> **rc.2:** the video manifest (still version 1) gains an additive field `videoSha256` — the streamed SHA-256 of
+> `video.mp4`, recorded when a recording is completed or a video is imported. Start-up indexing checks only the file
+> length (fast); the hash is verified during backup, restore, Library moves, exports and Help/`--library-check` integrity
+> scans, so a modified file of the same length is detected (FA-008). Older videos without the field get it recorded on
+> their first verification ("hash recorded now"). Older builds ignore the field.
+
 Status: implemented on branch `claude/video-v1`. Format version **1**. Owner requirement: *"Preserve existing image
 captures and ensure older versions cannot corrupt the new Library format."*
 
