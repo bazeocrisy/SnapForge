@@ -97,10 +97,12 @@ internal sealed class RecordingToolbar : Window
     private readonly ToggleButton _micToggle;
     private readonly ProgressBar _systemLevel;
     private readonly ProgressBar _micLevel;
+    private readonly ToggleButton? _cameraToggle;
     private bool _blink;
 
     /// <param name="excludeFromCapture">Always true in the app; false only for documentation screenshots and the control half of the exclusion test.</param>
-    public RecordingToolbar(string format, bool audioTrack, bool system, bool mic, string? stopHotkey, string? pauseHotkey, bool excludeFromCapture = true)
+    /// <param name="cameraOverlay">Screen + camera: show the camera overlay toggle.</param>
+    public RecordingToolbar(string format, bool audioTrack, bool system, bool mic, string? stopHotkey, string? pauseHotkey, bool excludeFromCapture = true, bool cameraOverlay = false)
     {
         WindowStyle = WindowStyle.None;
         ResizeMode = ResizeMode.NoResize;
@@ -138,6 +140,23 @@ internal sealed class RecordingToolbar : Window
         row.Children.Add(new Separator { Width = 1, Margin = new Thickness(6, 2, 6, 2) });
         row.Children.Add(Pair(_systemToggle, _systemLevel));
         row.Children.Add(Pair(_micToggle, _micLevel));
+        if (cameraOverlay)
+        {
+            var camera = new ToggleButton
+            {
+                Content = "Camera",
+                IsChecked = true,
+                Margin = new Thickness(4, 0, 2, 0),
+                Padding = new Thickness(8, 3, 8, 3),
+                Focusable = false,
+                ToolTip = "Show or hide the camera in the recording",
+            };
+            camera.SetResourceReference(StyleProperty, "ToolbarToggle");
+            AutomationProperties_SetName(camera, "Camera overlay");
+            camera.Click += (_, _) => CameraToggled?.Invoke(this, camera.IsChecked == true);
+            row.Children.Add(camera);
+            _cameraToggle = camera;
+        }
 
         _status = new TextBlock { FontSize = 11.5, TextWrapping = TextWrapping.Wrap, MaxWidth = 560, Margin = new Thickness(12, 0, 12, 6), Visibility = Visibility.Collapsed };
         _status.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
@@ -172,6 +191,20 @@ internal sealed class RecordingToolbar : Window
     public event EventHandler<bool>? SystemToggled;
 
     public event EventHandler<bool>? MicToggled;
+
+    /// <summary>Screen + camera: the user showed (true) or hid (false) the camera overlay.</summary>
+    public event EventHandler<bool>? CameraToggled;
+
+    /// <summary>The camera was lost: the overlay toggle is switched off and disabled.</summary>
+    public void SetCameraUnavailable(string reason)
+    {
+        if (_cameraToggle is { } t)
+        {
+            t.IsChecked = false;
+            t.IsEnabled = false;
+            t.ToolTip = reason;
+        }
+    }
 
     /// <summary>True if Windows confirmed the toolbar is excluded from screen capture.</summary>
     public bool Excluded { get; private set; }

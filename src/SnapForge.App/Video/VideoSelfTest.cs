@@ -253,6 +253,16 @@ internal static partial class VideoSelfTest
             Check("cancel-discards", false, ex.Message);
         }
 
+        // 8. SnapForge Studio and the recording lifecycle (SF-006, FA-021, FA-022). The runner has no camera: the camera
+        //    checks use the SYNTHETIC test camera and say so; the real-device count is reported as UNAVAILABLE.
+        var unavailable = new List<string>();
+        StudioChecks(dir, report, Check, (name, detail) =>
+        {
+            Console.WriteLine($"UNAVAILABLE {name}: {detail}");
+            unavailable.Add(name);
+        });
+        report["unavailable"] = unavailable;
+
         report["failures"] = failures;
         File.WriteAllText(Path.Combine(dir, "report.json"), JsonSerializer.Serialize(report, Json));
         Console.WriteLine(failures.Count == 0 ? "RESULT: PASS" : "RESULT: FAIL (" + string.Join(", ", failures) + ")");

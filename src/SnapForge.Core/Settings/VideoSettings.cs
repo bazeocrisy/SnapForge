@@ -18,6 +18,43 @@ public enum RecordingSource
     Display,
 }
 
+/// <summary>What SnapForge Studio records (SF-006).</summary>
+public enum StudioMode
+{
+    /// <summary>The screen only (the camera is never opened).</summary>
+    Screen,
+
+    /// <summary>The screen with the camera composited in a corner.</summary>
+    ScreenAndCamera,
+
+    /// <summary>The camera picture only, at the camera's own size.</summary>
+    Camera,
+}
+
+/// <summary>Shape of the camera overlay on a screen recording.</summary>
+public enum CameraOverlayShape
+{
+    Circle,
+    RoundedRectangle,
+}
+
+/// <summary>Size preset of the camera overlay (a share of the recording's shorter side).</summary>
+public enum CameraOverlaySize
+{
+    Small,
+    Medium,
+    Large,
+}
+
+/// <summary>Corner of the recording the camera overlay sits in.</summary>
+public enum CameraCorner
+{
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+}
+
 /// <summary>
 /// Screen recording preferences (Milestone V1). Defaults follow the owner decisions of 2026-11-26: system audio on,
 /// microphone off, cursor on, 30 FPS (60 optional), countdown on (3 s), MP4 H.264/AAC, Standard quality.
@@ -70,6 +107,21 @@ public sealed record VideoSettings
 
     public HotkeyGesture? CancelHotkey { get; init; }
 
+    /// <summary>SnapForge Studio: screen only (default), screen + camera, or camera only. The camera is off by default.</summary>
+    public StudioMode StudioMode { get; init; } = StudioMode.Screen;
+
+    /// <summary>Symbolic link of the chosen camera; null = the first camera Windows lists.</summary>
+    public string? CameraDeviceId { get; init; }
+
+    public CameraOverlayShape CameraShape { get; init; } = CameraOverlayShape.Circle;
+
+    public CameraOverlaySize CameraSize { get; init; } = CameraOverlaySize.Medium;
+
+    public CameraCorner CameraCorner { get; init; } = CameraCorner.BottomRight;
+
+    /// <summary>Mirror the camera picture (like looking in a mirror). Applies to the overlay and to camera-only recordings.</summary>
+    public bool CameraMirror { get; init; } = true;
+
     /// <summary>The settings with out-of-range values replaced by defaults (hand-edited or newer settings files).</summary>
     public VideoSettings Normalized()
     {
@@ -80,6 +132,10 @@ public sealed record VideoSettings
             CountdownSeconds = CountdownChoices.Contains(CountdownSeconds) ? CountdownSeconds : d.CountdownSeconds,
             Quality = Enum.IsDefined(Quality) ? Quality : d.Quality,
             Source = Enum.IsDefined(Source) ? Source : d.Source,
+            StudioMode = Enum.IsDefined(StudioMode) ? StudioMode : d.StudioMode,
+            CameraShape = Enum.IsDefined(CameraShape) ? CameraShape : d.CameraShape,
+            CameraSize = Enum.IsDefined(CameraSize) ? CameraSize : d.CameraSize,
+            CameraCorner = Enum.IsDefined(CameraCorner) ? CameraCorner : d.CameraCorner,
             MinimumFreeSpaceMegabytes = Math.Clamp(MinimumFreeSpaceMegabytes, 100, 100_000),
             LowSpaceWarningMinutes = Math.Clamp(LowSpaceWarningMinutes, 1, 600),
         };

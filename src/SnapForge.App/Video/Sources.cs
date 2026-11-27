@@ -328,6 +328,7 @@ internal sealed unsafe class WasapiSource(string name, bool loopback, string? de
     private string? _openId;
     private long _nextCheck;
     private bool _enabled;
+    private bool _denied;
     private float[] _scratch = [];
 
     public string Name { get; } = name;
@@ -349,9 +350,12 @@ internal sealed unsafe class WasapiSource(string name, bool loopback, string? de
         }
     }
 
+    /// <summary>True once Windows refused access (privacy settings); the source then stays silent.</summary>
+    public bool AccessDenied => _denied;
+
     public string? Read(Action<long, ReadOnlySpan<float>, bool> deliver)
     {
-        if (!_enabled)
+        if (!_enabled || _denied)
         {
             return null;
         }
@@ -450,9 +454,16 @@ internal sealed unsafe class WasapiSource(string name, bool loopback, string? de
                 (_client, _capture) = CoreAudio.OpenCapture(device, loopback);
                 CoreAudio.Start(_client);
             }
-            catch (NativeCallException)
+            catch (NativeCallException ex)
             {
                 Close();
+                if (ex.HResult == CameraException.E_ACCESSDENIED && !loopback)
+                {
+                    // Windows privacy settings block the microphone: say so once and do not retry silently.
+                    _denied = true;
+                    return PrivacySettings.MicrophoneBlockedMessage + " The recording continues without the microphone.";
+                }
+
                 return $"{Name}: the audio device could not be opened.";
             }
 
