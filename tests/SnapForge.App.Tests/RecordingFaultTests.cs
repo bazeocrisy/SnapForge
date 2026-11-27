@@ -185,8 +185,15 @@ public sealed class RecordingFaultTests : IDisposable
         Assert.True(r.Finalized);
         Core.Imaging.PixelBuffer frame = VideoAnalysis.DecodeFrame(path, 1200) ?? throw new InvalidOperationException("no frame");
         OverlayLayout l = composite.Layout;
-        Assert.True(SyntheticShare(frame, l.X + (l.Width / 4), l.Y + (l.Height / 4), l.Width / 2, l.Height / 2) > 0.9);
-        Assert.True(SyntheticShare(frame, 640 - l.X - l.Width, 360 - l.Y - l.Height, l.Width, l.Height) < 0.05);
+        double inside = SyntheticShare(frame, l.X + (l.Width / 4), l.Y + (l.Height / 4), l.Width / 2, l.Height / 2);
+        double opposite = SyntheticShare(frame, 640 - l.X - l.Width, 360 - l.Y - l.Height, l.Width, l.Height);
+        // Diagnostics for CI (runs 96, 98): where the overlay really is and what colours were decoded there.
+        string diag = $"layout {l.X},{l.Y} {l.Width}x{l.Height}; frame {frame.Width}x{frame.Height}; share inside {inside:0.00}, " +
+            $"TL {SyntheticShare(frame, 0, 0, l.Width, l.Height):0.00} TR {SyntheticShare(frame, frame.Width - l.Width, 0, l.Width, l.Height):0.00} " +
+            $"BL {SyntheticShare(frame, 0, frame.Height - l.Height, l.Width, l.Height):0.00} BR {SyntheticShare(frame, frame.Width - l.Width, frame.Height - l.Height, l.Width, l.Height):0.00}; " +
+            $"centre pixel BGRA {Px(frame, l.X + (l.Width / 2), l.Y + (l.Height / 2))}; written {r.FramesWritten}, captured {r.FramesCaptured}, repeated {r.FramesRepeated}, dropped {r.FramesDropped}";
+        Assert.True(inside > 0.9, diag);
+        Assert.True(opposite < 0.05, diag);
     }
 
     [Fact]
@@ -207,8 +214,9 @@ public sealed class RecordingFaultTests : IDisposable
         (long durationMs, int w, int h, bool _, int samples) = RecordingRecovery.Probe(path);
         Assert.Equal(640, w);
         Assert.Equal(360, h);
-        Assert.InRange(durationMs, 2700, 3300);
-        Assert.InRange(samples, (int)(durationMs * 30 / 1000) - 2, (int)(durationMs * 30 / 1000) + 2);
+        string diag = $"probe {durationMs} ms / {samples} samples; result {r.DurationMs} ms, written {r.FramesWritten}, captured {r.FramesCaptured}, repeated {r.FramesRepeated}, dropped {r.FramesDropped}, end {r.EndReason}";
+        Assert.True(durationMs is >= 2700 and <= 3300, diag);
+        Assert.True(Math.Abs(samples - (durationMs * 30 / 1000)) <= 2, diag);
         Assert.False(camera.IsRunning); // the recorder released the camera
     }
 
@@ -274,6 +282,12 @@ public sealed class RecordingFaultTests : IDisposable
     }
 
     /// <summary>Share of pixels in a rectangle that look like the SYNTHETIC camera (full red: magenta or yellow).</summary>
+    private static string Px(Core.Imaging.PixelBuffer f, int x, int y)
+    {
+        int o = ((Math.Clamp(y, 0, f.Height - 1) * f.Width) + Math.Clamp(x, 0, f.Width - 1)) * 4;
+        return $"{f.Pixels[o]},{f.Pixels[o + 1]},{f.Pixels[o + 2]},{f.Pixels[o + 3]}";
+    }
+
     internal static double SyntheticShare(Core.Imaging.PixelBuffer frame, int x0, int y0, int w, int h)
     {
         int total = 0, hits = 0;
