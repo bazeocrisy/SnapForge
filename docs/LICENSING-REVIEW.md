@@ -18,7 +18,7 @@ This review records what was checked and what remains open. It distinguishes res
 |---|---|---|---|
 | .NET runtime (Microsoft.NETCore.App) | MIT (+ notices for bundled components) | Include licence/notices | `THIRD-PARTY-NOTICES.md` in every package |
 | Windows Desktop runtime / WPF incl. `*_cor3.dll` native files | MIT / .NET licence terms | Same | Same |
-| Inno Setup (installer engine, installer only) | Inno Setup License (permits distributing installers built with it) | Keep its copyright notice in the installer (Inno does this automatically) | Researched: jrsoftware.org/files/is/license.txt — confirm wording before release |
+| Inno Setup 6.4.3 (installer engine; its setup/uninstall stub is embedded in `SnapForge-<version>-win-x64-setup.exe`) | Inno Setup License (free, including for commercial use; permits distributing installers built with it; no warranty) | Keep its copyright/licence notices intact; do not misrepresent its origin (the stub carries Inno's own notice automatically) | Researched: jrsoftware.org/files/is/license.txt — confirm the current wording before release (open question 4). rc.2 changes only installer *settings* (all users, Program Files, UAC), not the licence position |
 
 SnapForge references **no third-party NuGet packages at run time**; test packages (xUnit, coverlet, Test SDK) are not
 shipped. The SBOM (`*.cdx.json`, CycloneDX 1.5) in each package lists components and package hashes.
@@ -28,6 +28,18 @@ shipped. The SBOM (`*.cdx.json`, CycloneDX 1.5) in each package lists components
 Media Foundation (H.264/AAC encode/decode), Windows.Media.Ocr, Windows.Graphics.Capture, WASAPI, GDI. These are part
 of Windows and licensed to the Windows user. SnapForge ships no codec or OCR engine of its own.
 
+**Camera (release candidate 2, SnapForge Studio):** camera capture uses **Windows Media Foundation** camera capture
+APIs that ship with Windows (no driver, SDK or library is redistributed). **No new third-party dependency** is added
+by camera recording: the SBOM and `THIRD-PARTY-NOTICES.md` are unchanged by it. Camera frames are processed locally
+and written only into the user's recording; camera and microphone are off by default and Windows' own camera and
+microphone indicators/privacy settings apply. To be re-confirmed against the final rc.2 code and SBOM (the camera code
+was being written in parallel when this review was updated).
+
+**.NET:** the self-contained build redistributes the Microsoft .NET runtime and Windows Desktop runtime (WPF) under
+the MIT licence and their bundled third-party notices — unchanged in rc.2.
+
+**OCR:** `Windows.Media.Ocr` and the OCR language packs installed in Windows — unchanged; nothing redistributed.
+
 ## Open questions requiring qualified legal review
 
 1. **H.264 and AAC patent licensing for an application that invokes Windows' built-in encoders** to create files.
@@ -35,13 +47,20 @@ of Windows and licensed to the Windows user. SnapForge ships no codec or OCR eng
    application that drives them to *produce* H.264/AAC content creates any obligation for the app distributor has not
    been confirmed. **Do not assume using Windows-provided codecs removes all patent questions.** Owner action: obtain
    advice (or an opinion from the relevant patent pool administrator) before announcing screen recording publicly.
+   **Position unchanged in release candidate 2**: camera recording (SnapForge Studio) produces the same H.264/AAC MP4
+   output through the same Windows encoders, so it is covered by — and does not resolve — this open question. Still
+   **requires owner/legal review**.
 2. **GIF**: the LZW patents expired in 2003–2004; the GIF encoder is original code (no third-party library). Listed for
    completeness; no action expected.
-3. **Name "SnapForge"**: owner decision to use the name; trademark search/clearance not done (see
-   `website/BRANDING.md`, `docs/NAMING.md`). Owner action: trademark search before wider promotion.
+3. **Names "SnapForge", "QuickDock" and "SnapForge Studio"** (the latter two provisional, rc.2): owner decision to
+   use the name; trademark search/clearance not done (see `website/BRANDING.md`, `docs/NAMING.md` and the reviewer
+   checklist in `docs/IP-AND-DESIGN-REVIEW.md`). Owner action: trademark search before wider promotion.
 4. **Inno Setup licence wording** for redistribution in a free product: confirm the current licence text.
 
 ## Not applicable
 
 No paid SDKs, no cloud services, no telemetry SDKs, no fonts redistributed (Segoe UI is a Windows font used at run time
-and on the website via the visitor's own system fonts).
+and on the website via the visitor's own system fonts). Asset and font provenance in detail:
+`docs/IP-AND-DESIGN-REVIEW.md`. Code signing options (none in place yet): `docs/SIGNING.md`.
+
+*Updated 27 November 2026 for release candidate 2 (camera recording, all-users installer).*

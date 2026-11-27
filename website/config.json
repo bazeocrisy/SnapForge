@@ -1,25 +1,53 @@
 {
-  "_comment": "Central website configuration. Edit, then run `python3 website/build.py`. See README.md and LAUNCH-CHECKLIST.md. Leave values null/false until the owner has approved and verified them; unconfigured items are hidden or shown as 'not available yet'. release.ownerApproved: true is refused unless release-verification.json (written by tools/verify-release.py) matches the release details exactly and private vulnerability reporting is verified.",
+  "_comment": "Central website configuration. Edit, then run `python3 website/build.py`. See README.md and LAUNCH-CHECKLIST.md. Leave values null/false until the owner has approved and verified them; unconfigured items are hidden or shown as 'not available yet'. release.ownerApproved: true is refused unless release-verification.json (written by tools/verify-release.py) matches the release AND every asset (asset id, size, SHA-256, signing claim) exactly, and private vulnerability reporting is verified.",
   "siteUrl": "https://bazeocrisy.github.io/SnapForge/",
   "repositoryUrl": "https://github.com/bazeocrisy/SnapForge",
+  "_sourceUrl": "Where 'Source code' links point: the candidate branch until the owner approves merging it into main. After the merge set sourceUrl to https://github.com/bazeocrisy/SnapForge and sourceIsCandidate to false.",
+  "sourceUrl": "https://github.com/bazeocrisy/SnapForge/tree/release/v1.0-candidate",
+  "sourceIsCandidate": true,
   "security": {
     "privateReporting": {
       "url": null,
       "verified": false
     }
   },
+  "_testBuild": "Release-candidate test packages for invited testers: only a LINK to the GitHub Actions run page, never a file on this site. runUrl: https://github.com/bazeocrisy/SnapForge/actions/runs/<run id>; commit: the full 40-character commit SHA the run built. Leave null until the maintainer has checked that run; the page then says the link will be added.",
+  "testBuild": {
+    "version": "1.0.0-rc.2",
+    "runUrl": null,
+    "commit": null
+  },
+  "_release": "A future public release: one GitHub Release (tag) with one or two assets of the SAME version, each verified separately by tools/verify-release.py. publisher.subject is the signing certificate's full Subject string, publisher.thumbprints the allowed SHA-1 thumbprints (40 upper-case hex); both are required for any signed asset.",
   "release": {
     "ownerApproved": false,
     "version": null,
+    "tag": null,
     "date": null,
-    "downloadUrl": null,
-    "fileName": null,
-    "sizeBytes": null,
-    "sha256": null,
-    "signed": false,
-    "signer": null,
     "releaseNotesUrl": null,
-    "packageType": "portable"
+    "publisher": {
+      "subject": null,
+      "thumbprints": []
+    },
+    "assets": [
+      {
+        "kind": "installer",
+        "fileName": null,
+        "downloadUrl": null,
+        "assetId": null,
+        "sizeBytes": null,
+        "sha256": null,
+        "signed": false
+      },
+      {
+        "kind": "portable",
+        "fileName": null,
+        "downloadUrl": null,
+        "assetId": null,
+        "sizeBytes": null,
+        "sha256": null,
+        "signed": false
+      }
+    ]
   },
   "donations": {
     "githubSponsors": {
