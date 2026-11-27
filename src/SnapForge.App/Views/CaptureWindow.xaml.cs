@@ -15,9 +15,9 @@ using CaptureMode = SnapForge.Core.Capture.CaptureMode;
 namespace SnapForge.App.Views;
 
 /// <summary>
-/// The compact horizontal capture control panel: mode rail, Selection/Effects/Share, option switches, round
-/// Capture button with its hotkey, presets and links to the Editor and Library. Video, All-in-One, Effects and Share
-/// destinations are visibly disabled ("Not available yet") until they exist.
+/// The compact capture panel (SF-005): segmented Image / Video tabs, option cards ("What to capture" chips, "After
+/// capture", "Options"), a full-width primary action with its hotkey on a key cap, presets and links to the Editor
+/// and Library. All-in-One, Effects and Share destinations are visibly disabled ("Not available yet") until they exist.
 /// </summary>
 public partial class CaptureWindow : Window
 {
@@ -26,6 +26,7 @@ public partial class CaptureWindow : Window
     private CaptureOptions? _beforeReset;
     private int _lastDelay = 3;
     private bool _loading;
+    private bool _scrolling;
 
     internal CaptureWindow(AppServices services)
     {
@@ -61,8 +62,6 @@ public partial class CaptureWindow : Window
     {
         _loading = true;
         CaptureOptions o = _services.Settings.Capture;
-        SelectionText.Text = ModeLabel(o.Mode);
-        SelectionButton.SetValue(System.Windows.Automation.AutomationProperties.NameProperty, $"Selection: {ModeLabel(o.Mode)}");
         PreviewBox.IsChecked = o.PreviewInEditor;
         CopyBox.IsChecked = o.CopyToClipboard;
         SaveBox.IsChecked = o.SaveToLibrary;
@@ -78,27 +77,41 @@ public partial class CaptureWindow : Window
         DelayBox.Content = o.DelaySeconds > 0 ? $"Time Delay ({o.DelaySeconds} s)" : "Time Delay";
         LoadVideoOptions();
 
+        foreach ((RadioButton chip, CaptureMode mode) in ImageTargets)
+        {
+            chip.IsChecked = !_scrolling && o.Mode == mode;
+        }
+
+        ScrollingChip.IsChecked = _scrolling;
+        UpdatePrimaryAction();
+
         string action = IsVideoMode ? "Record / pause / resume" : "Capture";
         HotkeyRegistration? reg = App.HotkeyResults.FirstOrDefault(r => r.Action == action);
+        string tip;
         if ((IsVideoMode ? _services.Settings.Video.RecordHotkey : _services.Settings.CaptureHotkey) is not { } hk)
         {
             HotkeyText.Text = "No hotkey";
-            HotkeyText.ToolTip = "Set a global capture hotkey in Settings → Hotkeys.";
+            tip = IsVideoMode ? "Set a global record hotkey in Settings → Hotkeys." : "Set a global capture hotkey in Settings → Hotkeys.";
             HotkeyWarningIcon.Visibility = Visibility.Collapsed;
         }
         else if (reg is { Succeeded: false })
         {
             HotkeyText.Text = $"{FriendlyGesture(hk)} unavailable";
-            HotkeyText.ToolTip = HotkeyConflictHelp(hk, reg.Error);
+            tip = HotkeyConflictHelp(hk, reg.Error);
             HotkeyWarningIcon.Visibility = Visibility.Visible;
         }
         else
         {
             HotkeyText.Text = FriendlyGesture(hk);
-            HotkeyText.ToolTip = "Global capture hotkey (works while SnapForge runs in the notification area)";
+            tip = IsVideoMode
+                ? "Global record hotkey: starts a recording directly (works while SnapForge runs in the notification area)"
+                : "Global capture hotkey (works while SnapForge runs in the notification area)";
             HotkeyWarningIcon.Visibility = Visibility.Collapsed;
         }
 
+        HotkeyText.ToolTip = tip;
+        HotkeyCap.ToolTip = tip;
+        HotkeyCap.SetValue(System.Windows.Automation.AutomationProperties.NameProperty, $"Hotkey: {HotkeyText.Text}");
         _loading = false;
     }
 
@@ -155,25 +168,58 @@ public partial class CaptureWindow : Window
 
     internal void SetMode(CaptureMode mode) => Update(o => o with { Mode = mode });
 
-    private void OnSelectionMenu(object sender, RoutedEventArgs e)
+    /// <summary>The "What to capture" chips that map to a capture mode (Scrolling is a separate action).</summary>
+    internal (RadioButton Chip, CaptureMode Mode)[] ImageTargets =>
+    [
+        (RegionChip, CaptureMode.Region),
+        (WindowChip, CaptureMode.Window),
+        (ActiveWindowChip, CaptureMode.ActiveWindow),
+        (DisplayChip, CaptureMode.SingleScreen),
+        (FullScreenChip, CaptureMode.AllScreens),
+    ];
+
+    /// <summary>True while the Scrolling chip is chosen: the primary action starts a scrolling capture.</summary>
+    internal bool IsScrollingSelected => _scrolling;
+
+    private void OnTargetChecked(object sender, RoutedEventArgs e)
     {
-        var menu = new ContextMenu { PlacementTarget = SelectionButton, Placement = System.Windows.Controls.Primitives.PlacementMode.Bottom };
-        foreach ((CaptureMode mode, string tip) in new[]
+        if (_loading || sender is not RadioButton chip || RegionChip is null)
         {
-            (CaptureMode.Region, "Drag to select an area"),
-            (CaptureMode.Window, "Click a window"),
-            (CaptureMode.ActiveWindow, "The window you were using (no clicking)"),
-            (CaptureMode.SingleScreen, "Click a display"),
-            (CaptureMode.AllScreens, "Every display"),
-        })
-        {
-            var item = new MenuItem { Header = ModeLabel(mode), IsCheckable = true, IsChecked = _services.Settings.Capture.Mode == mode, ToolTip = tip };
-            item.Click += (_, _) => SetMode(mode);
-            menu.Items.Add(item);
+            return;
         }
 
-        SelectionButton.ContextMenu = menu;
-        menu.IsOpen = true;
+        if (ReferenceEquals(chip, ScrollingChip))
+        {
+            _scrolling = true;
+            UpdatePrimaryAction();
+            return;
+        }
+
+        _scrolling = false;
+        foreach ((RadioButton c, CaptureMode mode) in ImageTargets)
+        {
+            if (ReferenceEquals(c, chip))
+            {
+                SetMode(mode);
+            }
+        }
+
+        UpdatePrimaryAction();
+    }
+
+    /// <summary>Primary button text and accessible name for the current tab and choice.</summary>
+    private void UpdatePrimaryAction()
+    {
+        (string text, string name, string help) = (IsVideoMode, _scrolling) switch
+        {
+            (true, _) => ("Open Studio…", "Open Studio", "Opens the recording studio with the video options above"),
+            (false, true) => ("Start scrolling capture", "Start scrolling capture", "Select the area that scrolls; SnapForge stitches one tall image"),
+            _ => ("Capture", "Capture", "Captures with the options above (Enter)"),
+        };
+        CaptureButtonText.Text = text;
+        CaptureButton.SetValue(System.Windows.Automation.AutomationProperties.NameProperty, name);
+        CaptureButton.SetValue(System.Windows.Automation.AutomationProperties.HelpTextProperty, help);
+        CaptureButtonIcon.Data = (System.Windows.Media.Geometry)FindResource(IsVideoMode ? "IconVideoMode" : "BrandApertureMark");
     }
 
     private void OnDelayMenu(object sender, RoutedEventArgs e)
@@ -243,7 +289,11 @@ public partial class CaptureWindow : Window
     {
         if (IsVideoMode)
         {
-            _ = Video.RecordingController.StartAsync();
+            DockActions.OpenStudio();
+        }
+        else if (_scrolling)
+        {
+            _ = App.CaptureScrollingAsync();
         }
         else
         {
@@ -272,15 +322,15 @@ public partial class CaptureWindow : Window
         bool video = IsVideoMode;
         ImageOptions.Visibility = video ? Visibility.Collapsed : Visibility.Visible;
         VideoOptions.Visibility = video ? Visibility.Visible : Visibility.Collapsed;
-        CaptureButtonText.Text = video ? "Record" : "Capture";
-        CaptureButton.SetValue(System.Windows.Automation.AutomationProperties.NameProperty, video ? "Record" : "Capture");
         LoadFromSettings();
     }
 
     private void LoadVideoOptions()
     {
         VideoSettings v = _services.Settings.Video;
-        VideoSourceText.Text = SourceLabel(v.Source);
+        VideoRegionChip.IsChecked = v.Source == RecordingSource.Region;
+        VideoWindowChip.IsChecked = v.Source == RecordingSource.Window;
+        VideoDisplayChip.IsChecked = v.Source == RecordingSource.Display;
         FrameRateText.Text = $"{v.FramesPerSecond} FPS";
         QualityText.Text = v.Quality == VideoQuality.High ? "High" : "Standard";
         SystemAudioBox.IsChecked = v.RecordSystemAudio;
@@ -323,11 +373,18 @@ public partial class CaptureWindow : Window
         menu.IsOpen = true;
     }
 
-    private void OnVideoSourceMenu(object sender, RoutedEventArgs e) => ShowChoiceMenu(
-        VideoSourceButton,
-        [(RecordingSource.Region, "Region"), (RecordingSource.Window, "Window"), (RecordingSource.Display, "Display")],
-        _services.Settings.Video.Source,
-        source => UpdateVideo(v => v with { Source = source }));
+    private void OnSourceChecked(object sender, RoutedEventArgs e)
+    {
+        if (_loading || VideoRegionChip is null)
+        {
+            return;
+        }
+
+        RecordingSource source = ReferenceEquals(sender, VideoWindowChip) ? RecordingSource.Window
+            : ReferenceEquals(sender, VideoDisplayChip) ? RecordingSource.Display
+            : RecordingSource.Region;
+        UpdateVideo(v => v with { Source = source });
+    }
 
     private void OnFrameRateMenu(object sender, RoutedEventArgs e) => ShowChoiceMenu(
         FrameRateButton,
@@ -455,6 +512,9 @@ public partial class CaptureWindow : Window
 
     private void OnToggleWidget(object sender, RoutedEventArgs e) => App.ShowWidget();
 
+    /// <summary>View → Open QuickDock with keyboard (FA-004): Esc in QuickDock returns focus to this panel.</summary>
+    private void OnDockKeyboard(object sender, RoutedEventArgs e) => DockActions.OpenQuickDockWithKeyboard();
+
     /// <summary>The services (settings, library) this panel was created with.</summary>
     internal AppServices Services => _services;
 
@@ -515,7 +575,7 @@ public partial class CaptureWindow : Window
     {
         RememberPosition();
 
-        // Closing only hides the panel; it stays available from the notification area and the widget.
+        // Closing only hides the panel; it stays available from the notification area and QuickDock.
         base.OnClosing(e);
         if (Application.Current.MainWindow is { } main && main.IsLoaded && !e.Cancel && App.HasNotificationIcon)
         {

@@ -41,7 +41,7 @@ public class GateBUiTests
     // ------------------------------------------------------------------ capture panel
 
     [Fact]
-    public void Capture_panel_is_compact_horizontal_and_marks_unavailable_modes() => UiThread.Run(async () =>
+    public void Capture_panel_is_compact_and_marks_unavailable_modes() => UiThread.Run(async () =>
     {
         AppServices services = TestServices.Create();
         var panel = new CaptureWindow(services);
@@ -49,10 +49,16 @@ public class GateBUiTests
         await Task.Delay(300);
         try
         {
+            // SF-005: small (about 520 × 360 DIP at most), tabs on top, a full-width rectangular primary action.
             var content = (FrameworkElement)panel.Content;
-            Assert.InRange(content.ActualWidth, 600, 760);
-            Assert.InRange(content.ActualHeight, 150, 260);
-            Assert.True(content.ActualWidth > content.ActualHeight * 2, "panel should be horizontal");
+            Assert.InRange(content.ActualWidth, 440, 520);
+            Assert.InRange(content.ActualHeight, 200, 380);
+            Assert.True(content.ActualWidth > content.ActualHeight, "panel should be wider than tall");
+            Assert.True(panel.CaptureButton.ActualWidth > content.ActualWidth * 0.55, "the primary action spans the panel");
+            Assert.True(panel.CaptureButton.ActualWidth > panel.CaptureButton.ActualHeight * 4, "the primary action is a wide rectangle, not a round button");
+            Point tabs = panel.ModeTabs.TranslatePoint(new Point(0, 0), content);
+            Point action = panel.CaptureButton.TranslatePoint(new Point(0, 0), content);
+            Assert.True(tabs.Y < action.Y, "tabs at the top, action at the bottom");
 
             Assert.True(panel.ImageMode.IsChecked);
             Assert.True(panel.ImageMode.IsEnabled);
@@ -67,16 +73,21 @@ public class GateBUiTests
 
             Assert.True(panel.CaptureButton.IsDefault);
             Assert.Equal("Capture", AutomationProperties.GetName(panel.CaptureButton));
-            Assert.Equal("Print Screen", panel.HotkeyText.Text); // default hotkey, shown under the button
+            Assert.Equal("Print Screen", panel.HotkeyText.Text); // default hotkey, shown beside the button
+            Point cap = panel.HotkeyCap.TranslatePoint(new Point(0, panel.HotkeyCap.ActualHeight / 2), panel.CaptureButton);
+            Assert.True(cap.X >= panel.CaptureButton.ActualWidth && cap.Y > 0 && cap.Y < panel.CaptureButton.ActualHeight, "hotkey cap beside the button");
             Assert.True(panel.SaveBox.IsChecked); // Save to Library preserved
+            Assert.True(panel.RegionChip.IsChecked); // default mode
 
-            // Video mode swaps the options card and the button; Image mode restores the screenshot panel unchanged.
+            // Video mode swaps the options cards and the button; Image mode restores the screenshot panel unchanged.
             panel.VideoMode.IsChecked = true;
             await Task.Delay(100);
             Assert.Equal(Visibility.Visible, panel.VideoOptions.Visibility);
             Assert.Equal(Visibility.Collapsed, panel.ImageOptions.Visibility);
-            Assert.Equal("Record", AutomationProperties.GetName(panel.CaptureButton));
+            Assert.Equal("Open Studio", AutomationProperties.GetName(panel.CaptureButton));
+            Assert.Equal("Open Studio…", panel.CaptureButtonText.Text);
             Assert.Equal("Shift+F9", panel.HotkeyText.Text);
+            Assert.True(panel.VideoRegionChip.IsChecked);
             Assert.True(panel.SystemAudioBox.IsChecked); // owner defaults: system audio on, microphone off, cursor on, countdown on
             Assert.False(panel.MicBox.IsChecked);
             Assert.True(panel.VideoCursorBox.IsChecked);
@@ -103,15 +114,31 @@ public class GateBUiTests
         await Task.Delay(200);
         try
         {
-            // Selection dropdown: every item maps to a working capture mode.
-            panel.SelectionButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
-            ContextMenu menu = panel.SelectionButton.ContextMenu!;
-            Assert.Equal(["Region", "Window", "Active window", "Display", "Full screen"], menu.Items.OfType<MenuItem>().Select(i => (string)i.Header));
-            menu.Items.OfType<MenuItem>().Single(i => (string)i.Header == "Window").RaiseEvent(new RoutedEventArgs(MenuItem.ClickEvent));
-            menu.IsOpen = false;
+            // "What to capture" chips: every chip maps to a working capture mode, plus Scrolling.
+            Assert.Equal(["Region", "Window", "Active window", "Display", "Full screen", "Scrolling"], panel.TargetChips.Children.OfType<RadioButton>().Select(c => (string)c.Content));
+            foreach ((RadioButton chip, CaptureMode mode) in panel.ImageTargets)
+            {
+                Assert.Equal(CaptureWindow.ModeLabel(mode), chip.Content);
+                chip.IsChecked = true;
+                await Task.Delay(50);
+                Assert.Equal(mode, services.Settings.Capture.Mode);
+            }
+
+            panel.WindowChip.IsChecked = true;
             await Task.Delay(100);
             Assert.Equal(CaptureMode.Window, services.Settings.Capture.Mode);
-            Assert.Equal("Window", panel.SelectionText.Text);
+            Assert.True(panel.WindowChip.IsChecked); // still checked after the settings round trip
+
+            // Scrolling switches the primary action without changing the saved mode (the hotkey keeps using it).
+            panel.ScrollingChip.IsChecked = true;
+            await Task.Delay(100);
+            Assert.True(panel.IsScrollingSelected);
+            Assert.Equal("Start scrolling capture", AutomationProperties.GetName(panel.CaptureButton));
+            Assert.Equal(CaptureMode.Window, services.Settings.Capture.Mode);
+            panel.WindowChip.IsChecked = true;
+            await Task.Delay(100);
+            Assert.False(panel.IsScrollingSelected);
+            Assert.Equal("Capture", AutomationProperties.GetName(panel.CaptureButton));
 
             // Time delay: picker value, switch off, switch on again restores the chosen value.
             panel.SetDelay(15);
@@ -177,6 +204,60 @@ public class GateBUiTests
         Assert.Contains("Use the Print screen key to open screen capture", help, StringComparison.Ordinal);
         Assert.Contains("Settings → Accessibility → Keyboard", help, StringComparison.Ordinal);
     });
+
+    [Fact]
+    public void Capture_panel_video_tab_opens_the_studio_and_disabled_controls_explain_why() => UiThread.Run(async () =>
+    {
+        AppServices services = TestServices.Create();
+        var panel = new CaptureWindow(services);
+        Action previous = DockActions.OpenStudio;
+        int studio = 0;
+        DockActions.OpenStudio = () => studio++;
+        panel.Show();
+        await Task.Delay(200);
+        try
+        {
+            // Video sources are chips too and write the video settings.
+            panel.VideoMode.IsChecked = true;
+            await Task.Delay(100);
+            panel.VideoWindowChip.IsChecked = true;
+            await Task.Delay(100);
+            Assert.Equal(RecordingSource.Window, services.Settings.Video.Source);
+            Assert.True(panel.VideoWindowChip.IsChecked);
+
+            // The primary action goes through the Studio indirection (the same one QuickDock's Record uses).
+            panel.CaptureButton.RaiseEvent(new RoutedEventArgs(System.Windows.Controls.Primitives.ButtonBase.ClickEvent));
+            Assert.Equal(1, studio);
+
+            // Every disabled control says why in its tooltip.
+            panel.ImageMode.IsChecked = true;
+            await Task.Delay(100);
+            List<FrameworkElement> disabled = [.. Descendants(panel).OfType<FrameworkElement>().Where(e => e is Control && !e.IsEnabled && e.IsVisible)];
+            Assert.NotEmpty(disabled);
+            foreach (FrameworkElement e in disabled)
+            {
+                Assert.Contains("Not available yet", e.ToolTip as string ?? string.Empty, StringComparison.Ordinal);
+            }
+        }
+        finally
+        {
+            DockActions.OpenStudio = previous;
+            panel.Close();
+        }
+    });
+
+    private static IEnumerable<DependencyObject> Descendants(DependencyObject root)
+    {
+        for (int i = 0; i < VisualTreeHelper.GetChildrenCount(root); i++)
+        {
+            DependencyObject child = VisualTreeHelper.GetChild(root, i);
+            yield return child;
+            foreach (DependencyObject d in Descendants(child))
+            {
+                yield return d;
+            }
+        }
+    }
 
     // ------------------------------------------------------------------ widget
 
@@ -688,6 +769,140 @@ public class GateBUiTests
         finally
         {
             widget.Close();
+        }
+    });
+
+    [Fact]
+    public void QuickDock_is_a_small_pill_and_every_button_has_a_label_name_and_help_text() => UiThread.Run(async () =>
+    {
+        AppServices services = TestServices.Create();
+        var widget = new CaptureWidget(services);
+        widget.Show();
+        await Task.Delay(200);
+        try
+        {
+            // Collapsed: at most about 40 × 22 DIP, touching the top edge (offset 0), so it never covers a title bar.
+            MonitorInfo primary = PhysicalPlacement.Layout().Monitors[0];
+            PixelRect r = PhysicalPlacement.GetBounds(widget)!.Value;
+            Assert.Equal(primary.Bounds.Y, r.Y);
+            Assert.InRange(r.Width, 1, (int)Math.Ceiling(CaptureWidget.TabAlong * primary.DpiScale) + 1);
+            Assert.InRange(CaptureWidget.TabAlong, 1, 40);
+            Assert.InRange(CaptureWidget.TabAcross, 1, 22);
+            Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(widget.TabButton)));
+            Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetHelpText(widget.TabButton)));
+            Assert.Contains("QuickDock", AutomationProperties.GetName(widget), StringComparison.Ordinal);
+
+            widget.Expand();
+            await Task.Delay(200);
+            Assert.Equal(["Capture", "Record", "Text", "Library", "Editor", "Settings", "Presets"], widget.DockButtons.Select(b => (string)b.Content));
+            foreach (Button b in widget.DockButtons)
+            {
+                Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetName(b)), $"{b.Name} has no automation name");
+                Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetHelpText(b)), $"{b.Name} has no help text");
+                Assert.NotNull(b.Tag); // icon
+                Assert.False(b.Focusable); // mouse use never takes focus
+            }
+
+            Assert.False(string.IsNullOrWhiteSpace(AutomationProperties.GetHelpText(widget.GripHandle)));
+        }
+        finally
+        {
+            widget.Close();
+        }
+    });
+
+    private static FrameworkElement FocusRing(Button b) => (FrameworkElement)b.Template.FindName("FocusRing", b);
+
+    [Fact]
+    public void QuickDock_keyboard_mode_moves_focus_with_tab_and_arrows_enter_runs_the_button_and_esc_restores_the_previous_window() => UiThread.Run(async () =>
+    {
+        AppServices services = TestServices.Create();
+        var widget = new CaptureWidget(services);
+        var other = new Window
+        {
+            Title = "QuickDock keyboard test",
+            Width = 360,
+            Height = 220,
+            WindowStartupLocation = WindowStartupLocation.Manual,
+            Left = 160,
+            Top = 320,
+            Content = new Grid { Background = Brushes.White },
+        };
+        var invoked = new List<string>();
+        widget.ActionFilter = name =>
+        {
+            invoked.Add(name);
+            return false; // record only; do not capture, open windows or record in the test
+        };
+        widget.Show();
+        other.Show();
+        await Task.Delay(300);
+        try
+        {
+            // Make the other window the foreground window with a real click (the "app being captured").
+            nint otherHwnd = new WindowInteropHelper(other).Handle;
+            nint dockHwnd = new WindowInteropHelper(widget).Handle;
+            (int ox, int oy) = Centre((FrameworkElement)other.Content);
+            NativeInput.MoveTo(ox, oy);
+            NativeInput.LeftDown();
+            await Task.Delay(Step);
+            NativeInput.LeftUp();
+            await WaitFor(() => NativeMethods.GetForegroundWindow() == otherHwnd, 5);
+
+            widget.EnterKeyboardMode();
+            await WaitFor(() => widget.IsKeyboardMode && widget.IsExpanded && NativeMethods.GetForegroundWindow() == dockHwnd && widget.CaptureButton.IsKeyboardFocused, 5,
+                () => $"foreground {NativeMethods.GetForegroundWindow()}, dock {dockHwnd}, focused {System.Windows.Input.Keyboard.FocusedElement}");
+            Assert.Equal(otherHwnd, widget.PreviousForeground);
+            Assert.Equal(0, ExStyle(widget) & NativeMethods.WS_EX_NOACTIVATE); // activatable while in keyboard mode
+            Assert.All(widget.DockButtons, b => Assert.True(b.Focusable));
+            Assert.Equal(Visibility.Visible, FocusRing(widget.CaptureButton).Visibility); // focus is visible
+
+            NativeInput.KeyPress(0x09); // Tab
+            await WaitFor(() => widget.RecordButton.IsKeyboardFocused, 5);
+            Assert.Equal(Visibility.Visible, FocusRing(widget.RecordButton).Visibility);
+            Assert.Equal(Visibility.Collapsed, FocusRing(widget.CaptureButton).Visibility);
+            NativeInput.KeyPress(0x27); // Right arrow
+            await WaitFor(() => widget.TextButton.IsKeyboardFocused, 5);
+            NativeInput.KeyPress(0x25); // Left arrow
+            await WaitFor(() => widget.RecordButton.IsKeyboardFocused, 5);
+            NativeInput.KeyPress(0x23); // End
+            await WaitFor(() => widget.PresetsButton.IsKeyboardFocused, 5);
+            NativeInput.KeyPress(0x09); // Tab wraps around to the first button
+            await WaitFor(() => widget.CaptureButton.IsKeyboardFocused, 5);
+            NativeInput.KeyPress(0x09);
+            await WaitFor(() => widget.RecordButton.IsKeyboardFocused, 5);
+            Assert.Empty(invoked);
+
+            // Enter runs the focused button; the dock leaves keyboard mode and the previous window gets focus back.
+            NativeInput.KeyPress(0x0D);
+            await WaitFor(() => invoked.Count == 1, 5);
+            Assert.Equal("Record", invoked[0]);
+            await WaitFor(() => NativeMethods.GetForegroundWindow() == otherHwnd, 5);
+            Assert.False(widget.IsKeyboardMode);
+            Assert.False(widget.IsExpanded);
+            Assert.NotEqual(0, ExStyle(widget) & NativeMethods.WS_EX_NOACTIVATE); // non-activating again
+            Assert.All(widget.DockButtons, b => Assert.False(b.Focusable));
+
+            // Esc closes keyboard mode without running anything and restores the previous foreground window.
+            widget.EnterKeyboardMode();
+            await WaitFor(() => NativeMethods.GetForegroundWindow() == dockHwnd && widget.CaptureButton.IsKeyboardFocused, 5);
+            NativeInput.KeyPress(0x1B);
+            await WaitFor(() => !widget.IsKeyboardMode && NativeMethods.GetForegroundWindow() == otherHwnd, 5);
+            Assert.False(widget.IsExpanded);
+            Assert.Single(invoked);
+
+            // Mouse use is unchanged afterwards: hovering opens the dock without changing the foreground window.
+            PixelRect r = PhysicalPlacement.GetBounds(widget)!.Value;
+            NativeInput.MoveTo(r.X + (r.Width / 2), r.Y + (r.Height / 2));
+            await WaitFor(() => widget.IsExpanded, 5);
+            Assert.Equal(otherHwnd, NativeMethods.GetForegroundWindow());
+            NativeInput.MoveTo(r.X + (r.Width / 2), r.Y + 400);
+            await WaitFor(() => !widget.IsExpanded, 5);
+        }
+        finally
+        {
+            widget.Close();
+            other.Close();
         }
     });
 
