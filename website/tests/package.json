@@ -1,0 +1,13 @@
+{
+  "name": "snapforge-website-browser-tests",
+  "private": true,
+  "description": "Browser checks for the SnapForge website (test-only; the site itself has no dependencies).",
+  "license": "MIT",
+  "scripts": {
+    "test": "node browser-check.js ../public ../test-output --label ci --browsers chromium,firefox,webkit --require-all"
+  },
+  "devDependencies": {
+    "axe-core": "4.10.2",
+    "playwright": "1.63.0"
+  }
+}

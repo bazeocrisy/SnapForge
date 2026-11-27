@@ -1,0 +1,6 @@
+# Python bytecode (build.py, tools, tests)
+__pycache__/
+*.py[cod]
+# browser-test dependencies and local test output
+tests/node_modules/
+test-output/
