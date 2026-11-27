@@ -91,7 +91,7 @@ def load_config(path: Path, verification_path: Path = VERIFICATION) -> dict:
                           "(security.privateReporting.url + verified: true) — see LAUNCH-CHECKLIST.md")
         if not verification_path.exists():
             errors.append(f"release.ownerApproved is true but {verification_path.name} is missing: run "
-                          "tools/verify-release.py (or the 'Website release verification' workflow) against the "
+                          "tools/verify-release.py against the "
                           "published GitHub Release first — see LAUNCH-CHECKLIST.md")
         else:
             rec = json.loads(verification_path.read_text(encoding="utf-8"))
@@ -515,6 +515,8 @@ def contrast(c1: str, c2: str) -> float:
 def validate(out: Path) -> list[str]:
     problems: list[str] = []
     external: set[str] = set()
+    if not (out / ".nojekyll").exists():
+        problems.append(".nojekyll missing: GitHub Pages would run Jekyll over the site (keep static/.nojekyll)")
     for page in sorted(out.glob("*.html")):
         text = page.read_text(encoding="utf-8")
         p = PageParser()

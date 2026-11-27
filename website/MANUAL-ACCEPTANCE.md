@@ -1,7 +1,7 @@
 # Manual accessibility acceptance (keyboard and screen readers)
 
 Automated checks (axe-core, focus visibility, menu keyboard handling) catch only part of WCAG 2.2 AA. These manual
-procedures must be run by a person before launch (`LAUNCH-CHECKLIST.md` A5). **Status: not yet run.**
+procedures must be run by a person before launch (`LAUNCH-CHECKLIST.md` A3). **Status: not yet run.**
 
 Test against a local build (`python3 -m http.server 8000 --directory website/public`, open
 `http://localhost:8000/`) or the deployed site. Record each result in the table at the end: pass / fail / notes,

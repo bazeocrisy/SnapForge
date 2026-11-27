@@ -1,7 +1,7 @@
 # SnapForge website
 
 The SnapForge project website, for free GitHub Pages hosting at **https://bazeocrisy.github.io/SnapForge/**.
-**Status: draft for review (PR #2) — not deployed, no release.** Launch steps are in
+**Status: built and ready on the `gh-pages` branch; GitHub Pages not yet switched on; no software release.** Launch steps are in
 [LAUNCH-CHECKLIST.md](LAUNCH-CHECKLIST.md); branding and name decisions in [BRANDING.md](BRANDING.md); the review
 handoff in [HANDOFF.md](HANDOFF.md).
 
@@ -15,19 +15,20 @@ domain, or from any local web server.
 |---|---|---|
 | `src/layout.html` | **source** | Shared page shell: header, navigation, footer, meta tags, Content-Security-Policy |
 | `src/pages/*.html` | **source** | Page content with `{{tokens}}` filled by the build (Home, Features, Download, User Guide, What's New, Roadmap, Support/FAQ, Donate, Privacy, About/License, 404) |
-| `static/**` | **source** | Copied verbatim into the site: `assets/css/site.css`, `assets/js/site.js`, `assets/icons/*.svg`, `assets/img/` (logo, Open Graph image), `assets/screenshots/*.jpg`, `favicon.ico` |
+| `static/**` | **source** | Copied verbatim into the site: `.nojekyll`, `assets/css/site.css`, `assets/js/site.js`, `assets/icons/*.svg`, `assets/img/` (logo, Open Graph image), `assets/screenshots/*.jpg`, `favicon.ico` |
 | `static/assets/img/og-image.png` | **source** (rendered once) | Made by `node tools/make-og-image.js` from `tools/og-image.html`; re-render after changing the logo or slogan |
 | `config.json` | **source** | Release, donation and security-contact settings — see below |
 | `release-verification.json` | **source** (tool output, reviewed) | Written only by `tools/verify-release.py` after it has checked the real GitHub Release. Absent until a release exists |
-| `public/**` | **generated — do not edit** | The deployed site. `build.py` deletes it and rebuilds it entirely: `static/**` copied, every `*.html`, `sitemap.xml` and `robots.txt` generated |
+| `public/**` | **generated — do not edit** | The site that is copied to the `gh-pages` branch. `build.py` deletes it and rebuilds it entirely: `static/**` copied, every `*.html`, `sitemap.xml` and `robots.txt` generated |
 | `build.py` | tool | Build + validation (Python 3 standard library only) |
 | `tools/verify-release.py` | tool | Release-publication verifier (read-only) |
+| `tools/publish-gh-pages.sh` | tool | Builds, checks and commits `public/` to the `gh-pages` branch |
 | `tests/test_website.py` | tests | Unit tests: build gates, stale-output detection, verifier against a fake GitHub |
 | `tests/browser-check.js`, `tests/package*.json` | tests | Browser tests (Playwright + axe-core, pinned by `package-lock.json`); not needed to build or deploy |
 | `test-evidence/` | evidence | Screenshots and JSON from the last local browser run |
 | `design-references/` | reference | Supplied concept images (not published, not real UI) and the current app icon |
 
-`public/` is committed because GitHub Pages deploys it as-is and reviewers can read the exact HTML. **CI detects
+`public/` is committed so reviewers can read the exact HTML that goes to `gh-pages` and reviewers can read the exact HTML. **CI detects
 stale or hand-edited output:** `python3 website/build.py --check` builds into a temporary folder and fails if
 `public/` differs in any byte, is missing a file or has an extra one (tested in `tests/test_website.py`).
 After changing anything under `src/`, `static/` or `config.json`, run `python3 website/build.py` and commit
@@ -48,7 +49,7 @@ hold — `release.ownerApproved: true` on its own is refused by the build:
 1. The owner approved the software release, and it is published as a **GitHub Release** of `bazeocrisy/SnapForge`
    (not a draft or pre-release). Actions artifacts are rejected: they expire and need a GitHub sign-in.
 2. `config.json → release` is filled in from that release.
-3. `tools/verify-release.py` (or the **Website release verification** workflow, which runs it on Windows) has
+3. `tools/verify-release.py` (run on your PC; on Windows if the release is signed) has
    checked the actual release: exact asset name, the downloadable bytes, file size, SHA-256, the package contents
    and the signing claim — and written `release-verification.json`, which must match `config.json` field for field.
 4. Private vulnerability reporting is enabled and verified (`config.json → security.privateReporting`).
@@ -76,13 +77,31 @@ Each provider is **hidden** until it has a URL **and** `verified: true`. Accepte
 
 Plain external links only — no embedded buttons, scripts or trackers; no tax-deductibility claims.
 
-## Deployment
+## Publishing (GitHub Pages from the `gh-pages` branch)
 
-`.github/workflows/website.yml` validates every push/PR touching `website/` (build check, unit tests, browser
-tests in Chromium, Firefox and WebKit). It **deploys only** when the owner runs it by hand from `main` with
-**deploy** ticked **and** the repository variable `WEBSITE_DEPLOY_APPROVED` is `true` — see
-[LAUNCH-CHECKLIST.md §A](LAUNCH-CHECKLIST.md#a-before-the-site-may-be-deployed-even-with-no-release-yet).
-`.github/workflows/website-release-verify.yml` only reads a published release and uploads the record.
+No GitHub Actions, variables or manual workflow runs are involved. GitHub Pages serves the `gh-pages` branch as-is.
+
+**One-time setup (owner):** repository **Settings → Pages → Build and deployment → Source: Deploy from a branch →
+Branch: `gh-pages`, folder `/ (root)` → Save.** The site appears at https://bazeocrisy.github.io/SnapForge/ within a
+few minutes. To take it offline: Settings → Pages → **Unpublish site** (or set the source back to *None*).
+
+**`gh-pages` contains only the built site:** the contents of `website/public/` at its root, including
+`.nojekyll` (so GitHub serves the files directly instead of running Jekyll). All website sources stay on the
+development branch (`claude/website`); `gh-pages` is never edited by hand.
+
+**Updating the site later:** change the sources on the development branch, commit, then
+
+```bash
+bash website/tools/publish-gh-pages.sh     # rebuild, run build check + unit tests, commit public/ to gh-pages
+git push origin gh-pages                   # the live site updates a minute or two later
+```
+
+The script refuses to publish if `website/` has uncommitted changes or if any check fails. Each `gh-pages`
+commit says which source commit it was built from.
+
+**Automatic checks:** `.github/workflows/website.yml` runs by itself on every push or pull request that touches
+`website/` (build check, unit tests, browser tests in Chromium, Firefox and WebKit). It never deploys and needs no
+action; a red result just means "don't publish this yet".
 
 ## Testing
 
@@ -117,4 +136,4 @@ automated runs: [HANDOFF.md](HANDOFF.md#test-evidence).
 * The 404 page uses absolute `/SnapForge/` paths (it is served at any depth); with a custom domain at the root,
   change `siteUrl` in `config.json` and rebuild.
 * The User Guide describes the current development builds and must be re-checked against the released build.
-* Signed-release claims can only be validated on Windows (the verification workflow runs there).
+* Signed-release claims can only be validated on Windows (run `tools/verify-release.py` there).

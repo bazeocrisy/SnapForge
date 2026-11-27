@@ -3,19 +3,20 @@
 Nothing here is authorised yet: **no deployment and no software release** until the owner says so. This is the
 order of work for when they do. Each step names who does it and how it is checked.
 
-## A. Before the site may be deployed (even with "no release yet")
+## A. Switching the website on (no release needed)
+
+The `gh-pages` branch already holds the built, checked site. The Download button is disabled and donation links are
+hidden, so the site can go live before any software release.
 
 | # | Step | Who | Check |
 |---|---|---|---|
-| A1 | Milestone 3 reviewed and merged into `main`, so the repository's front page shows the code the site describes | Owner / reviewer | `main` contains `src/`, `README.md`, `LICENSE` |
-| A2 | **Private vulnerability reporting enabled**: Settings → Code security → *Private vulnerability reporting* → Enable | Owner | See §C |
-| A3 | Issues enabled (Settings → General → Features → Issues) | Owner | `https://github.com/bazeocrisy/SnapForge/issues` opens |
-| A4 | Software README and docs updated to the owner's decisions (official name, Windows 11 x64 target) | Software branches | No "working name" / "Windows 10 and 11" statements remain |
-| A5 | Manual accessibility acceptance (`MANUAL-ACCEPTANCE.md`) passed | Tester | Results table filled in |
-| A6 | Website PR #2 approved at the independent review gate and merged | Owner | — |
-| A7 | Settings → Pages → Source: **GitHub Actions**; Settings → Environments → `github-pages` → required reviewer: owner | Owner | — |
-| A8 | Settings → Secrets and variables → Actions → Variables: `WEBSITE_DEPLOY_APPROVED` = `true` | Owner | — |
-| A9 | Actions → **Website** → Run workflow on `main`, tick **deploy** | Owner | Site loads at https://bazeocrisy.github.io/SnapForge/ ; repeat the browser checks against it |
+| A1 | Recommended first: merge Milestone 3 into `main`, so the repository's front page shows the code the site describes (the site's "Source code on GitHub" link points there) | Owner / reviewer | `main` contains `src/`, `README.md`, `LICENSE` |
+| A2 | Settings → Pages → Source: **Deploy from a branch** → `gh-pages` / `(root)` → Save | Owner | https://bazeocrisy.github.io/SnapForge/ loads (allow a few minutes) |
+| A3 | Click through every page on a PC and a phone; then run `MANUAL-ACCEPTANCE.md` | Owner / tester | Results table filled in |
+| A4 | Before a release (§B): private vulnerability reporting (§C), Issues enabled (Settings → General → Features), software README updated to the official name and Windows 11 x64 | Owner / software branches | — |
+
+To update the live site later: `bash website/tools/publish-gh-pages.sh` then `git push origin gh-pages`.
+To take it offline: Settings → Pages → Unpublish site.
 
 ## B. Before the site may offer a download
 
@@ -24,10 +25,10 @@ order of work for when they do. Each step names who does it and how it is checke
 | B1 | Owner approves the software release (separate review gate) | Written approval |
 | B2 | Release built by CI from the approved commit; owner publishes it as a **GitHub Release** (not draft, not pre-release) with the ZIP as an asset. *This website never publishes releases.* | Release page exists |
 | B3 | Fill in `config.json → release` (all fields; `ownerApproved: true` only with the owner's approval) | — |
-| B4 | **Verify the published release**: Actions → **Website release verification** → Run workflow (Windows runner; checks a signing claim with `Get-AuthenticodeSignature`). Or locally: `python3 website/tools/verify-release.py` (unsigned releases only) | Workflow green |
-| B5 | Download the `release-verification-<sha>` artifact, read it, save it as `website/release-verification.json` | `result: verified`, checks list, package contents, signing |
+| B4 | **Verify the published release** on your PC: `python website/tools/verify-release.py` (run it on Windows if the release is signed — the signature is checked with `Get-AuthenticodeSignature`) | Ends with `VERIFIED` |
+| B5 | Read the written `website/release-verification.json` | `result: verified`, checks list, package contents, signing |
 | B6 | `python3 website/build.py` — the build refuses unless the record matches `config.json` exactly **and** private reporting is verified (A2/§C) | Builds without errors |
-| B7 | Review the Download, Support and About pages (package contents, checksum, signing text come only from the record); commit; PR; deploy (A9) | — |
+| B7 | Review the Download, Support and About pages (package contents, checksum, signing text come only from the record); commit; then `bash website/tools/publish-gh-pages.sh` and `git push origin gh-pages` | Live Download page shows the release |
 
 What `verify-release.py` checks (any failure → nothing written, download stays disabled):
 
@@ -41,7 +42,7 @@ What `verify-release.py` checks (any failure → nothing written, download stays
 5. Signing: `signed: false` → the executable must have **no** Authenticode signature. `signed: true` → it must
    have one and Windows must report it **Valid** with a subject containing `signer`.
 
-If anything about the release changes (re-uploaded asset, new tag), re-run B4–B6: a stale record no longer matches
+If anything about the release changes (re-uploaded asset, new tag), re-run B4–B7: a stale record no longer matches
 and the build fails.
 
 ## C. Private vulnerability reporting (required before launch)

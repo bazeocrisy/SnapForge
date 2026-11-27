@@ -20,7 +20,7 @@ Checks (all must pass, otherwise nothing is written and the exit code is 1):
      - signed: false -> the executable must have no Authenticode signature at all (PE certificate table empty);
      - signed: true  -> it must carry a signature AND, on Windows, Get-AuthenticodeSignature must report Status
        "Valid" with a signer subject containing release.signer. Off Windows a "signed" claim cannot be validated and
-       fails. Run the "Website release verification" workflow (Windows runner) for that.
+       fails: run this tool on a Windows PC for a signed release.
 """
 from __future__ import annotations
 
@@ -205,8 +205,8 @@ def verify(cfg: dict, *, api_base: str, rewrite, work: Path) -> dict:
         if not has_sig:
             raise Failed("config claims a signed release, but SnapForge.exe has no Authenticode signature")
         if sys.platform != "win32":
-            raise Failed("a 'signed' claim can only be validated on Windows (Get-AuthenticodeSignature); run the "
-                         "'Website release verification' workflow")
+            raise Failed("a 'signed' claim can only be validated on Windows (Get-AuthenticodeSignature); run this "
+                         "tool on a Windows PC")
         exe_path = work / "SnapForge.exe"
         exe_path.write_bytes(exe_bytes)
         result = authenticode_on_windows(exe_path)
