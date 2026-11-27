@@ -6,10 +6,10 @@ namespace SnapForge.Core.Editing;
 
 public sealed class DocumentChangedEventArgs(bool imageChanged, bool sizeChanged = false) : EventArgs
 {
-    /// <summary>True when the visible pixels changed (redaction, crop), so the UI must refresh its bitmap.</summary>
+    /// <summary>True when the visible pixels changed (redaction, crop, rotate/flip, resize, canvas, effects), so the UI must refresh its bitmap.</summary>
     public bool ImageChanged { get; } = imageChanged;
 
-    /// <summary>True when the image dimensions changed (crop).</summary>
+    /// <summary>True when the image dimensions changed (crop, quarter-turn rotation, resize, canvas, border, shadow).</summary>
     public bool SizeChanged { get; } = sizeChanged;
 }
 
@@ -257,7 +257,7 @@ public sealed class EditorDocument
         }
     }
 
-    /// <summary>Swaps in new images and annotations (crop and its undo).</summary>
+    /// <summary>Swaps in new images and annotations (crop, whole-image commands and their undo).</summary>
     internal (PixelBuffer Base, PixelBuffer? Working, Annotation[] Annotations) ReplaceContent(PixelBuffer newBase, PixelBuffer? newWorking, IEnumerable<Annotation> newAnnotations)
     {
         var previous = (_base, _working, _annotations.ToArray());
@@ -290,8 +290,9 @@ public sealed class EditorDocument
     {
         if (command is not null)
         {
-            bool size = command is CropCommand;
-            Changed?.Invoke(this, new DocumentChangedEventArgs(command is RedactCommand || size, size));
+            bool size = command is CropCommand || command is IImageEditCommand { ChangesSize: true };
+            bool image = size || command is RedactCommand || command is IImageEditCommand;
+            Changed?.Invoke(this, new DocumentChangedEventArgs(image, size));
         }
     }
 }
