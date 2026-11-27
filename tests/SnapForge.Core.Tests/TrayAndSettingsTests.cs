@@ -144,7 +144,10 @@ public class TrayAndSettingsTests
         File.WriteAllText(path, "{ \"Version\": 1, \"Theme\": \"Neon\" }");
         AppSettings s = AppSettings.Load(path);
         Assert.Equal(ThemePreference.System, s.Theme);
-        Assert.True(File.Exists(path + ".damaged"));
+
+        // FA-019: the bad file is copied to a unique settings.damaged-<utc>-<random>.json (was an overwritable ".damaged").
+        string copy = Assert.Single(Directory.GetFiles(dir.Path, "settings.damaged-*.json"));
+        Assert.Equal("{ \"Version\": 1, \"Theme\": \"Neon\" }", File.ReadAllText(copy));
     }
 
     [Fact]
