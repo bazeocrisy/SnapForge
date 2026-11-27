@@ -1,3 +1,4 @@
+using System.Text.RegularExpressions;
 using System.Diagnostics;
 using System.IO;
 using SnapForge.App.Video;
@@ -165,6 +166,46 @@ public sealed class RecordingFaultTests : IDisposable
         Assert.False(File.Exists(path));
         Assert.True(rec.ThreadsExited.IsCompleted);
         Assert.Throws<InvalidOperationException>(rec.Start);
+    }
+
+    [Theory]
+    [InlineData(320, 240)]
+    [InlineData(640, 352)]
+    [InlineData(640, 360)]
+    [InlineData(1280, 720)]
+    [InlineData(1000, 562)]
+    public void Recording_of_any_even_size_decodes_to_what_was_written_without_timestamp_gaps(int width, int height)
+    {
+        // Isolates the encoder path (no camera): what is decoded at t = 0 must be the first captured frame, and the
+        // file's timestamps must be as regular as those handed to the writer (CI runs 96–104 diagnostics).
+        string path = Path.Combine(_dir, $"size-{width}x{height}.mp4");
+        var writes = new System.Collections.Concurrent.ConcurrentQueue<(long Time, bool Repeat)>();
+        var restarts = new System.Collections.Concurrent.ConcurrentQueue<long>();
+        var hooks = new RecorderHooks { AfterVideoWrite = (t, rep) => writes.Enqueue((t, rep)), EncoderRestarted = restarts.Enqueue };
+        RecordingResult r;
+        using (ScreenRecorder rec = ScreenRecorder.Create(new SyntheticFrameSource(width, height, 30, 0), [], Options, path, hooks))
+        {
+            rec.Start();
+            Thread.Sleep(1500);
+            r = rec.Stop();
+        }
+
+        Assert.True(r.Finalized);
+        Core.Imaging.PixelBuffer d0 = VideoAnalysis.DecodeFrame(path, 0) ?? throw new InvalidOperationException("no frame");
+        var probes = new[] { (width / 4, height / 4), (width / 2, height / 2), (3 * width / 4, 3 * height / 4), (width / 8, 7 * height / 8) };
+        string diag = $"{width}x{height}: decoded {d0.Width}x{d0.Height}; " + string.Join("; ", probes.Select(pt => $"({pt.Item1},{pt.Item2}) written {Px(r.FirstFrame!, pt.Item1, pt.Item2)} decoded {Px(d0, pt.Item1, pt.Item2)}")) +
+            $"; {Timestamps(path)}; {WriteDiag(writes, restarts)}; encoder {r.Encoder} hw {r.HardwareEncoder} fallback {r.SoftwareFallback}";
+        foreach ((int x, int y) in probes)
+        {
+            int o1 = ((y * width) + x) * 4, o2 = ((y * d0.Width) + x) * 4;
+            for (int c = 0; c < 3; c++)
+            {
+                Assert.True(Math.Abs(r.FirstFrame!.Pixels[o1 + c] - d0.Pixels[o2 + c]) < 60, diag);
+            }
+        }
+
+        Assert.DoesNotContain("max gap 2", Timestamps(path), StringComparison.Ordinal); // no 200+ ms hole in the file
+        Assert.True(Regex.IsMatch(Timestamps(path), @"max gap (3[0-9]|4[0-9]) ms"), diag);
     }
 
     [Fact]
