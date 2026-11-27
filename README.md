@@ -5,52 +5,36 @@
 
 # SnapForge
 
-A fast, private screenshot and annotation tool for Windows 10 and 11, built with C#, .NET 10 and WPF.
+A free, private screenshot, screen-recording and annotation app for **Windows 11 (24H2 or later, x64)**, built with
+C#, .NET 10 and WPF. MIT licensed. No ads, no subscription, no account, no telemetry — everything stays on your PC.
 
-> **Status: development build (v0.1.0-dev), not released.** Automated tests run on Windows in CI;
-> interactive acceptance testing on physical Windows hardware is still pending
-> (see [docs/ACCEPTANCE-TESTING.md](docs/ACCEPTANCE-TESTING.md)).
-> "SnapForge" is a working name — see [naming conflicts](docs/RESEARCH.md#4-product-name-check-snapforge) and
-> [alternative names](docs/NAMING.md).
+> **Status: 1.0.0 release candidate (`1.0.0-rc.1`) — not approved for public release.** The integration branch is
+> `release/v1.0-candidate`. Automated tests run on Windows in CI; manual acceptance on physical Windows 11 PCs, code
+> signing and legal review are still pending — see the [release-candidate handoff](docs/RELEASE-CANDIDATE-HANDOFF.md),
+> [known limitations](docs/KNOWN-LIMITATIONS.md) and [manual acceptance checklist](docs/MANUAL-ACCEPTANCE-1.0.md).
 
 ## Features
 
-Three workspaces modelled on a familiar capture/edit/organize workflow (see [competitive analysis](docs/COMPETITIVE-ANALYSIS.md)):
-
-* **Capture window** — big Capture button, Region / Window / Display / Full screen, Preview in Editor, Copy to
-  clipboard, Save to Library (off = capture without history), capture mouse pointer, delay countdown, presets with
-  their own global hotkeys; notification-area icon; configurable global hotkey (default Print Screen, conflicts reported).
-* **Editor** — menu bar, horizontal toolbar, canvas, Quick Styles & Tool Properties panel, Recent Captures Tray
-  (pin, close vs delete, unsaved indicator, persists across restarts), light/dark themes.
-* **Library** — every capture saved automatically and stays editable; All / Recent / Favorites / Tags / Folders /
-  Trash; search, sort, date groups, adjustable thumbnails, multi-select, rename, duplicate, export, sanitize;
-  backup/restore, retention, storage usage, movable location ([format](docs/CAPTURE-FORMAT.md)).
-
-### Screen recording (Milestone V1 — feature branch, under review)
-
-* **Video mode** in the capture panel and a **Record** button on the widget: record a region, a window or a display
-  to **MP4** (H.264 + AAC) with the encoders built into Windows; 30 FPS (60 optional), Standard / High quality.
-* **Audio**: system sound (on by default) and microphone (off by default), toggled live with level meters.
-* **Floating toolbar**: elapsed time, Pause/Resume, Stop and save, Cancel and discard; it and the dashed outline are
-  kept out of the recording. Countdown before recording; cursor on/off; hotkeys **Shift+F9** record/pause/resume,
-  **Shift+F10** stop.
-* **Library**: videos with play badge, duration and size; Videos view; player; rename, tags, favourites, folders,
-  search, Trash; export or drag out as MP4. Interrupted recordings are recovered at the next start.
-* Videos cannot be redacted. Details: [video plan](docs/VIDEO-PLAN.md), [acceptance and known limitations](docs/VIDEO-ACCEPTANCE.md).
-
-### Capture and annotation (MVP)
-
-* **Capture**: full screen (all displays), region (can span monitors), window, single display.
-  Multi-monitor and mixed-DPI aware; the screen is frozen while you select.
-* **Annotate**: arrow, line, rectangle, ellipse, highlight, text, numbered step markers, crop; colors, thickness,
-  Quick Styles; Shift to constrain; select, move, recolor, resize, delete, edit text.
-* **Redact**: replaces pixels with solid black and covers earlier annotations. Undo works while editing; saved or
-  copied images contain only the black box — nothing to un-blur, nothing hidden under a layer ([details](docs/REDACTION.md)).
-* **Undo / redo** for every edit.
-* **Output**: save PNG or JPEG, copy to clipboard (bitmap + PNG).
-* **Private by design**: no network access, no telemetry, no account, no admin rights. Captures are kept in a
-  **local** library (`%LOCALAPPDATA%\SnapForge\Library`) unless you turn that off; nothing is ever uploaded.
-  See the [threat model](docs/SECURITY.md).
+* **Capture** — region (with magnifier and arrow-key nudging), window, active window, display, full screen,
+  scrolling capture (auto or manual scroll), repeat last capture, new from clipboard; delay, mouse pointer, presets,
+  global hotkeys (Print Screen by default; conflicts reported). Multi-monitor and mixed-DPI aware.
+* **Capture panel, desktop widget and notification-area icon** — one click to capture or record from anywhere.
+* **Editor** — arrow, line, rectangle, ellipse, highlight, text, numbered steps, pen, callout, stamps, redact, blur,
+  pixelate, crop; rotate, flip, resize, canvas size, border, drop shadow, watermark; copy/paste/duplicate
+  annotations; Quick Styles; undo/redo for every edit; print.
+* **Redaction you can trust** — redact replaces pixels with solid black in every export, copy and drag; **Sanitize**
+  removes the original pixels from the Library copy too ([details](docs/REDACTION.md)). Blur and pixelate are visual
+  effects, not redaction.
+* **Extract text (OCR)** — offline, with the recognition languages built into Windows; review, edit and copy.
+* **Screen recording** — region, window or display to MP4 (H.264 + AAC) with system sound and microphone, pause/resume,
+  floating toolbar kept out of the video, recovery of interrupted recordings.
+* **Video editing** — trim, remove sections, step through frames, save a frame as an image, export MP4 or GIF.
+* **Library** — every capture saved automatically and stays editable; search, tags, folders, favourites, Trash,
+  combine images, import PNG/JPEG/BMP/MP4, backup/restore, retention, movable location ([format](docs/CAPTURE-FORMAT.md)).
+* **Output** — PNG, JPEG, BMP, TIFF, MP4, GIF; clipboard; native drag-and-drop of files (flattened, redacted, no
+  metadata) — tested with Explorer-style drop targets on CI; Office, Teams and browser targets await manual verification.
+* **Private by design** — no network code, standard user rights, local storage under `%LOCALAPPDATA%\SnapForge`.
+  See the [threat model](docs/THREAT-MODEL.md) and [security policy](SECURITY.md).
 
 ## Keyboard shortcuts
 
@@ -59,16 +43,21 @@ Three workspaces modelled on a familiar capture/edit/organize workflow (see [com
 | Capture (current settings) / Region / Window / Display / Full screen | Ctrl+N / Ctrl+1 / 2 / 3 / 4 | Undo / Redo | Ctrl+Z / Ctrl+Y (Ctrl+Shift+Z) |
 | Select / Arrow / Line / Rectangle / Ellipse | V / A / L / R / E | Copy / Export | Ctrl+C / Ctrl+S |
 | Highlight / Text / Step / Redact / Crop | H / T / N / X / C | Delete selection | Del |
+| Pen / Callout / Stamp / Blur / Pixelate | D / K / S / B / P | Copy / paste / duplicate annotation | Ctrl+Shift+C / Ctrl+V / Ctrl+D |
+| Active window / Scrolling capture / Repeat last | Ctrl+5 / Ctrl+6 / Ctrl+R | New from clipboard / Extract text | Ctrl+Shift+V / Ctrl+Shift+T |
+| Record / pause / resume, Stop recording | Shift+F9, Shift+F10 | Print | Ctrl+P |
 | Editor / Library / Settings | Ctrl+E / Ctrl+L / Ctrl+, | Zoom in / out / fit / 1:1 | Ctrl+= / Ctrl+− / Ctrl+0 / Ctrl+Alt+0 |
 | Pin current capture in tray / Close capture | Ctrl+Shift+P / Ctrl+W | Global capture hotkey | Print Screen (configurable) |
 | Cancel | Esc (or right-click during capture) | Zoom with wheel | Ctrl+wheel |
 
-## Download a development build
+## Download a release-candidate build
 
-Every CI run publishes a portable, self-contained build (`SnapForge.exe` plus five WPF native DLLs; no .NET
-install needed — CI verifies this on a runner with .NET removed) as the artifact
-`SnapForge-portable-win-x64-dev-<commit>` on the **Actions** run page, with `SHA256SUMS.txt`. It is unsigned, so
-SmartScreen will ask for confirmation. `SnapForge.exe --self-test report.txt` runs a non-interactive diagnostic.
+There is **no public download yet**. For testing, every CI run on `release/v1.0-candidate` publishes
+`SnapForge-<version>-packages-<commit>` on the **Actions** run page: a portable ZIP, a per-user installer
+(`SnapForge-<version>-setup-win-x64.exe`, no administrator rights), a CycloneDX SBOM and `SHA256SUMS.txt`. The
+builds are **unsigned**, so Windows SmartScreen may show a warning; verify the checksum first
+(`Get-FileHash <file>`). Help → About shows the version, build number and commit. `SnapForge.exe --self-test
+report.txt` runs a non-interactive diagnostic. See [INSTALLATION.md](docs/INSTALLATION.md).
 
 ## Build from source
 
@@ -85,24 +74,11 @@ The Windows projects compile on Linux/macOS (`EnableWindowsTargeting`) but run o
 
 ## Documentation
 
-* **Milestone V1 screen recording (branch `claude/video-v1`, awaiting independent review):** [handoff](docs/V1-HANDOFF.md) · [plan and decisions](docs/VIDEO-PLAN.md) · [architecture and API research](docs/VIDEO-ARCHITECTURE.md) · [threat model](docs/VIDEO-THREAT-MODEL.md) · [Library video format](docs/LIBRARY-VIDEO-FORMAT.md) · [benchmarks](docs/VIDEO-BENCHMARKS.md) · [test results](docs/VIDEO-TEST-RESULTS.md) · [acceptance and known limitations](docs/VIDEO-ACCEPTANCE.md)
-* **Milestone 3 handoff (awaiting independent review):** [handoff](docs/MILESTONE-3-HANDOFF.md) · [benchmarks](docs/BENCHMARKS.md)
-* **Milestone 3 planning:** [forensic audit](docs/SNAGIT-FORENSIC-AUDIT.md) · [feature parity matrix](docs/FEATURE-PARITY-MATRIX.md) · [master requirements](docs/PRODUCT-REQUIREMENTS.md) · [UI specification](docs/UI-SPECIFICATION.md) · [roadmap](docs/DEVELOPMENT-ROADMAP.md) · [source registry](docs/SOURCE-REGISTRY.md)
-* [Architecture and decisions](docs/ARCHITECTURE.md)
-* [Requirements and acceptance criteria](docs/REQUIREMENTS.md)
-* [Security and privacy model](docs/SECURITY.md)
-* [Research: capture APIs, dependencies, licensing, naming](docs/RESEARCH.md)
-* [Screenshots of the three workspaces](docs/screenshots/README.md)
-* [Competitive analysis (Snagit as usability reference)](docs/COMPETITIVE-ANALYSIS.md)
-* [Editable capture format v1](docs/CAPTURE-FORMAT.md)
-* [Redaction pipeline review](docs/REDACTION.md)
-* [Windows 10/11 compatibility](docs/COMPATIBILITY.md)
-* [Windows Graphics Capture investigation](docs/WINDOWS-GRAPHICS-CAPTURE.md)
-* [Automated UI testing](docs/UI-TESTING.md)
-* [Alternative product names](docs/NAMING.md)
-* [Windows acceptance test guide](docs/ACCEPTANCE-TESTING.md) and [results form](docs/ACCEPTANCE-RESULTS-TEMPLATE.md)
-* [Self-audit](docs/AUDIT.md)
-* [Third-party notices](THIRD-PARTY-NOTICES.md)
+* **1.0 release candidate:** [handoff](docs/RELEASE-CANDIDATE-HANDOFF.md) · [release notes](docs/RELEASE-NOTES-1.0.0-rc.1.md) · [requirements traceability](docs/PRODUCT-REQUIREMENTS-TRACEABILITY.md) · [defect register](docs/DEFECT-REGISTER.md) · [known limitations](docs/KNOWN-LIMITATIONS.md) · [manual acceptance](docs/MANUAL-ACCEPTANCE-1.0.md) · [benchmarks](docs/BENCHMARKS-1.0.md) · [product inventory](docs/FINAL-PRODUCT-INVENTORY.md)
+* **Using SnapForge:** [user guide](docs/USER-GUIDE.md) · [installation](docs/INSTALLATION.md)
+* **Security and legal:** [security policy](SECURITY.md) · [threat model](docs/THREAT-MODEL.md) · [security testing](docs/SECURITY-TESTING.md) · [privacy model](docs/SECURITY.md) · [redaction](docs/REDACTION.md) · [licensing review](docs/LICENSING-REVIEW.md) · [dependencies and SBOM](docs/DEPENDENCIES.md) · [third-party notices](THIRD-PARTY-NOTICES.md)
+* **Releasing:** [release process](docs/RELEASE-PROCESS.md) · [code signing preparation](docs/SIGNING.md) · [rollback](docs/ROLLBACK.md) · [maintenance](docs/MAINTENANCE.md) · [contributing](CONTRIBUTING.md)
+* **Design and history:** [architecture](docs/ARCHITECTURE.md) · [capture format](docs/CAPTURE-FORMAT.md) · [Library video format](docs/LIBRARY-VIDEO-FORMAT.md) · [video architecture](docs/VIDEO-ARCHITECTURE.md) · [video threat model](docs/VIDEO-THREAT-MODEL.md) · [Milestone 3 handoff](docs/MILESTONE-3-HANDOFF.md) · [V1 recording handoff](docs/V1-HANDOFF.md) · [UI testing](docs/UI-TESTING.md) · [research](docs/RESEARCH.md) · [competitive analysis](docs/COMPETITIVE-ANALYSIS.md)
 
 ## License
 

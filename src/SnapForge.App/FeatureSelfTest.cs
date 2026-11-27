@@ -303,6 +303,42 @@ internal static unsafe class FeatureSelfTest
             return $"4K rotate + downscale + upscale to 5000x3000 + blur r8: {sw.Elapsed.TotalMilliseconds:0} ms";
         });
 
+        r.Check("gif-encoder-performance", () =>
+        {
+            // Same workload as the Core unit test, measured here without coverage instrumentation.
+            int w = 640, h = 360;
+            var frame = new PixelBuffer(w, h);
+            for (int y = 0; y < h; y++)
+            {
+                for (int x = 0; x < w; x++)
+                {
+                    frame.SetPixel(x, y, ArgbColor.FromRgb((byte)(x * 255 / w), (byte)(y * 255 / h), 128));
+                }
+            }
+
+            using var ms = new MemoryStream();
+            var sw = System.Diagnostics.Stopwatch.StartNew();
+            using (var encoder = new GifEncoder(ms, w, h, new GifEncoderOptions { Dithering = GifDithering.OrderedBayer4x4 }, leaveOpen: true))
+            {
+                for (int k = 0; k < 30; k++)
+                {
+                    frame.FillRect(new PixelRect(20 + (k * 15), 100, 12, 18), ArgbColor.Black);
+                    frame.FillRect(new PixelRect(40, 120, 10 + (k * 8), 14), ArgbColor.FromRgb(30, 30, 200));
+                    encoder.AddFrame(frame, 6);
+                }
+
+                encoder.Finish();
+            }
+
+            sw.Stop();
+            if (sw.Elapsed > TimeSpan.FromSeconds(3))
+            {
+                throw new InvalidOperationException($"30 GIF frames of 640x360 took {sw.Elapsed.TotalSeconds:0.0} s (target < 3 s)");
+            }
+
+            return $"30 frames 640x360 (ordered dither): {sw.Elapsed.TotalMilliseconds:0} ms, {ms.Length} bytes";
+        });
+
         r.Check("image-transforms", () =>
         {
             PixelBuffer img = RenderText(["Transform check 123"], 20);

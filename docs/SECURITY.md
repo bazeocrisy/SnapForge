@@ -15,7 +15,7 @@ the privacy model from "nothing persists unless exported" to "captures persist l
 | Recent tray layout | `<Library>\tray.json` | Tray changes | Never contains pixels |
 | Settings (options, presets, hotkeys, quick styles, library path) | `%LOCALAPPDATA%\SnapForge\settings.json` | Settings changes | Uninstall/delete folder |
 | Crash logs (exception text + OS version, **no image data**) | `%LOCALAPPDATA%\SnapForge\logs\` | Unexpected error | Manually |
-| Drag-and-drop copies (flattened PNG/JPEG, no metadata) | `%LOCALAPPDATA%\SnapForge\Temp\Drag\<time>-<random>\` | Only when a drop target asks for files during a drag | 2 minutes after the drag, on exit, and at the next start (crash) |
+| Drag-and-drop copies (flattened PNG/JPEG, no metadata) | `%LOCALAPPDATA%\SnapForge\Temp\Drag\<time>-<random>\` | Only when a drop target asks for files during a drag | Deleted at once if the drag is cancelled; after a drop, kept for 24 hours (targets such as browser upload fields read the file late), capped at 2 GB in total, swept at exit and at the next start; Settings → Delete drag-and-drop copies now |
 | Imported images | Stored as new Library captures (pixels only; the source file's metadata is not kept) | File → Import images…, Library → Import…, or dropping files on SnapForge | Like any capture |
 | Widget placement, panel position, drag format, startup choice | `settings.json` | Settings changes | Uninstall/delete folder |
 | Startup entry | `HKCU\Software\Microsoft\Windows\CurrentVersion\Run\SnapForge` | User turns on "Launch with Windows" | User turns it off (SnapForge or Windows Settings → Startup) |
@@ -75,7 +75,7 @@ Full pipeline review: [REDACTION.md](REDACTION.md).
 * The development build is not code-signed (release blocker; owner decision PD-04: trusted signing before any public release).
 * Drag and drop: once a target has copied a dragged file (e.g. into a document, an email draft or a chat upload), that
   copy is outside SnapForge's control, exactly like an exported file. Some targets read the file after the drop;
-  SnapForge keeps the temporary copy for 2 minutes for them. A drop target receives only the flattened image.
+  SnapForge keeps the temporary copy for up to 24 hours (2 GB cap) for them; Settings can delete them at any time. A drop target receives only the flattened image.
 * The widget is a non-activating window: it cannot take keyboard focus. Keyboard users reach the same commands from
   the notification-area menu, the capture panel and the main window.
 * WPF keeps its own copies of on-screen bitmaps in unmanaged memory; a memory dump of the running process could

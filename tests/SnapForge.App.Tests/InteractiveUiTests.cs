@@ -102,7 +102,7 @@ public class InteractiveUiTests
             WindowStartupLocation = WindowStartupLocation.Manual,
             Left = 0,
             Top = 0,
-            Width = 980,
+            Width = 1280, // default width: one toolbar row, so the image shows at 1:1 (narrow widths: ReleaseCandidateUiTests)
             Height = 700,
             Topmost = true,
         };
