@@ -284,6 +284,16 @@ internal static partial class VideoSelfTest
         {
             close.Set();
             thread.Join(TimeSpan.FromSeconds(5));
+            try
+            {
+                Directory.Delete(Path.Combine(dir, "studio-selftest"), recursive: true);
+            }
+            catch (IOException)
+            {
+            }
+            catch (UnauthorizedAccessException)
+            {
+            }
         }
 
         PixelBuffer frame = VideoAnalysis.DecodeFrame(path, 1500) ?? throw new InvalidOperationException("No frame decoded.");

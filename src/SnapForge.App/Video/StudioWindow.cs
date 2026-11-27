@@ -30,6 +30,7 @@ internal sealed class StudioWindow : Window
 
     private readonly AppServices _services;
     private readonly Func<string?, string, ICameraSource> _cameraFactory;
+    private readonly Func<IReadOnlyList<Mf.VideoDevice>> _listCameras;
     private readonly StackPanel _targetSection;
     private readonly StackPanel _cameraSection;
     private readonly StackPanel _cursorRow;
@@ -54,10 +55,13 @@ internal sealed class StudioWindow : Window
     private int _generation;
     private Task _cameraReleased = Task.CompletedTask;
 
-    public StudioWindow(AppServices services, Func<string?, string, ICameraSource>? cameraFactory = null)
+    /// <param name="cameraFactory">Creates the preview camera (symbolic link, name); tests pass the synthetic camera.</param>
+    /// <param name="listCameras">Lists cameras without opening them; tests pass a fixed list.</param>
+    public StudioWindow(AppServices services, Func<string?, string, ICameraSource>? cameraFactory = null, Func<IReadOnlyList<Mf.VideoDevice>>? listCameras = null)
     {
         _services = services;
         _cameraFactory = cameraFactory ?? ((id, name) => new MediaFoundationCameraSource(id, name));
+        _listCameras = listCameras ?? MediaFoundationCameraSource.Enumerate;
         Title = "SnapForge Studio";
         Width = 448;
         SizeToContent = SizeToContent.Height;
@@ -298,13 +302,17 @@ internal sealed class StudioWindow : Window
     {
         try
         {
-            _cameras = MediaFoundationCameraSource.Enumerate(); // listing does not open a camera
+            _cameras = _listCameras(); // listing does not open a camera
         }
         catch (NativeCallException)
         {
             _cameras = [];
         }
         catch (DllNotFoundException)
+        {
+            _cameras = []; // no Media Foundation (Windows N without the Media Feature Pack)
+        }
+        catch (EntryPointNotFoundException)
         {
             _cameras = [];
         }

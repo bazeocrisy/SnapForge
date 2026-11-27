@@ -84,6 +84,7 @@ internal static partial class RecordingController
             return;
         }
 
+        _ = MediaFoundationAvailable(); // MFStartup before Studio lists cameras (Start reports a missing Media Foundation)
         var studio = new StudioWindow(services, CameraFactory);
         _studio = studio;
         studio.StartRequested += (_, _) =>
