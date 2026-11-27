@@ -48,7 +48,7 @@
       </ul>
     </nav>
   </div>
-  <p class="status-strip"><span class="container">In development — no public release yet. <a href="roadmap.html">Project status</a></span></p>
+  <p class="status-strip"><span class="container">No public release yet — release candidate 2 is in testing. <a href="roadmap.html">Project status</a></span></p>
 </header>
 <main id="main" tabindex="-1">
 <section class="page-hero">
@@ -92,7 +92,8 @@
   <details class="faq">
     <summary>When can I download it?</summary>
     <p>When the first release has been reviewed and approved. The <a href="download.html">Download page</a> will
-    show it, with its checksum.</p>
+    show it, with its checksum. Release candidate 2 is being tested by invited testers; see
+    <a href="download.html#test-builds">Test builds</a>.</p>
   </details>
   <details class="faq">
     <summary>Does SnapForge upload my screenshots or collect data?</summary>
@@ -116,8 +117,9 @@
   </details>
   <details class="faq">
     <summary>Why does Windows warn me before running it?</summary>
-    <p>Development builds are not code-signed, so SmartScreen may show a warning. Only run a copy you downloaded
-    from this site or the project's GitHub Releases whose checksum matches. See
+    <p>Test builds are not code-signed, so SmartScreen may show a warning. Keep SmartScreen and Defender turned
+    on. Only run builds you obtained from the project's CI page (or, later, its GitHub Releases) and whose checksum
+    you verified; if you are unsure, wait for the signed release. See
     <a href="download.html#smartscreen">Windows security prompts</a>.</p>
   </details>
   <details class="faq">
@@ -132,9 +134,20 @@
     SnapForge's Settings. SnapForge reports hotkeys it cannot register.</p>
   </details>
   <details class="faq">
-    <summary>I can't find the widget.</summary>
-    <p>Choose <em>View → Show capture widget</em> in SnapForge; it moves the widget to the top centre of the screen
-    and opens it briefly.</p>
+    <summary>I can't find QuickDock (the widget).</summary>
+    <p>Use SnapForge's <em>View</em> menu to show it again (<em>View → Show capture widget</em> in release
+    candidate 1); it moves QuickDock to the top centre of the screen.</p>
+  </details>
+  <details class="faq">
+    <summary>Does SnapForge use my camera or microphone?</summary>
+    <p>Only when you switch them on in SnapForge Studio for a recording; both are off by default. The camera
+    picture stays on your PC, inside the recording you make, and Windows shows its camera indicator while the
+    camera is on. See <a href="privacy.html#app">Privacy</a>.</p>
+  </details>
+  <details class="faq">
+    <summary>Does uninstalling delete my captures?</summary>
+    <p>No. Captures, recordings and settings are kept in <code>%LOCALAPPDATA%\SnapForge</code>. See
+    <a href="download.html#uninstall">Uninstalling</a> to remove them too.</p>
   </details>
   <details class="faq">
     <summary>How do I remove SnapForge completely?</summary>
@@ -155,7 +168,7 @@
 <li><a href="privacy.html">Privacy</a></li>
 <li><a href="about.html">About & License</a></li>
 <li><a href="support.html" aria-current="page">Report a problem</a></li>
-<li><a href="https://github.com/bazeocrisy/SnapForge" rel="noopener noreferrer">Source code on GitHub<span class="visually-hidden"> (external site)</span></a></li>
+<li><a href="https://github.com/bazeocrisy/SnapForge/tree/release/v1.0-candidate" rel="noopener noreferrer">Source code on GitHub<span class="visually-hidden"> (external site)</span></a></li>
       </ul>
     </nav>
   </div>
