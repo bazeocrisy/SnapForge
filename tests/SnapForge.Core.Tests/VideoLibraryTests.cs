@@ -142,17 +142,19 @@ public class VideoLibraryTests
     }
 
     [Fact]
-    public void Older_versions_backup_format_is_unchanged_and_ignores_videos()
+    public void FA005_backup_includes_videos_and_still_reads_the_legacy_image_only_format()
     {
+        // Was: "Older_versions_backup_format_is_unchanged_and_ignores_videos". FA-005 requires videos in backups, so
+        // backups are now format 2; version 1 backups (images only) are still restored (see BackupRestoreTests).
         using var dir = new TestDirectory();
         var lib = CaptureLibrary.Open(dir.Path);
         AddImage(lib);
-        AddVideo(lib);
+        CaptureRecord v = AddVideo(lib);
         string zip = dir.Sub("backup.zip");
-        Assert.Equal(1, lib.Backup(zip)); // images only (videos: documented limitation)
+        Assert.Equal(2, lib.Backup(zip));
         using var archive = System.IO.Compression.ZipFile.OpenRead(zip);
-        Assert.All(archive.Entries.Where(e => e.FullName != "snapforge-backup.json"), e => Assert.StartsWith("captures/", e.FullName, StringComparison.Ordinal));
-        Assert.Equal(6, archive.Entries.Count); // header + the image's five files; nothing from the video
+        Assert.Contains(archive.Entries, e => e.FullName == $"videos/{v.Id:D}/{CaptureLibrary.VideoFile}");
+        Assert.Equal(10, archive.Entries.Count); // manifest + the image's five files + the video's four files
     }
 
     [Fact]
@@ -252,13 +254,16 @@ public class VideoLibraryTests
     }
 
     [Fact]
-    public void Moving_the_library_moves_videos_and_leaves_in_progress_recordings()
+    public void FA006_moving_the_library_copies_videos_and_in_progress_recordings_and_keeps_the_source()
     {
+        // Was: "..._leaves_in_progress_recordings" and the old copy was deleted at once. FA-006/FA-007: interrupted
+        // recordings are copied too, and MoveTo never deletes the source (DeleteSourceAfterVerifiedMove does, later).
         using var dir = new TestDirectory();
         var lib = CaptureLibrary.Open(dir.Sub("old"));
         CaptureRecord img = AddImage(lib);
         CaptureRecord v = AddVideo(lib, bytes: 3 * 1024 * 1024);
-        lib.BeginVideo(Now);
+        (Guid recording, string recordingPath) = lib.BeginVideo(Now);
+        File.WriteAllBytes(recordingPath, [1, 2, 3]);
 
         CaptureLibrary moved = lib.MoveTo(dir.Sub("new"));
         Assert.Equal(2, moved.Records.Count);
@@ -266,7 +271,9 @@ public class VideoLibraryTests
         Assert.Null(moved.Find(v.Id)!.Damage);
         Assert.Equal(3 * 1024 * 1024, new FileInfo(moved.VideoPath(v.Id)).Length);
         Assert.NotNull(moved.Find(img.Id));
-        Assert.Empty(lib.Records);
+        Assert.Equal(recording, Assert.Single(moved.InterruptedRecordings()).Id);
+        Assert.Equal(2, lib.Records.Count); // source untouched
+        Assert.Equal(2, CaptureLibrary.Open(dir.Sub("old")).Records.Count);
         Assert.Throws<IOException>(() => CaptureLibrary.Open(dir.Sub("other")).MoveTo(dir.Sub("new")));
     }
 }

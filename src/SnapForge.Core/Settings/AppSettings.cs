@@ -1,3 +1,5 @@
+using System.Globalization;
+using System.Security.Cryptography;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using SnapForge.Core.Annotations;
@@ -122,8 +124,9 @@ public sealed record QuickStyle
 }
 
 /// <summary>
-/// User preferences, stored as JSON in %LOCALAPPDATA%\SnapForge\settings.json. Unknown or damaged files fall back
-/// to defaults (the damaged file is kept for inspection).
+/// User preferences, stored as JSON in %LOCALAPPDATA%\SnapForge\settings.json. Damaged files fall back to defaults
+/// (a uniquely named copy is kept); files from a newer version load as defaults in read-only mode and are never
+/// overwritten (see <see cref="LoadWithStatus"/>).
 /// </summary>
 public sealed record AppSettings
 {
@@ -214,47 +217,137 @@ public sealed record AppSettings
             .Append(("Stop recording", Video.StopHotkey))
             .Append(("Cancel recording", Video.CancelHotkey));
 
-    public static AppSettings Load(string path)
+    /// <summary>Loads settings; see <see cref="LoadWithStatus"/> for what happens with damaged or newer files.</summary>
+    public static AppSettings Load(string path) => LoadWithStatus(path).Settings;
+
+    /// <summary>
+    /// Loads settings and says how (FA-019):
+    /// <list type="bullet">
+    /// <item>missing file: defaults (<see cref="SettingsLoadStatus.Missing"/>);</item>
+    /// <item>a file written by a newer SnapForge (higher <see cref="Version"/>) or one that cannot be read: defaults in
+    /// read-only mode (<see cref="SettingsLoadResult.IsReadOnly"/>). The file is left exactly as it is, and
+    /// <see cref="Save"/>/<see cref="TrySave"/> refuse to overwrite a newer file;</item>
+    /// <item>a damaged file: defaults, after copying the file to a unique
+    /// <c>settings.damaged-&lt;utc&gt;-&lt;random&gt;.json</c> beside it (earlier copies are never overwritten).</item>
+    /// </list>
+    /// </summary>
+    public static SettingsLoadResult LoadWithStatus(string path)
     {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
         if (!File.Exists(path))
         {
-            return new AppSettings();
+            return new SettingsLoadResult(new AppSettings(), SettingsLoadStatus.Missing, null, null);
+        }
+
+        byte[] bytes;
+        try
+        {
+            bytes = File.ReadAllBytes(path);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return new SettingsLoadResult(new AppSettings(), SettingsLoadStatus.Unreadable, $"The settings file could not be read ({ex.Message}). Defaults are used and the file is not overwritten.", null);
+        }
+
+        if (ProbeVersion(bytes) is int version && version > CurrentVersion)
+        {
+            return new SettingsLoadResult(
+                new AppSettings(),
+                SettingsLoadStatus.NewerVersion,
+                $"The settings were saved by a newer version of SnapForge (settings version {version}). Defaults are used for this session and the file is not changed.",
+                null);
         }
 
         try
         {
-            AppSettings? s = JsonSerializer.Deserialize<AppSettings>(File.ReadAllBytes(path), Json);
-            if (s is null || s.Version > CurrentVersion)
+            AppSettings s = JsonSerializer.Deserialize<AppSettings>(bytes, Json) ?? throw new JsonException("The settings file is empty.");
+            if (s.Version < 1)
             {
-                throw new JsonException("Unsupported settings version.");
+                throw new JsonException($"Invalid settings version {s.Version}.");
             }
 
-            return s with
-            {
-                Capture = s.Capture.Normalized(),
-                Presets = s.Presets.Count == 0 ? CapturePreset.Defaults : MigratePresets(s.Presets),
-                Widget = s.Widget ?? new WidgetSettings(),
-                DragDrop = (s.DragDrop ?? new DragDropSettings()).Normalized(),
-                Video = (s.Video ?? new VideoSettings()).Normalized(),
-
-                // Milestone 3.1: the capture panel opens at start by default. Older files stored "false" because it
-                // was the previous default, so the new default is applied once; the user can turn it off again.
-                ShowCaptureWindowOnStart = s.CapturePanelDefaultApplied ? s.ShowCaptureWindowOnStart : true,
-                CapturePanelDefaultApplied = true,
-            };
+            return new SettingsLoadResult(Normalize(s), SettingsLoadStatus.Loaded, null, null);
         }
-        catch (Exception ex) when (ex is JsonException or NotSupportedException or IOException or ArgumentException or FormatException)
+        catch (Exception ex) when (ex is JsonException or NotSupportedException or ArgumentException or FormatException or InvalidOperationException)
         {
+            string? copy = CopyDamaged(path, bytes);
+            string message = copy is null
+                ? $"The settings file is damaged ({ex.Message}); defaults are used. A copy could not be kept."
+                : $"The settings file is damaged ({ex.Message}); defaults are used. A copy was kept as {Path.GetFileName(copy)}.";
+            return new SettingsLoadResult(new AppSettings(), SettingsLoadStatus.Damaged, message, copy);
+        }
+    }
+
+    private static AppSettings Normalize(AppSettings s) => s with
+    {
+        Capture = s.Capture.Normalized(),
+        Presets = s.Presets.Count == 0 ? CapturePreset.Defaults : MigratePresets(s.Presets),
+        Widget = s.Widget ?? new WidgetSettings(),
+        DragDrop = (s.DragDrop ?? new DragDropSettings()).Normalized(),
+        Video = (s.Video ?? new VideoSettings()).Normalized(),
+
+        // Milestone 3.1: the capture panel opens at start by default. Older files stored "false" because it
+        // was the previous default, so the new default is applied once; the user can turn it off again.
+        ShowCaptureWindowOnStart = s.CapturePanelDefaultApplied ? s.ShowCaptureWindowOnStart : true,
+        CapturePanelDefaultApplied = true,
+    };
+
+    /// <summary>The top-level "Version" number of a settings file, or null if it cannot be determined.</summary>
+    private static int? ProbeVersion(byte[] bytes)
+    {
+        try
+        {
+            using var doc = JsonDocument.Parse(bytes);
+            if (doc.RootElement.ValueKind == JsonValueKind.Object)
+            {
+                foreach (JsonProperty p in doc.RootElement.EnumerateObject())
+                {
+                    if (string.Equals(p.Name, nameof(Version), StringComparison.OrdinalIgnoreCase) && p.Value.ValueKind == JsonValueKind.Number)
+                    {
+                        return p.Value.TryGetInt32(out int v) ? v : int.MaxValue;
+                    }
+                }
+            }
+        }
+        catch (JsonException)
+        {
+        }
+
+        return null;
+    }
+
+    /// <summary>Copies a damaged settings file to a new unique name beside it; returns the copy's path or null.</summary>
+    private static string? CopyDamaged(string path, byte[] bytes)
+    {
+        string dir = Path.GetDirectoryName(Path.GetFullPath(path)) ?? ".";
+        string stem = Path.GetFileNameWithoutExtension(path);
+        for (int attempt = 0; attempt < 5; attempt++)
+        {
+            string stamp = DateTime.UtcNow.ToString("yyyyMMdd'T'HHmmssfff'Z'", CultureInfo.InvariantCulture);
+            string random = Convert.ToHexStringLower(RandomNumberGenerator.GetBytes(4));
+            string copy = Path.Combine(dir, $"{stem}.damaged-{stamp}-{random}.json");
             try
             {
-                File.Move(path, path + ".damaged", overwrite: true);
-            }
-            catch (IOException)
-            {
-            }
+                // CreateNew: an earlier copy is never overwritten.
+                using (var fs = new FileStream(copy, FileMode.CreateNew, FileAccess.Write, FileShare.None))
+                {
+                    fs.Write(bytes);
+                    fs.Flush(flushToDisk: true);
+                }
 
-            return new AppSettings();
+                return copy;
+            }
+            catch (IOException) when (File.Exists(copy))
+            {
+                // Name collision: try another random suffix.
+            }
+            catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+            {
+                return null;
+            }
         }
+
+        return null;
     }
 
     /// <summary>
@@ -266,7 +359,38 @@ public sealed record AppSettings
             ? p with { Name = CapturePreset.DelayedRegionPresetName }
             : p)];
 
-    public void Save(string path) => AtomicFile.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(this, Json));
+    /// <summary>
+    /// Saves atomically. Throws <see cref="SettingsSaveException"/> (an <see cref="IOException"/>) when the file
+    /// cannot be written, or when the existing file was written by a newer SnapForge, which is never overwritten (FA-019).
+    /// </summary>
+    public void Save(string path)
+    {
+        SettingsSaveResult result = TrySave(path);
+        if (!result.Succeeded)
+        {
+            throw new SettingsSaveException(result.Error ?? "The settings could not be saved.", result.Exception);
+        }
+    }
+
+    /// <summary>Saves atomically and reports failure instead of throwing (FA-019). See <see cref="Save"/>.</summary>
+    public SettingsSaveResult TrySave(string path)
+    {
+        ArgumentException.ThrowIfNullOrWhiteSpace(path);
+        try
+        {
+            if (File.Exists(path) && ProbeVersion(File.ReadAllBytes(path)) is int existing && existing > CurrentVersion)
+            {
+                return new SettingsSaveResult(false, $"The settings file was saved by a newer version of SnapForge (settings version {existing}); it was not overwritten.", null, IsReadOnly: true);
+            }
+
+            AtomicFile.WriteAllBytes(path, JsonSerializer.SerializeToUtf8Bytes(this, Json));
+            return new SettingsSaveResult(true, null, null);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or NotSupportedException)
+        {
+            return new SettingsSaveResult(false, $"The settings could not be saved: {ex.Message}", ex);
+        }
+    }
 
     private static readonly JsonSerializerOptions Json = new()
     {

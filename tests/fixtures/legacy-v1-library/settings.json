@@ -1,0 +1,121 @@
+{
+  "Version": 1,
+  "LibraryPath": "D:\\Shots",
+  "Capture": {
+    "Mode": "Region",
+    "DelaySeconds": 0,
+    "CaptureCursor": false,
+    "PreviewInEditor": true,
+    "CopyToClipboard": false,
+    "SaveToLibrary": true
+  },
+  "Presets": [
+    {
+      "Id": "8f6d2b0e-1a3c-4d5e-9f00-000000000001",
+      "Name": "Region to Editor",
+      "Options": {
+        "Mode": "Region",
+        "DelaySeconds": 0,
+        "CaptureCursor": false,
+        "PreviewInEditor": true,
+        "CopyToClipboard": false,
+        "SaveToLibrary": true
+      },
+      "Hotkey": null
+    },
+    {
+      "Id": "8f6d2b0e-1a3c-4d5e-9f00-000000000002",
+      "Name": "Window to Editor",
+      "Options": {
+        "Mode": "Window",
+        "DelaySeconds": 0,
+        "CaptureCursor": false,
+        "PreviewInEditor": true,
+        "CopyToClipboard": false,
+        "SaveToLibrary": true
+      },
+      "Hotkey": null
+    },
+    {
+      "Id": "8f6d2b0e-1a3c-4d5e-9f00-000000000003",
+      "Name": "Full screen to Clipboard (no history)",
+      "Options": {
+        "Mode": "AllScreens",
+        "DelaySeconds": 0,
+        "CaptureCursor": false,
+        "PreviewInEditor": false,
+        "CopyToClipboard": true,
+        "SaveToLibrary": false
+      },
+      "Hotkey": null
+    },
+    {
+      "Id": "8f6d2b0e-1a3c-4d5e-9f00-000000000004",
+      "Name": "Region with 3 s delay and pointer",
+      "Options": {
+        "Mode": "Region",
+        "DelaySeconds": 3,
+        "CaptureCursor": true,
+        "PreviewInEditor": true,
+        "CopyToClipboard": false,
+        "SaveToLibrary": true
+      },
+      "Hotkey": null
+    }
+  ],
+  "CaptureHotkey": "Ctrl\u002BShift\u002BS",
+  "Theme": "Dark",
+  "ShowRecentTray": true,
+  "ShowPropertiesPanel": true,
+  "PropertiesPanelWidth": 260,
+  "LibraryThumbnailSize": 240,
+  "LibrarySort": "NewestFirst",
+  "Retention": {
+    "EmptyTrashAfterDays": 30,
+    "MoveToTrashAfterDays": null
+  },
+  "CloseToNotificationArea": true,
+  "ShowCaptureWindowOnStart": true,
+  "CapturePanelDefaultApplied": false,
+  "CapturePanelTopmost": false,
+  "ShowPanelHotkey": null,
+  "PrivacyNoticeShown": false,
+  "UserQuickStyles": [],
+  "FavoriteQuickStyles": [],
+  "LastTool": "Highlight",
+  "LastColor": "#FFE53935",
+  "LastStrokeWidth": 4,
+  "Widget": {
+    "Enabled": true,
+    "Topmost": true,
+    "ExpandMode": "Hover",
+    "AutoHide": false,
+    "Placement": null
+  },
+  "WidgetIntroShown": false,
+  "DragDrop": {
+    "Format": "Png",
+    "JpegQuality": 92
+  },
+  "LaunchAtStartup": false,
+  "CapturePanelPosition": null,
+  "Video": {
+    "RecordSystemAudio": true,
+    "RecordMicrophone": false,
+    "MicrophoneDeviceId": null,
+    "CaptureCursor": true,
+    "FramesPerSecond": 30,
+    "Quality": "Standard",
+    "Countdown": true,
+    "CountdownSeconds": 3,
+    "Source": "Region",
+    "OpenAfterRecording": true,
+    "MinimumFreeSpaceMegabytes": 500,
+    "LowSpaceWarningMinutes": 10,
+    "RecordHotkey": "Shift\u002BF9",
+    "StopHotkey": "Shift\u002BF10",
+    "SaveToLibrary": true,
+    "CancelHotkey": null
+  },
+  "EffectiveLibraryPath": "D:\\Shots"
+}

@@ -35,7 +35,9 @@ public static class AtomicFile
                 file.Flush(flushToDisk: !SkipDiskFlush.Value);
             }
 
+            DurabilityFaults.Checkpoint("atomic.flushed:" + Path.GetFileName(full));
             File.Move(temp, full, overwrite: true);
+            DurabilityFaults.Checkpoint("atomic.renamed:" + Path.GetFileName(full));
         }
         finally
         {
@@ -104,10 +106,80 @@ public static class AtomicFile
         {
         }
 
+        DurabilityFaults.Checkpoint("delete.overwritten:" + Path.GetFileName(path));
         File.Delete(path);
     }
 
     public static string Sha256Hex(byte[] data) => Convert.ToHexStringLower(SHA256.HashData(data));
+
+    /// <summary>Size of the buffer used by the streaming helpers (no file is ever read whole).</summary>
+    public const int StreamBufferSize = 1 << 20;
+
+    /// <summary>Streams a file through SHA-256 (never loads it whole). <paramref name="progress"/> receives bytes read so far.</summary>
+    public static (string Sha256, long Length) HashFile(string path, Action<long>? progress = null, CancellationToken cancellationToken = default)
+    {
+        using var stream = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.Read, StreamBufferSize, FileOptions.SequentialScan);
+        return HashStream(stream, long.MaxValue, progress, cancellationToken);
+    }
+
+    /// <summary>
+    /// Streams at most <paramref name="maxBytes"/> + 1 bytes of <paramref name="stream"/> through SHA-256 and returns
+    /// the hash and the number of bytes read (callers compare it with the expected length; reading one byte more
+    /// detects longer-than-declared data without reading it all).
+    /// </summary>
+    public static (string Sha256, long Length) HashStream(Stream stream, long maxBytes, Action<long>? progress = null, CancellationToken cancellationToken = default)
+    {
+        ArgumentNullException.ThrowIfNull(stream);
+        using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+        long total = CopyBounded(stream, null, hash, maxBytes, progress, cancellationToken);
+        return (Convert.ToHexStringLower(hash.GetHashAndReset()), total);
+    }
+
+    /// <summary>
+    /// Copies a file to <paramref name="destination"/> atomically (temp + flush + rename), hashing the bytes as they
+    /// are copied. Never buffers the whole file.
+    /// </summary>
+    public static (string Sha256, long Length) CopyFile(string source, string destination, Action<long>? progress = null, CancellationToken cancellationToken = default)
+    {
+        string sha = string.Empty;
+        long length = 0;
+        Write(destination, target =>
+        {
+            using var input = new FileStream(source, FileMode.Open, FileAccess.Read, FileShare.Read, StreamBufferSize, FileOptions.SequentialScan);
+            using var hash = IncrementalHash.CreateHash(HashAlgorithmName.SHA256);
+            length = CopyBounded(input, target, hash, long.MaxValue, progress, cancellationToken);
+            sha = Convert.ToHexStringLower(hash.GetHashAndReset());
+        });
+        return (sha, length);
+    }
+
+    /// <summary>
+    /// Copies up to <paramref name="maxBytes"/> + 1 bytes from <paramref name="input"/> to <paramref name="output"/>
+    /// (if any), feeding <paramref name="hash"/>; returns the number of bytes read.
+    /// </summary>
+    internal static long CopyBounded(Stream input, Stream? output, IncrementalHash? hash, long maxBytes, Action<long>? progress, CancellationToken cancellationToken)
+    {
+        byte[] buffer = new byte[StreamBufferSize];
+        long total = 0;
+        long limit = maxBytes == long.MaxValue ? long.MaxValue : maxBytes + 1;
+        while (total < limit)
+        {
+            cancellationToken.ThrowIfCancellationRequested();
+            int want = (int)Math.Min(buffer.Length, limit - total);
+            int read = input.Read(buffer, 0, want);
+            if (read <= 0)
+            {
+                break;
+            }
+
+            hash?.AppendData(buffer, 0, read);
+            output?.Write(buffer, 0, read);
+            total += read;
+            progress?.Invoke(total);
+        }
+
+        return total;
+    }
 
     private static bool TryDelete(string path)
     {

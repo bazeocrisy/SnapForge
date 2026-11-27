@@ -14,8 +14,8 @@ public static class ImageOps
     /// <summary>Largest supported width or height of a result image.</summary>
     public const int MaxDimension = 32768;
 
-    /// <summary>Largest supported pixel count (width × height) of a result image.</summary>
-    public const long MaxPixelCount = 400_000_000;
+    /// <summary>Largest supported pixel count (width × height) of a result image: the <see cref="ImageBudget"/> (FA-018).</summary>
+    public const long MaxPixelCount = ImageBudget.MaxPixels;
 
     /// <summary>Largest supported blur radius.</summary>
     public const int MaxBlurRadius = 1024;
@@ -520,7 +520,7 @@ public static class ImageOps
         int imageX = (int)-minX, imageY = (int)-minY;
 
         // Shadow coverage (0..255): the source alpha at the shadow position, then blurred.
-        var mask = new int[cw * ch];
+        var mask = new int[checked(cw * ch)];
         byte[] sp = source.Pixels;
         for (int y = 0; y < h; y++)
         {

@@ -1,0 +1,19 @@
+{
+  "format": "snapforge.video",
+  "version": 1,
+  "id": "e4cfadda-8623-429f-a596-a23c20c68134",
+  "createdUtc": "2026-11-20T09:33:00.0000000Z",
+  "modifiedUtc": "2026-11-27T18:21:01.5981025Z",
+  "width": 64,
+  "height": 36,
+  "framesPerSecond": 30,
+  "durationMs": 1000,
+  "hasAudio": false,
+  "recovered": false,
+  "container": "mp4",
+  "videoCodec": "h264",
+  "audioCodec": null,
+  "videoBytes": 2468,
+  "layout": "progressive",
+  "generator": "SnapForge 1.0.0.0"
+}

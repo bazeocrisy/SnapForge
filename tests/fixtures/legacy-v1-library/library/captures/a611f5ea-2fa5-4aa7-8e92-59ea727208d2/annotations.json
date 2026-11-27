@@ -1,0 +1,111 @@
+{
+  "format": "snapforge.capture.annotations",
+  "version": 1,
+  "annotations": [
+    {
+      "id": "db4bd1a1-78fa-4411-8314-85e64660eeae",
+      "color": "#FF112233",
+      "strokeWidth": 6,
+      "type": "arrow",
+      "start": [
+        1,
+        2
+      ],
+      "end": [
+        30,
+        40
+      ]
+    },
+    {
+      "id": "fb33ab59-f89a-4bd3-afae-c67affe8d269",
+      "color": "#FFE53935",
+      "strokeWidth": 4,
+      "type": "line",
+      "start": [
+        5,
+        5
+      ],
+      "end": [
+        9,
+        1
+      ]
+    },
+    {
+      "id": "697a077f-0df3-4cca-b21d-a4edbcaad104",
+      "color": "#FFE53935",
+      "strokeWidth": 4,
+      "type": "rectangle",
+      "rect": [
+        1,
+        1,
+        10,
+        5
+      ]
+    },
+    {
+      "id": "62e65741-8266-4dcb-964b-2eb14073932f",
+      "color": "#FFE53935",
+      "strokeWidth": 4,
+      "type": "ellipse",
+      "rect": [
+        2,
+        2,
+        8,
+        4
+      ]
+    },
+    {
+      "id": "43c73d80-3738-4449-aa90-912b6adf3c29",
+      "color": "#FFFDD835",
+      "strokeWidth": 4,
+      "type": "highlight",
+      "rect": [
+        0,
+        0,
+        20,
+        6
+      ],
+      "opacity": 0.35
+    },
+    {
+      "id": "ed154561-f6df-4fd7-adfc-99414b5ad455",
+      "color": "#FFE53935",
+      "strokeWidth": 4,
+      "type": "text",
+      "position": [
+        3,
+        4
+      ],
+      "text": "Line 1\nLine \u00222\u0022 \u2713",
+      "fontSize": 24,
+      "measuredSize": [
+        80,
+        60
+      ]
+    },
+    {
+      "id": "c0163682-9028-475f-be3e-bccf4616b277",
+      "color": "#FFE53935",
+      "strokeWidth": 4,
+      "type": "step",
+      "center": [
+        50,
+        50
+      ],
+      "number": 7,
+      "radius": 18
+    },
+    {
+      "id": "77f2e0c4-fd1d-4fc6-80be-bf13292f4fc7",
+      "color": "#FF000000",
+      "strokeWidth": 0,
+      "type": "redaction",
+      "region": [
+        4,
+        4,
+        10,
+        3
+      ]
+    }
+  ]
+}

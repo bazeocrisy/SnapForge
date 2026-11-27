@@ -78,12 +78,14 @@ public class CaptureLibraryTests
         using var dir = new TestDirectory();
         var lib = CaptureLibrary.Open(dir.Path);
         CaptureRecord rec = Add(lib, "a");
-        string baseFile = Path.Combine(lib.CapturesDirectory, rec.Id.ToString("D"), CaptureFormat.BaseFile);
+        string baseFile = Path.Combine(lib.CapturesDirectory, rec.Id.ToString("D"), lib.ReadCaptureManifest(rec.Id).Base.Name);
+        Assert.True(File.Exists(baseFile));
         DateTime stamp = File.GetLastWriteTimeUtc(baseFile);
         Thread.Sleep(20);
         PixelBuffer img = lib.Load(rec.Id).BaseImage;
         lib.SaveContent(rec.Id, null, [new LineAnnotation(new PointD(0, 0), new PointD(5, 5))], img, false);
         Assert.Equal(stamp, File.GetLastWriteTimeUtc(baseFile));
+        Assert.Equal(Path.GetFileName(baseFile), lib.ReadCaptureManifest(rec.Id).Base.Name); // still referenced
         Assert.Single(lib.Load(rec.Id).Annotations);
         Assert.Equal(1, lib.Find(rec.Id)!.AnnotationCount);
     }
@@ -112,15 +114,43 @@ public class CaptureLibraryTests
     }
 
     [Fact]
-    public void Crash_after_base_but_before_manifest_is_detected_as_damage_not_silently_loaded()
+    public void FA015_modified_committed_base_is_detected_as_damage_not_silently_loaded()
     {
         using var dir = new TestDirectory();
         var lib = CaptureLibrary.Open(dir.Path);
         CaptureRecord rec = Add(lib, "a");
-        // Simulate: new base written, then crash before the manifest (commit point) was updated.
-        File.WriteAllBytes(Path.Combine(lib.CapturesDirectory, rec.Id.ToString("D"), CaptureFormat.BaseFile), PixelCodec.Encode(PixelBufferTests.Gradient(5, 5)));
+
+        // Same-size modification of the committed base: the hash check catches it.
+        string baseFile = Path.Combine(lib.CapturesDirectory, rec.Id.ToString("D"), lib.ReadCaptureManifest(rec.Id).Base.Name);
+        byte[] bytes = File.ReadAllBytes(baseFile);
+        bytes[^1] ^= 0xFF;
+        File.WriteAllBytes(baseFile, bytes);
         var reopened = CaptureLibrary.Open(dir.Path);
-        Assert.Throws<InvalidDataException>(() => reopened.Load(rec.Id));
+        Assert.Contains("integrity", Assert.Throws<InvalidDataException>(() => reopened.Load(rec.Id)).Message, StringComparison.Ordinal);
+
+        // A different size is already reported by the index.
+        File.WriteAllBytes(baseFile, PixelCodec.Encode(PixelBufferTests.Gradient(5, 5)));
+        Assert.Contains("size changed", CaptureLibrary.Open(dir.Path).Find(rec.Id)!.Damage, StringComparison.Ordinal);
+    }
+
+    [Fact]
+    public void FA015_crash_after_new_base_before_manifest_keeps_previous_generation_and_removes_the_leftover()
+    {
+        using var dir = new TestDirectory();
+        var lib = CaptureLibrary.Open(dir.Path);
+        CaptureRecord rec = Add(lib, "a");
+        byte[] before = lib.Load(rec.Id).BaseImage.Pixels;
+        string folder = Path.Combine(lib.CapturesDirectory, rec.Id.ToString("D"));
+
+        // Simulate: next generation's base (and a legacy-named file) written, then a crash before the manifest commit.
+        File.WriteAllBytes(Path.Combine(folder, CaptureFormat.GenerationBaseFile(2)), PixelCodec.Encode(PixelBufferTests.Gradient(5, 5)));
+        File.WriteAllBytes(Path.Combine(folder, CaptureFormat.BaseFile), PixelCodec.Encode(PixelBufferTests.Gradient(5, 5)));
+        File.WriteAllText(Path.Combine(folder, "notes-by-user.txt"), "unknown files are never touched");
+        var reopened = CaptureLibrary.Open(dir.Path);
+        Assert.Equal(before, reopened.Load(rec.Id).BaseImage.Pixels);
+        Assert.False(File.Exists(Path.Combine(folder, CaptureFormat.GenerationBaseFile(2))));
+        Assert.False(File.Exists(Path.Combine(folder, CaptureFormat.BaseFile)));
+        Assert.True(File.Exists(Path.Combine(folder, "notes-by-user.txt")));
     }
 
     [Fact]
@@ -302,7 +332,12 @@ public class CaptureLibraryTests
         CaptureLibrary moved = lib.MoveTo(dir.Sub("new"));
         Assert.Equal(a.Id, Assert.Single(moved.Records).Id);
         moved.Load(a.Id);
-        Assert.Empty(Directory.GetDirectories(Path.Combine(dir.Sub("old"), "captures")));
+
+        // FA-007: the old copy is kept until the app calls DeleteSourceAfterVerifiedMove (was deleted at once).
+        Assert.Single(Directory.GetDirectories(Path.Combine(dir.Sub("old"), "captures")));
+        SourceCleanupResult cleanup = CaptureLibrary.DeleteSourceAfterVerifiedMove(Path.Combine(dir.Sub("new"), CaptureLibrary.RelocationJournalFile));
+        Assert.Empty(cleanup.LeftInPlace);
+        Assert.False(Directory.Exists(Path.Combine(dir.Sub("old"), "captures"))); // emptied folders are removed
 
         var other = CaptureLibrary.Open(dir.Sub("other"));
         Add(other, "x");
@@ -385,9 +420,16 @@ public class CaptureLibraryTests
             }
         }
 
-        string annotationsJson = File.ReadAllText(Path.Combine(reopened.CapturesDirectory, rec.Id.ToString("D"), CaptureFormat.AnnotationsFile));
+        string folder = Path.Combine(reopened.CapturesDirectory, rec.Id.ToString("D"));
+        string annotationsJson = File.ReadAllText(Path.Combine(folder, reopened.ReadCaptureManifest(rec.Id).Annotations.Name));
         Assert.DoesNotContain("password123", annotationsJson, StringComparison.Ordinal);
-        Assert.Empty(Directory.GetFiles(Path.Combine(reopened.CapturesDirectory, rec.Id.ToString("D")), "*" + AtomicFile.TempSuffix));
+        foreach (string file in Directory.GetFiles(folder))
+        {
+            Assert.DoesNotContain("password123", File.ReadAllText(file), StringComparison.Ordinal);
+        }
+
+        Assert.Empty(Directory.GetFiles(folder, "*" + AtomicFile.TempSuffix));
+        Assert.Equal(["annotations.2.json", "base.2.sfpx", "manifest.json", "meta.json", "thumb.2.sfpx"], Directory.GetFiles(folder).Select(Path.GetFileName).Order(StringComparer.Ordinal));
     }
 
     [Fact]
@@ -407,19 +449,26 @@ public class CaptureLibraryTests
     }
 
     [Fact]
-    public void Interrupted_sanitize_is_completed_on_next_open()
+    public void FA016_legacy_rc_interrupted_sanitize_of_a_v1_folder_is_recovered_on_next_open()
     {
+        // The 1.0 RC sanitize swapped files in a v1 folder; state after "sanitized base written" + "old base deleted"
+        // but before the rename. The sanitized base is adopted (generation 1) and the capture loads.
         using var dir = new TestDirectory();
-        var lib = CaptureLibrary.Open(dir.Path);
-        CaptureRecord rec = Add(lib, "a");
-        string folder = Path.Combine(lib.CapturesDirectory, rec.Id.ToString("D"));
-        // State after "new base written" + "old base deleted" but before the rename:
-        byte[] sanitized = File.ReadAllBytes(Path.Combine(folder, CaptureFormat.BaseFile));
+        var index = LegacyFixtures.CopyTo(dir.Path);
+        Guid id = LegacyFixtures.Id(index, "redacted");
+        string folder = Path.Combine(dir.Path, "library", "captures", id.ToString("D"));
+        var sanitized = LegacyFixtures.SecretImage();
+        sanitized.FillRect(LegacyFixtures.SecretRegion, ArgbColor.Black);
         File.Delete(Path.Combine(folder, CaptureFormat.BaseFile));
-        File.WriteAllBytes(Path.Combine(folder, "base.sanitized.sfpx"), sanitized);
-        var reopened = CaptureLibrary.Open(dir.Path);
-        Assert.Null(reopened.Find(rec.Id)!.Damage);
-        reopened.Load(rec.Id);
+        File.Delete(Path.Combine(folder, CaptureFormat.ThumbFile));
+        File.WriteAllBytes(Path.Combine(folder, "base.sanitized.sfpx"), PixelCodec.Encode(sanitized));
+
+        var reopened = CaptureLibrary.Open(Path.Combine(dir.Path, "library"));
+        CaptureRecord r = reopened.Find(id)!;
+        Assert.Null(r.Damage);
+        Assert.Equal(sanitized.Pixels, reopened.Load(id).BaseImage.Pixels);
+        Assert.True(r.HasReversibleRedactions); // masks remain: sanitize is offered again to strip hidden annotations
+        Assert.False(File.Exists(Path.Combine(folder, "base.sanitized.sfpx")));
     }
 
     [Fact]
