@@ -18,6 +18,10 @@ public partial class App : Application
     private const string InstanceName = "SnapForge-SingleInstance-7c1d";
 
     /// <summary>Single-instance key: one SnapForge per Windows session and data profile.</summary>
+    // Published by the running copy and read by a second launch: one name for both (a mismatch made every second
+    // launch of a --profile copy look like a pre-milestone-3 build and wait on a message box; CI run 111).
+    private static string InstanceInfoName => $@"Local\{InstanceKey}-info";
+
     private static string InstanceKey => ProductInfo.Profile is null ? InstanceName : $"{InstanceName}-p-{ProductInfo.Profile}";
 
     /// <summary>Removes <c>--profile &lt;name&gt;</c> from the arguments and selects that (or SNAPFORGE_PROFILE's) profile.</summary>
@@ -150,7 +154,7 @@ public partial class App : Application
             return;
         }
 
-        _instanceInfo = InstanceInfo.Publish($@"Local\{InstanceKey}-info", InstanceInfo.Current());
+        _instanceInfo = InstanceInfo.Publish(InstanceInfoName, InstanceInfo.Current());
         ThreadPool.RegisterWaitForSingleObject(_activateSignal, (_, _) => Dispatcher.BeginInvoke(ShowPrimaryWindow), null, Timeout.Infinite, executeOnlyOnce: false);
         ThreadPool.RegisterWaitForSingleObject(_exitSignal, (_, _) => Dispatcher.BeginInvoke(() => _ = ExitAsync()), null, Timeout.Infinite, executeOnlyOnce: false);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
@@ -347,7 +351,7 @@ public partial class App : Application
     /// </summary>
     private bool TakeOverFromRunningInstance()
     {
-        InstanceInfo? running = InstanceInfo.Read($@"Local\{InstanceName}-info");
+        InstanceInfo? running = InstanceInfo.Read(InstanceInfoName);
         if (running is not null && running.Build == InstanceInfo.CurrentBuild)
         {
             _activateSignal!.Set();

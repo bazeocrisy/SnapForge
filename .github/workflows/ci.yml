@@ -613,7 +613,7 @@ jobs:
 
           # 4. Program Files permissions: no write access for standard users.
           $acl = Get-Acl $machine
-          $bad = $acl.Access | Where-Object { $_.AccessControlType -eq 'Allow' -and $_.IdentityReference -match 'Users|Everyone|Authenticated' -and ($_.FileSystemRights -band ([System.Security.AccessControl.FileSystemRights]'Write, Modify, FullControl, CreateFiles, AppendData')) -ne 0 }
+          $bad = $acl.Access | Where-Object { $_.AccessControlType -eq 'Allow' -and $_.IdentityReference -match 'Users|Everyone|Authenticated' -and ((($_.FileSystemRights -band ([System.Security.AccessControl.FileSystemRights]'CreateFiles, AppendData, WriteExtendedAttributes, WriteAttributes, DeleteSubdirectoriesAndFiles, Delete, ChangePermissions, TakeOwnership')) -ne 0) -or (([int64]$_.FileSystemRights -band 0x50000000) -ne 0)) }
           if ($bad) { $bad | Format-List; throw "Program Files folder is writable by standard users" }
           Write-Output "PASS $machine is not writable by Users/Everyone/Authenticated Users"
           if (Compare-Object $before (DataHash)) { throw "INSTALLING rc.2 CHANGED USER DATA" }

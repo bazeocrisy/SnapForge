@@ -178,6 +178,15 @@ internal sealed partial class ScrollingCaptureWindow : Window
                 SendWheel(-WheelNotchesPerStep * 120);
                 await Task.Delay(SettleTime).ConfigureAwait(true);
                 StitchStatus s = AddFrame(manual: false);
+                // A frame grabbed while the application is still repainting (or a smooth-scroll animation is still
+                // running) cannot be matched; nothing was appended, so wait and grab again before giving up
+                // (CI run 111: Unaligned after the first wheel step although the page had scrolled 48 px).
+                for (int retry = 0; s == StitchStatus.Unaligned && retry < 3 && !_stopAuto; retry++)
+                {
+                    await Task.Delay(SettleTime).ConfigureAwait(true);
+                    s = AddFrame(manual: false);
+                }
+
                 if (s == StitchStatus.NoMovement)
                 {
                     if (++still >= 2)
