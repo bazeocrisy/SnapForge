@@ -311,6 +311,39 @@ public class CaptureLibraryTests
     }
 
     [Fact]
+    public void Redacted_secret_colour_appears_in_no_thumbnail_or_flattened_output()
+    {
+        // Adversarial: a block of a distinctive "secret" colour is redacted; neither the stored thumbnail nor the
+        // flattened image may contain that colour (not even blended at the edges).
+        using var dir = new TestDirectory();
+        var lib = CaptureLibrary.Open(dir.Path);
+        var img = new PixelBuffer(400, 300);
+        img.FillRect(img.Bounds, ArgbColor.White);
+        var secret = ArgbColor.FromRgb(0x12, 0xFE, 0x34);
+        img.FillRect(new PixelRect(100, 80, 120, 60), secret);
+        var doc = new EditorDocument(img);
+        doc.Execute(new RedactCommand(new PixelRect(96, 76, 128, 68), ArgbColor.Black));
+        CaptureRecord rec = lib.Create(new CaptureContent(doc.BaseImage, doc.Annotations), doc.Image, Now);
+        static bool Greenish(ArgbColor c) => c.G > 150 && c.R < 120 && c.B < 120;
+        PixelBuffer thumb = lib.LoadThumbnail(rec.Id)!;
+        for (int y = 0; y < thumb.Height; y++)
+        {
+            for (int x = 0; x < thumb.Width; x++)
+            {
+                Assert.False(Greenish(thumb.GetPixel(x, y)), $"secret colour in thumbnail at {x},{y}");
+            }
+        }
+
+        for (int y = 0; y < doc.Image.Height; y++)
+        {
+            for (int x = 0; x < doc.Image.Width; x++)
+            {
+                Assert.False(Greenish(doc.Image.GetPixel(x, y)), $"secret colour in flattened image at {x},{y}");
+            }
+        }
+    }
+
+    [Fact]
     public void Sanitize_removes_original_pixels_from_storage_and_hidden_annotations()
     {
         using var dir = new TestDirectory();

@@ -129,6 +129,9 @@ jobs:
           if (-not $iscc) { choco install innosetup --version=6.4.3 -y --no-progress | Out-Null; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
           & $iscc /Qp "/DAppVersion=$version" "/DFileVersion=$fileVersion" "/DSourceDir=$PWD\artifacts\portable\SnapForge" "/DOutputDir=$PWD\$out" installer\SnapForge.iss
           if ($LASTEXITCODE -ne 0) { throw "Installer build failed" }
+          $runtime = (dotnet msbuild src/SnapForge.App/SnapForge.App.csproj -getProperty:BundledNETCoreAppPackageVersion).Trim()
+          python tools/sbom/generate_sbom.py --version $version --commit $env:GITHUB_SHA --runtime $runtime --package $zip --package (Get-ChildItem "$out/*-setup.exe").FullName --out "$out/SnapForge-$version-sbom.cdx.json"
+          if ($LASTEXITCODE -ne 0) { throw "SBOM generation failed" }
           Get-ChildItem $out -File | Sort-Object Name | ForEach-Object { "{0}  {1}" -f (Get-FileHash $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant(), $_.Name } | Tee-Object -Variable sums
           $sums | Out-File -Encoding ascii "$out/SHA256SUMS.txt"
           "### Release candidate packages ($version, build $env:GITHUB_RUN_NUMBER)`n" + (($sums | ForEach-Object { "    $_" }) -join "`n") | Out-File -Append $env:GITHUB_STEP_SUMMARY
@@ -278,6 +281,22 @@ jobs:
             Write-Output "PREVIEW-BEGIN $($f.Name)"
             Write-Output ([Convert]::ToBase64String([IO.File]::ReadAllBytes($f.FullName)))
             Write-Output "PREVIEW-END $($f.Name)"
+          }
+
+      - name: Full-resolution dark-theme PNGs for the website (base64 in 4000-character lines)
+        if: always()
+        shell: pwsh
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "screenshots"
+          $names = "editor-dark","library-dark","library-videos-dark","capture-panel-dark","capture-panel-video-dark","widget-expanded-dark","recording-dark","recording-toolbar-dark","video-editor-dark","player-dark","settings-widget-dragdrop-dark","settings-recording-dark","ocr-dark","welcome-dark","tray-dark"
+          foreach ($n in $names) {
+            $f = Join-Path $out "$n.png"
+            if (-not (Test-Path $f)) { Write-Output "WEBPNG-MISSING $n"; continue }
+            $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($f))
+            $hash = (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant()
+            Write-Output "WEBPNG-BEGIN $n $hash"
+            for ($i = 0; $i -lt $b64.Length; $i += 4000) { Write-Output ("WEBPNG " + $b64.Substring($i, [Math]::Min(4000, $b64.Length - $i))) }
+            Write-Output "WEBPNG-END $n"
           }
 
       - name: Upload screenshots

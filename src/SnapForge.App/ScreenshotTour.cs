@@ -44,8 +44,11 @@ internal static class ScreenshotTour
             Guid? videoId = SeedVideo(services, log);
 
             // Real screenshots: each window is shown on the actual desktop and the screen pixels are captured with
-            // SnapForge's own GDI capture (not an off-screen rendering). The CI desktop is small (1024×768), so
-            // windows are sized to fit its work area.
+            // SnapForge's own GDI capture (not an off-screen rendering). For crisp website images the display is
+            // switched to 1920×1080 when the display offers that mode (temporary, not saved; restored at the end).
+            bool hiRes = Video.VideoSelfTest.TrySetDisplayMode(1920, 1080);
+            log.Add(hiRes ? "Display switched to 1920x1080 for the tour." : "1920x1080 not available; using the current display mode.");
+            Pump(1500);
             Core.Capture.ScreenLayout layout = Interop.PhysicalPlacement.Layout();
             PixelRect work = layout.Monitors[0].WorkArea;
             log.Add($"Desktop: {string.Join("; ", layout.Monitors.Select(m => $"{m.DeviceName} {m.Bounds.Width}x{m.Bounds.Height} at {m.DpiScale * 100:0}%"))}");
@@ -83,6 +86,31 @@ internal static class ScreenshotTour
                     SaveRegion(tray, Path.Combine(outputFolder, $"tray-{suffix}.png"), log);
                 }
 
+                // Welcome / Getting started.
+                Dialogs.WelcomeWindow.ShowFor(main, services.Library.Root, "Print Screen", "Shift+F9", () => { });
+                Pump(500);
+                if (Application.Current.Windows.OfType<Dialogs.WelcomeWindow>().FirstOrDefault() is { } welcome)
+                {
+                    SaveScreen(welcome, null, Path.Combine(outputFolder, $"welcome-{suffix}.png"), log);
+                    welcome.Close();
+                }
+
+                // Text recognition (OCR) of the open capture, when Windows has an OCR language installed.
+                if (Ocr.OcrService.AvailableLanguages().Count > 0)
+                {
+                    Ocr.TextRecognitionWindow.Show(main, main.RenderFinalImage(), demo.Title);
+                    Pump(3000);
+                    if (Application.Current.Windows.OfType<Ocr.TextRecognitionWindow>().FirstOrDefault() is { } ocr)
+                    {
+                        SaveScreen(ocr, null, Path.Combine(outputFolder, $"ocr-{suffix}.png"), log);
+                        ocr.Close();
+                    }
+                }
+                else
+                {
+                    log.Add("OCR screenshot skipped: no OCR language installed on this machine.");
+                }
+
                 main.ShowLibraryWorkspace();
                 main.LibraryPane.SelectIds(services.Library.Records.OrderByDescending(r => r.CreatedUtc).Take(2).Select(r => r.Id));
                 Pump(900);
@@ -107,6 +135,19 @@ internal static class ScreenshotTour
                     Pump(2500); // let the media pipeline open and play a little
                     SaveScreen(player, null, Path.Combine(outputFolder, $"player-{suffix}.png"), log);
                     player.Close();
+
+                    var editor = new Video.VideoEditorWindow(services, videoRecord, services.Library.VideoPath(vid))
+                    {
+                        WindowStartupLocation = WindowStartupLocation.Manual,
+                        Left = work.X / dip + 40,
+                        Top = work.Y / dip + 30,
+                        Width = Math.Min(1000, work.Width / dip - 80),
+                        Height = Math.Min(680, work.Height / dip - 60),
+                    };
+                    editor.Show();
+                    Pump(1500);
+                    SaveScreen(editor, null, Path.Combine(outputFolder, $"video-editor-{suffix}.png"), log);
+                    editor.Close();
                 }
 
                 var capture = new CaptureWindow(services);
@@ -183,6 +224,11 @@ internal static class ScreenshotTour
                 Pump(200);
             }
 
+            if (hiRes)
+            {
+                Video.VideoSelfTest.RestoreDisplayMode();
+            }
+
             File.WriteAllLines(Path.Combine(outputFolder, "screenshots.txt"), log);
             return 0;
         }
@@ -223,7 +269,7 @@ internal static class ScreenshotTour
     private static void SaveScreen(Window window, int? margin, string path, List<string> log)
     {
         // Park the pointer in a corner so no hover state or tooltip from a previous step is captured.
-        Interop.NativeMethods.SetCursorPos(0, 767);
+        Interop.NativeMethods.SetCursorPos(0, (int)SystemParameters.PrimaryScreenHeight - 1);
         bool wasTopmost = window.Topmost;
         window.Topmost = true;
         if (window.ShowActivated)
@@ -333,6 +379,9 @@ internal static class ScreenshotTour
                 doc.Execute(new AddAnnotationCommand(new ArrowAnnotation(new PointD(1010, 140), new PointD(880, 250)) { Color = ArgbColor.Parse("#E53935"), StrokeWidth = 6 }));
                 doc.Execute(new AddAnnotationCommand(new StepMarkerAnnotation(new PointD(372, 236), 1, 22) { Color = ArgbColor.Parse("#1E88E5") }));
                 doc.Execute(new AddAnnotationCommand(new StepMarkerAnnotation(new PointD(760, 560), 2, 22) { Color = ArgbColor.Parse("#1E88E5") }));
+                doc.Execute(new AddAnnotationCommand(new CalloutAnnotation(new RectD(1040, 300, 210, 64), new PointD(930, 420), "Error appears after clicking Pay", 18) { Color = ArgbColor.Parse("#E53935"), StrokeWidth = 3 }));
+                doc.Execute(new AddAnnotationCommand(new StampAnnotation(new PointD(1180, 560), StampKind.Warning, 56) { Color = ArgbColor.Parse("#F59E0B") }));
+                doc.Execute(new AddAnnotationCommand(new FreehandAnnotation([.. Enumerable.Range(0, 40).Select(i => new PointD(640 + (i * 6), 640 + (Math.Sin(i / 3.0) * 8)))]) { Color = ArgbColor.Parse("#43A047"), StrokeWidth = 4 }));
                 doc.Execute(new AddAnnotationCommand(new HighlightAnnotation(new RectD(560, 532, 300, 56)) { Color = ArgbColor.Parse("#FDD835") }));
                 var text = new TextAnnotation(new PointD(1000, 92), "Error appears after\nclicking Pay", 26) { Color = ArgbColor.Parse("#E53935"), StrokeWidth = 4 };
                 doc.Execute(new AddAnnotationCommand(text with { MeasuredSize = AnnotationRenderer.MeasureText(text.Text, text.FontSize) }));

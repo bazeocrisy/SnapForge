@@ -230,9 +230,10 @@ internal static unsafe class FeatureSelfTest
         {
             PixelBuffer f = VideoAnalysis.DecodeFrame(src, 4500) ?? throw new InvalidOperationException("no frame");
             ArgbColor px = f.GetPixel(10, 10);
-            if (px.R < 150 || px.G > 80 || px.B < 150)
+            // Second 4–5 of the source is cyan (30, 220, 220).
+            if (px.R > 80 || px.G < 150 || px.B < 150)
             {
-                throw new InvalidOperationException($"frame at 4.5 s should be magenta, got ({px.R},{px.G},{px.B})");
+                throw new InvalidOperationException($"frame at 4.5 s should be cyan, got ({px.R},{px.G},{px.B})");
             }
 
             return $"{f.Width}x{f.Height} frame at 4.5 s has the right colour";

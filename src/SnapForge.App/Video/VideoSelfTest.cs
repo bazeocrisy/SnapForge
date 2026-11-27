@@ -38,6 +38,9 @@ internal static partial class VideoSelfTest
 
     [DllImport("user32.dll", CharSet = CharSet.Unicode)]
     private static extern int ChangeDisplaySettingsW(nint devMode, uint flags);
+
+    /// <summary>Returns the display to its saved (registry) mode.</summary>
+    internal static void RestoreDisplayMode() => _ = ChangeDisplaySettingsW(0, 0);
 #pragma warning restore SYSLIB1054
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
@@ -60,7 +63,7 @@ internal static partial class VideoSelfTest
     /// Benchmarks only: temporarily switches the primary display to w×h if the display offers that mode
     /// (CDS_FULLSCREEN = not saved, restored by Windows when the process ends). Returns false if unsupported.
     /// </summary>
-    private static bool TrySetDisplayMode(int w, int h)
+    internal static bool TrySetDisplayMode(int w, int h)
     {
         var dm = new DevMode { Size = (ushort)Marshal.SizeOf<DevMode>() };
         for (int i = 0; EnumDisplaySettingsW(null, i, ref dm); i++)
