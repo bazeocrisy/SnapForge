@@ -789,6 +789,8 @@ public partial class App : Application
         Add("_Capture", () => _ = CaptureWithOptionsAsync(AppServices.Current!.Settings.Capture), bold: true);
         Add("Capture _panel…", ShowCaptureWindow);
         Add("Show _QuickDock", ShowWidget);
+        nint previousForeground = Interop.NativeMethods.GetForegroundWindow();
+        Add("Open QuickDock with _keyboard", () => DockActions.OpenQuickDockWithKeyboard(previousForeground));
         if (AppServices.Current?.Settings.Widget.Enabled == true)
         {
             Add("_Hide QuickDock", () => AppServices.Current?.UpdateSettings(s => s with { Widget = s.Widget with { Enabled = false } }));

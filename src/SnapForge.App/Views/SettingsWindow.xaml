@@ -31,8 +31,8 @@
                           AutomationProperties.Name="Launch with Windows" />
                 <TextBlock x:Name="StartupStatus" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="26,0,0,4" />
 
-                <TextBlock Text="CAPTURE WIDGET" Style="{StaticResource SectionHeader}" />
-                <CheckBox x:Name="WidgetEnabledBox" Content="Show the capture widget at the screen edge" Click="OnWidgetChanged" AutomationProperties.Name="Show the capture widget" />
+                <TextBlock Text="QUICKDOCK" Style="{StaticResource SectionHeader}" />
+                <CheckBox x:Name="WidgetEnabledBox" Content="Show the QuickDock at the screen edge" Click="OnWidgetChanged" AutomationProperties.Name="Show the capture widget" />
                 <CheckBox x:Name="WidgetTopmostBox" Content="Keep the widget on top of other windows" Click="OnWidgetChanged" />
                 <CheckBox x:Name="WidgetAutoHideBox" Content="Auto-hide: shrink to a thin strip until the pointer touches it" Click="OnWidgetChanged" />
                 <DockPanel Margin="0,4,0,0">

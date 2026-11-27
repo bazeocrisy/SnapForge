@@ -200,7 +200,7 @@
                         <MenuItem Header="_Editor" InputGestureText="Ctrl+E" Click="OnShowEditor" />
                         <MenuItem Header="_Library" InputGestureText="Ctrl+L" Click="OnShowLibrary" />
                         <MenuItem Header="Capture _panel" Click="OnShowCaptureWindow" />
-                        <MenuItem Header="Show capture _widget" Click="OnShowWidget" ToolTip="Shows the capture widget at the top centre of the screen and opens it" />
+                        <MenuItem Header="Show _QuickDock" Click="OnShowWidget" ToolTip="Shows the QuickDock at the top centre of the screen and opens it" />
                         <Separator />
                         <MenuItem x:Name="ShowTrayMenu" Header="Show _Recent Captures" IsCheckable="True" Click="OnToggleTray" />
                         <MenuItem x:Name="ShowPanelMenu" Header="Show Quick Styles &amp; _Properties" IsCheckable="True" Click="OnTogglePanel" />
