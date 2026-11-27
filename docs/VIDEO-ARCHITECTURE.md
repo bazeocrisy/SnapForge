@@ -15,7 +15,7 @@ blocked from this environment); **[PC]** needs a physical PC.
 | Encoding + container | **Media Foundation Sink Writer**: H.264 (Main), AAC-LC 160 kbit/s 48 kHz stereo, **fragmented MP4** | Uses the encoders that ship with Windows; hardware encoder when present (`MF_READWRITE_ENABLE_HARDWARE_TRANSFORMS`), else the Microsoft software encoder; fragmented MP4 limits crash loss [CI] | Bundled FFmpeg/x264 (licensing, size, supply chain), paid SDKs (owner: no paid dependencies) |
 | System sound | **WASAPI loopback** on the default render endpoint, shared mode, `AUTOCONVERTPCM` to 48 kHz stereo float | Captures exactly what the user hears; follows default-device changes (Bluetooth) [SDK]; behaviour with real devices [PC] | Stereo-mix drivers (not present on most PCs) |
 | Microphone | **WASAPI capture** on the default or a chosen endpoint | Opened only when Microphone is on → Windows mic privacy indicator [Assumed][PC] | — |
-| Keep own UI out of video | `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` on toolbar and outline | Windows 10 2004+; accepted on the runner [CI]; pixel-level absence [PC] | Hiding the toolbar (would hide the controls) |
+| Keep own UI out of video | `SetWindowDisplayAffinity(WDA_EXCLUDEFROMCAPTURE)` on toolbar, outline and SnapForge Studio | Windows 10 2004+; accepted on the runner [CI]; pixel-level absence [PC] | Hiding the toolbar (would hide the controls) |
 | Read back / validate | Media Foundation **Source Reader** (decode to RGB32 / PCM) | Sync measurement, thumbnails of recovered videos, recovery verification [CI] | — |
 
 All native calls go through explicit COM/WinRT vtable interop (`src/SnapForge.App/Video/Interop`), with each vtable slot
@@ -60,10 +60,117 @@ check was not acceptable.
 | Default output changed (Bluetooth headset) | loopback re-opened on the new default within ~1 s; gap filled with silence | VID-R08 |
 | Display disconnected / window closed | recording stops and is saved, notice | VID-R09 |
 | Resolution change / window resize | frame pool recreated; output size fixed; content clipped/letterboxed | VID-R09 |
-| PC locked | recording paused, notice; user resumes | VID-R10 |
-| Sleep / sign-out / shutdown | stop and save before suspend / session end | VID-R10 |
+| PC locked | recording paused (camera released), notice; user resumes | VID-R10 |
+| Sleep / sign-out / shutdown | stop and save before suspend / session end (bounded waits, then crash recovery) | VID-R10, FA-021 |
+| Recorder thread stalls while stopping | reported after 10 s, partial file recovered, its native objects released only when it exits | FA-021 |
+| Stop pressed twice / stop + cancel at once | one finalization (state machine + idempotent recorder) | FA-021 |
+| Camera busy / denied / unplugged | see §3a | SF-006 |
 | Long recording | 64-bit timestamps, fragmented file grows without rewriting; bounded buffers | VID-R11 |
 | Second recording requested | refused (one recorder per process; single-instance app) | VID-R14 |
+
+## 3a. SnapForge Studio and the camera pipeline (SF-006)
+
+`RecordingController.OpenStudio()` is the Record entry point for the capture panel and the dock: it shows
+**SnapForge Studio** (`StudioWindow`), or brings the toolbar to the front while recording. Studio's Start saves the
+choices (all in `VideoSettings`: `StudioMode`, `CameraDeviceId`, `CameraShape`, `CameraSize`, `CameraCorner`,
+`CameraMirror` plus the existing audio/video fields) and calls `StartAsync()`, which the record hotkey also uses
+directly. Studio is excluded from capture (`WDA_EXCLUDEFROMCAPTURE`) like the toolbar and outline.
+
+```
+ MFEnumDeviceSources(VIDCAP) ─► IMFActivate::ActivateObject(IMFMediaSource) ─► MFCreateSourceReaderFromMediaSource
+   (lists names + symbolic links;            (opens the device: camera light on)      (ADVANCED_VIDEO_PROCESSING)
+    does not open the camera)
+          native type closest to 1280×720@30 (CameraFormatChooser) ─► output RGB32 (else NV12 / YUY2 converted in code)
+          camera thread: ReadSample ─► BGRA ─► CameraFrameRing (4 frames, QPC timestamps)
+                                                    │ newest frame not newer than the screen frame
+ WGC screen frame ─► CompositeFrameSource ──────────┴─► CameraCompositor (crop, bilinear, mirror, AA mask) ─► recorder
+ Camera only:        CameraFrameSource (camera size, rounded down to even) ─────────────────────────────────► recorder
+```
+
+* **One owner thread per camera** — `MediaFoundationCameraSource` opens, reads and shuts down the device on a single
+  MTA thread; no other thread releases its COM objects. `Stop()` waits 3 s, then calls `IMFMediaSource::Shutdown`
+  (unblocks a stuck `ReadSample`; the pointer is guarded so the reader thread cannot release it meanwhile), waits again,
+  and otherwise logs and leaves the objects to that thread. Shutdown order: reader released → `IMFMediaSource::Shutdown`
+  → `IMFActivate::ShutdownObject` (camera light off). [SDK] order; light behaviour [PC].
+* **Clock** — camera sample times are mapped onto QPC with the smallest arrival offset seen (no jitter, never in the
+  future; re-anchored after a > 200 ms discontinuity), so frames are on the recorder's existing clock. [PC] latency.
+* **Composition** — Screen + camera: each screen frame is copied and the newest camera frame not newer than it is
+  drawn in the chosen corner (margin 3 % of the shorter side; sizes 22/30/40 %; circle = square box, rounded
+  rectangle = 16:9 box with 16 % radius), centre-cropped to the box aspect (no distortion), bilinear, optional mirror,
+  one-pixel antialiased edge. A camera change alone also yields a new frame, so the overlay moves over a static screen.
+  CPU cost is per overlay pixel (maps and mask cached per layout). [CI synthetic]
+* **Camera only** — the camera feed is the video at its native size; audio as configured. [CI synthetic]
+* **Privacy** — camera and microphone are off by default; the camera opens only after an explicit camera choice in
+  Studio (preview) or at Start in a camera mode, and is released on Screen only, close, minimize, lock, sleep, Start
+  (the recorder reopens it after the area is chosen), pause and hiding the overlay. A Windows privacy block
+  (`E_ACCESSDENIED`, or `Deny` in the CapabilityAccessManager consent store [Assumed]) is explained with a link to
+  Settings → Privacy & security → Camera / Microphone; nothing retries silently.
+* **Testing seam** — `ICameraSource` with `MediaFoundationCameraSource` and `SyntheticCameraSource` (CI has no camera;
+  every synthetic result is labelled SYNTHETIC). `RecordingController.CameraFactory` substitutes the camera.
+
+| Camera event | Behaviour |
+|---|---|
+| No camera | Studio says so and disables Start for camera modes; `StartAsync` explains | 
+| Busy (`MF_E_HW_MFT_FAILED_START_STREAMING`, `ERROR_BUSY`, sharing violation, preempted) | "used by another app"; Screen + camera may continue without it |
+| Access denied (`E_ACCESSDENIED`) | privacy message + open Settings; no retry |
+| Unplugged / fails mid-recording (`ReadSample` error / `MF_SOURCE_READERF_ERROR` / end of stream) | Screen + camera: notice, overlay removed, screen keeps recording; Camera only: recording stops and is saved |
+| Pause / lock / overlay hidden | camera released (light off); reopened on resume / show (failure → notice) |
+| Stop / cancel / exit / sleep | camera released with the recorder's sources (after the capture thread has exited) |
+
+### Interop used (vtable slots from mfobjects.idl / mfidl.idl / mfreadwrite.idl order) [SDK]
+
+| Interface | Slots used | File |
+|---|---|---|
+| IMFAttributes (3–32) | GetUINT32 7, GetUINT64 8, GetGUID 10, GetAllocatedString 13, SetUINT32 21, SetUINT64 22, SetGUID 24 | `MediaFoundation.cs` |
+| IMFActivate : IMFAttributes | ActivateObject 33, ShutdownObject 34 | `MediaFoundation.Camera.cs` |
+| IMFMediaSource : IMFMediaEventGenerator (3–6) | Shutdown 12 (GetCharacteristics 7, CreatePresentationDescriptor 8, Start 9, Stop 10, Pause 11) | `MediaFoundation.Camera.cs` |
+| IMFSourceReader | SetStreamSelection 4, GetNativeMediaType 5, GetCurrentMediaType 6, SetCurrentMediaType 7, ReadSample 9 | both |
+| IMFSample : IMFAttributes | GetSampleTime 35, ConvertToContiguousBuffer 41 | `MediaFoundation.cs` |
+| IMFMediaBuffer | Lock 3, Unlock 4 | `MediaFoundation.cs` |
+| IMF2DBuffer | Lock2D 3, Unlock2D 4 | `MediaFoundation.Camera.cs` |
+| Functions | `MFEnumDeviceSources` (mf.dll), `MFCreateSourceReaderFromMediaSource` (mfreadwrite.dll) | `MediaFoundation.Camera.cs` |
+
+GUIDs: `MF_DEVSOURCE_ATTRIBUTE_SOURCE_TYPE` c60ac5fe-…, `…_VIDCAP_GUID` 8ac3587a-…, `…_FRIENDLY_NAME` 60d0e559-…,
+`…_VIDCAP_SYMBOLIC_LINK` 58f0aad8-…, `MF_SOURCE_READER_ENABLE_ADVANCED_VIDEO_PROCESSING` 0f81da2c-…, IID_IMFMediaSource
+279a808d-…, IID_IMF2DBuffer 7dc9d5f9-… — all from the scratch-workspace IDL copies [SDK]. The `MF_E_*` HRESULTs come
+from mferror.h, which was not in that set [Assumed]; any other failure is reported with its code.
+
+## 3b. Recording lifecycle (FA-021)
+
+```
+          TryBeginStart            TryCompleteStart          TryBeginStop / TryBeginCancel
+  Idle ───────────────► Starting ───────────────► Recording ◄──► Paused ───────────────► Stopping
+   ▲  ▲                    │  stop/cancel here = start abandoned        (exactly once)       │ recorder threads
+   │  └── AbortStart ──────┘  (selection, camera, countdown)                                  ▼ joined (bounded)
+   │                                                                                       Finalizing
+   └──────────── Finish(ok) ──────────────────────────────────────────────────────────────── │ Library / save-as
+                                         Faulted ◄── Finish(faulted) ─────────────────────────┘ (new start allowed)
+```
+
+* `RecordingLifecycle` holds the phase under one lock; every request is a single atomic transition, so double stops,
+  stop + cancel races, pause during stop etc. cannot interleave. The controller acts only on a successful transition.
+* `ScreenRecorder.Stop/Cancel` are idempotent: the first call owns the work (a `TaskCompletionSource`), concurrent and
+  later calls wait for it and receive the same result; a cancel after a stop returns false (the file is saved).
+* **Bounded joins** — capture, audio and encoder threads are each joined for at most 10 s (`RecorderHooks.JoinTimeout`).
+  A thread that does not finish is reported (`RecordingResult.Stalled`, toolbar notice, `recording.log`); the fragmented
+  file stays in the Library for recovery; COM objects that thread still uses are **not** released — sources are
+  disposed only when `ThreadsExited` completes (deliberate, logged leak until then). The controller then recovers the
+  file as soon as the threads exit (or at the next start). The encoder thread is the writer's only user, including
+  `Finalize` and release.
+* **Exit** — `StopForExit` waits at most 8 s on the UI thread, then leaves the fragmented MP4 for
+  `RecordingRecovery` at the next start. Sign-out uses the same path. **Sleep** — the suspend notification stops the
+  recording and waits (≤ 5 s) for the file before returning; the Library step runs after wake. **Lock** — pauses
+  (and releases the camera) via the same `TryPause` transition as the button.
+* **Fault seams** (`RecorderHooks`, tests/self-test only): delay or throw before each encoder write (disk full =
+  `IOException` 0x80070070), block the capture loop, before `Finalize`, and the join timeout.
+
+## 3c. Saving outside the Library (FA-022)
+
+`VerifiedFileCopy.Copy`: copy to `.<name>.snapforge-tmp-<random>` in the destination folder (hashing the source while
+reading), `Flush(true)`, verify size and SHA-256 by reading the copy back, then `File.Move(temp, target, overwrite:
+true)` (MoveFileEx replace — atomic on the volume; the save dialog already confirmed any overwrite). Only after that
+does the controller delete the Library copy. Any failure deletes the temp file and leaves the Library copy and any
+existing destination untouched; the user is told.
 
 ## 4. Licensing and distribution (H.264 / AAC)
 

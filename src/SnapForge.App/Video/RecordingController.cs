@@ -796,6 +796,11 @@ internal static partial class RecordingController
         }
 
         RecordingResult r = work.GetAwaiter().GetResult();
+        if (r.Cancelled)
+        {
+            Abandon(services, session.VideoId); // a discard in progress at exit stays discarded (not "recovered" later)
+        }
+
         if (r.Finalized && !r.Cancelled && session.TryClaimCompletion())
         {
             var info = new VideoInfo(r.Width, r.Height, r.FramesPerSecond, r.DurationMs, r.HasAudio);

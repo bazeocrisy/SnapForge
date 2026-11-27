@@ -71,6 +71,46 @@ Results go into ACCEPTANCE-RESULTS-TEMPLATE.md (one row per ID: pass/fail, PC mo
 | V1-COMPAT-02 | Windows 10 22H2: record, play, toolbar exclusion — report separately | PC |
 | V1-COMPAT-03 | Standard (non-admin) user; high contrast theme; multi-monitor and mixed DPI (record on the secondary display) | PC |
 
+## F. SnapForge Studio and camera (SF-006)
+
+**What CI verifies is synthetic only.** The runner has no camera: every camera check there uses the SYNTHETIC test
+camera (`SyntheticCameraSource`, magenta picture with a moving yellow bar) and says so in its output; the real-device
+count is printed as `UNAVAILABLE camera-enumeration` (never PASS). Composition, layout, mirror, masks, camera-only
+sizing, lifecycle and fault handling are verified with real Media Foundation encoding on CI; **everything that needs
+a real camera driver is PC-only** (rows marked PC below).
+
+| ID | Check | How |
+|---|---|---|
+| SF6-UI-01 | Record button (capture panel / dock) opens **SnapForge Studio**; while recording it brings the toolbar to the front | PC |
+| SF6-UI-02 | Studio: modes Screen / Screen + camera / Camera; capture area (hidden in Camera); camera device, preview, shape, size, position, mirror (shown only in camera modes); system audio, microphone + device; frame rate, quality, countdown, cursor, Library / open options; Start and Cancel. Choices are remembered after restart | PC |
+| SF6-UI-03 | Keyboard only: Tab reaches every control, arrows move inside each segment row, Space selects, Enter = Start, Esc = Cancel; Narrator reads every control's name | PC |
+| SF6-UI-04 | Light and dark themes (and high contrast) look consistent with the rest of SnapForge | PC |
+| SF6-UI-05 | **Studio window is not in the recording** | CI (`studio-window-not-recorded`) + PC |
+| SF6-PRIV-01 | Fresh install: mode is Screen, camera and microphone off; opening Studio does **not** turn the camera light on | SIM (`Studio_settings_default…`) + PC |
+| SF6-PRIV-02 | Choosing Screen + camera / Camera turns the camera light on (preview); choosing Screen, closing Studio, minimizing it, locking the PC or pressing Start turns it off within ~1 s | PC |
+| SF6-PRIV-03 | Settings → Privacy & security → Camera → desktop apps **off**: Studio and Start explain that Windows blocks the camera and offer to open that page; nothing retries silently. Same for Microphone | PC |
+| SF6-CAM-01 | Integrated laptop camera: preview, Screen + camera recording (overlay in each corner, each size, circle and rounded rectangle, mirror on/off), Camera-only recording at the camera's size (e.g. 1280×720) | PC (CI: SYNTHETIC only — `studio-*-synthetic`) |
+| SF6-CAM-02 | USB webcam (and choosing between two cameras): same as CAM-01; the chosen camera is remembered; if it is unplugged before recording, the first camera is used with a notice | PC |
+| SF6-CAM-03 | Camera busy (open it in the Windows Camera app first) → clear "used by another app" message; Screen + camera offers to record the screen only | PC |
+| SF6-CAM-04 | **Unplug the camera while recording** Screen + camera → notice, overlay disappears, the screen keeps recording, file valid; Camera-only → recording stops and is saved | PC (CI/SIM: simulated unplug in `Composite_source…survives_unplug`) |
+| SF6-CAM-05 | **Camera light off after Stop / Cancel / exit**, and while paused or with the overlay hidden (toolbar Camera toggle); back on after Resume / showing it again | PC |
+| SF6-CAM-06 | Lock (Win+L) while recording with the camera → pauses, light off; Resume → camera back. Sleep → recording stopped and saved before sleep, light off after wake | PC |
+| SF6-CAM-07 | Long recording with the camera: 30 min Screen + camera at 1080p30 → memory flat, < 1 % dropped frames, A/V within the V1 targets (≤ 80 ms), overlay never freezes | PC (CI: 3 s synthetic, < 1 % dropped) |
+| SF6-CAM-08 | Camera overlay lag relative to the screen ≤ 1 frame (wave a hand in front of the camera and on screen at once) | PC |
+
+## G. Recording lifecycle (FA-021) and saving outside the Library (FA-022)
+
+| ID | Check | How |
+|---|---|---|
+| FA21-01 | Stop pressed twice / Stop hotkey + toolbar Stop at once → one save | SIM (`RecordingLifecycleTests`) + CI (`lifecycle-double-stop`, `Concurrent_stops…`) |
+| FA21-02 | Stop and Cancel at the same time → either saved or discarded, never half | CI (`Stop_and_cancel_race…`) |
+| FA21-03 | A stalled encoder/capture thread → Stop returns within the bound, user told, file recovered | CI (`lifecycle-stall-timeout`, injected stall) |
+| FA21-04 | Disk full while writing → recording ends, notice, the part already written is recovered | CI (`Disk_full_while_writing…`, injected IOException) + PC (V1-REL-06) |
+| FA21-05 | Stop / Cancel hotkey during area selection or countdown → nothing is recorded | PC |
+| FA21-06 | Close SnapForge (tray → Exit) while recording → the app closes within ~10 s; the recording is saved or recovered at next start | PC |
+| FA22-01 | Save to Library off → save dialog → file at the chosen place, not in the Library; overwriting an existing file only after the dialog's confirmation | PC |
+| FA22-02 | Save to a full USB stick / a read-only folder → message; recording kept in the Library; any existing file there unchanged; no `.…snapforge-tmp-…` file left | SIM (`RecordingSaveOutsideTests`) + CI (`save-outside-library-atomic`) + PC |
+
 ## Known limitations (V1)
 
 | ID | Limitation |
@@ -88,3 +128,7 @@ Results go into ACCEPTANCE-RESULTS-TEMPLATE.md (one row per ID: pass/fail, PC mo
 | KL-V12 | Recordings are written as fragmented MP4 (crash-safe) and converted to a standard MP4 when recording stops; conversion needs free space equal to the recording's size. Without it the fragmented file is kept (tile tooltip says so) — it plays, but Windows' own players mis-time its fragments (measured up to ~230 ms A/V offset). V1 offers no later re-conversion. |
 | KL-V13 | 4K recording on the Windows **software** H.264 encoder is far slower than real time on CI hardware (4K60: 4 h for a 5-min benchmark row incl. analysis). 4K is only expected to work with a hardware encoder; untested until a PC run. |
 | KL-V11 | Library integrity check for videos is the file size recorded in the manifest (no hash of multi-GB files at start-up). |
+| KL-V14 | Camera support is verified on CI with a **synthetic** camera only. Real drivers (format negotiation, RGB32 conversion, MJPG decode, NV12 buffers with padded heights, the privacy registry check, busy/unplug error codes, the camera light) are **unverified until tested on a PC** (section F). |
+| KL-V15 | The camera overlay is composited on the CPU (BGRA). Measured cost is per overlay pixel only, but 4K recordings with a large overlay add CPU load on top of the software encoder. |
+| KL-V16 | Camera timestamps are mapped onto the recording clock from the camera's sample times (smallest arrival offset); a camera with a large internal delay shows that delay in the overlay (SF6-CAM-08). |
+| KL-V17 | Stopping waits at most 10 s per recorder thread, exit at most 8 s in total; a recording that does not stop in time is recovered from its last complete fragment at the next start (KL-V04 applies). |
