@@ -691,6 +691,104 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  ui-audit:
+    # RC5 QA: the INSTALLED app at real Windows display scaling. For each step (100/125/150/200 %) the runner's display
+    # scaling is changed live, read back, and the installed SnapForge.exe --ui-audit opens every window, dialog, menu,
+    # editor tool, settings section, QuickDock state, Record panel and recording window, measures text size,
+    # clipping, off-window controls, accessible names and Tab reachability, and takes real screen captures. The Setup
+    # wizard is photographed too. A scaling the runner cannot apply is reported as UNVERIFIED (never as passed).
+    name: UI audit — installed app at 100/125/150/200 % display scaling (text size, clipping, keyboard, screenshots)
+    needs: windows
+    if: ${{ !cancelled() && needs.windows.outputs.packaged == 'true' }}
+    runs-on: windows-latest
+    timeout-minutes: 45
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          sparse-checkout: |
+            /installer/tests/
+          sparse-checkout-cone-mode: false
+
+      - name: Download the release-candidate package
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: ${{ needs.windows.outputs.packages }}
+          path: packages
+
+      - name: Install SnapForge (the real installer)
+        shell: pwsh
+        run: |
+          $setup = (Get-ChildItem packages\*-setup.exe | Select-Object -First 1).FullName
+          $p = Start-Process -FilePath $setup -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=install.log' -Wait -PassThru
+          if ($p.ExitCode -ne 0) { Get-Content install.log -Tail 40; throw "install failed" }
+          Write-Output "PASS installed $((Get-Item "$env:ProgramFiles\SnapForge\SnapForge.exe").VersionInfo.ProductVersion)"
+
+      - name: Audit every window, dialog, menu, tool and settings section at each display scaling
+        shell: pwsh
+        run: |
+          . installer/tests/display-scaling.ps1
+          . installer/tests/capture-window.ps1
+          $modes = [SfDisplay]::Modes()
+          Write-Output "INFO display modes: $modes"
+          foreach ($res in '2560x1440', '1920x1080') {
+            $wh = $res.Split('x')
+            if ($modes -match "\b$res\b" -and [SfDisplay]::SetResolution([int]$wh[0], [int]$wh[1])) { Write-Output "INFO display set to $res"; break }
+          }
+          Start-Sleep -Seconds 3
+          $exe = "$env:ProgramFiles\SnapForge\SnapForge.exe"
+          $setup = (Get-ChildItem packages\*-setup.exe | Select-Object -First 1).FullName
+          $summary = @()
+          foreach ($scale in 100, 125, 150, 200) {
+            $applied = [SfDisplay]::SetScale($scale)
+            Start-Sleep -Seconds 4
+            $now = [SfDisplay]::Scale()
+            $dir = Join-Path $PWD "ui-audit\$scale"
+            New-Item -ItemType Directory -Force $dir | Out-Null
+            $p = Start-Process -FilePath $exe -ArgumentList '--profile', "ci-ui-audit-$scale", '--ui-audit', "`"$dir`"", "$scale" -Wait -PassThru
+            $report = Get-Content (Join-Path $dir 'ui-audit.json') -Raw | ConvertFrom-Json
+            $appScale = [math]::Round(($report.monitors | Select-Object -First 1).dpiScale * 100)
+            $verified = ($appScale -eq $scale)
+            $state = if ($verified) { 'VERIFIED' } else { 'UNVERIFIED' }
+            Write-Output "UIAUDIT SCALE $scale% $state (Windows reports $($now[1])%, maximum $($now[2])%; SnapForge measured $appScale% = $([math]::Round(96 * $appScale / 100)) DPI; exit $($p.ExitCode)): $($report.states.Count) states, $($report.fails) FAIL, $($report.warns) WARN"
+            foreach ($f in $report.findings) { Write-Output "UIAUDIT $scale% $($f.Severity) [$($f.State)] $($f.Element): $($f.Problem)" }
+            # The Setup wizard at this scaling (first page), then closed — nothing is installed by this.
+            $sp = Start-Process -FilePath $setup -PassThru
+            $hwnd = [IntPtr]::Zero
+            for ($i = 0; $i -lt 60 -and $hwnd -eq [IntPtr]::Zero; $i++) { Start-Sleep -Milliseconds 500; $c = Get-Process | Where-Object { $_.MainWindowTitle -like 'Setup - SnapForge*' } | Select-Object -First 1; if ($c) { $hwnd = $c.MainWindowHandle; $wiz = $c } }
+            if ($hwnd -ne [IntPtr]::Zero) { [void](Save-WindowPng $hwnd (Join-Path $dir 'setup-wizard.png')); Stop-Process -Id $wiz.Id -Force }
+            Stop-Process -Id $sp.Id -Force -ErrorAction SilentlyContinue
+            $summary += [pscustomobject]@{ scale = $scale; verified = $verified; windowsReports = $now[1]; maximum = $now[2]; measured = $appScale; states = $report.states.Count; fail = $report.fails; warn = $report.warns }
+          }
+          $summary | Format-Table -AutoSize | Out-String | Write-Output
+          $summary | ConvertTo-Json | Set-Content ui-audit\summary.json
+          [void][SfDisplay]::SetScale(100)
+
+      - name: Screenshots for review (base64 in 4000-character lines)
+        if: always()
+        shell: pwsh
+        run: |
+          foreach ($scale in 100, 125, 150, 200) {
+            foreach ($n in 'editor', 'menu-image', 'editor-tool-text', 'library', 'capture-panel', 'quickdock-expanded', 'settings', 'record-panel-more-options', 'recording-controls', 'dialog-resize-image', 'setup-wizard') {
+              $f = "ui-audit\$scale\$n.png"
+              if (-not (Test-Path $f)) { Write-Output "WEBPNG-MISSING ui-$scale-$n"; continue }
+              $bytes = [IO.File]::ReadAllBytes($f)
+              $hash = (Get-FileHash $f -Algorithm SHA256).Hash.ToLowerInvariant()
+              $b64 = [Convert]::ToBase64String($bytes)
+              Write-Output "WEBPNG-BEGIN ui-$scale-$n $hash"
+              for ($i = 0; $i -lt $b64.Length; $i += 4000) { Write-Output ("WEBPNG " + $b64.Substring($i, [Math]::Min(4000, $b64.Length - $i))) }
+              Write-Output "WEBPNG-END ui-$scale-$n"
+            }
+          }
+
+      - name: Upload the UI audit (reports and every screen capture)
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: ui-audit-${{ github.sha }}
+          path: ui-audit
+          retention-days: 30
+
   installer:
     name: Installer — clean install, rc.1/rc.2/rc.3 → rc.4 upgrades with SnapForge open, graceful close, recording, other session, interrupted setup, repair, two users, uninstall keeps data
     needs: [windows, rc1-baseline, rc2-baseline, rc3-baseline]

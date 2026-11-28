@@ -138,6 +138,15 @@ public partial class App : Application
             return;
         }
 
+        if (args.Length >= 2 && args[0] == "--ui-audit")
+        {
+            // QA (RC5): every window, dialog, menu, tool and settings section at the CURRENT display scaling.
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            string label = args.Length >= 3 && !args[2].StartsWith("--", StringComparison.Ordinal) ? args[2] : "current";
+            Shutdown(UiAudit.Run(args[1], label, strict: args.Contains("--strict")));
+            return;
+        }
+
         if (args.Length >= 1 && args[0] is "--self-test" or "--screenshots")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;

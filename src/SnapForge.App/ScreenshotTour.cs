@@ -301,7 +301,7 @@ internal static class ScreenshotTour
         }
     }
 
-    private static PixelRect? Bounds(Window window)
+    internal static PixelRect? Bounds(Window window)
     {
         nint hwnd = new System.Windows.Interop.WindowInteropHelper(window).Handle;
         if (hwnd == 0)
@@ -314,7 +314,7 @@ internal static class ScreenshotTour
     }
 
     /// <summary>Brings the window to the front and saves the screen pixels it covers (plus an optional margin).</summary>
-    private static void SaveScreen(Window window, int? margin, string path, List<string> log)
+    internal static void SaveScreen(Window window, int? margin, string path, List<string> log)
     {
         // Park the pointer in a corner so no hover state or tooltip from a previous step is captured.
         Interop.NativeMethods.SetCursorPos(0, (int)SystemParameters.PrimaryScreenHeight - 1);
@@ -338,7 +338,7 @@ internal static class ScreenshotTour
     }
 
     /// <summary>Captures a screen region with SnapForge's GDI capture and writes PNG + a small JPEG preview.</summary>
-    private static void SaveRegion(PixelRect screenRect, string path, List<string> log)
+    internal static void SaveRegion(PixelRect screenRect, string path, List<string> log)
     {
         Pump(150);
         Capture.CaptureSnapshot snap = Capture.ScreenCaptureService.TakeSnapshot(includeCursor: false);
@@ -370,7 +370,7 @@ internal static class ScreenshotTour
 
     /// <summary>Creates realistic-looking synthetic screenshots (no real screen content) with annotations.</summary>
     /// <summary>A real 4-second screen recording of a moving demo window, saved in the Library like any recording.</summary>
-    private static Guid? SeedVideo(AppServices services, List<string> log)
+    internal static Guid? SeedVideo(AppServices services, List<string> log)
     {
         try
         {
@@ -400,7 +400,7 @@ internal static class ScreenshotTour
         }
     }
 
-    private static void SeedLibrary(CaptureLibrary library, RecentTray tray)
+    internal static void SeedLibrary(CaptureLibrary library, RecentTray tray)
     {
         (string Title, string App, string[] Tags, string Folder, bool Fav, int DaysAgo)[] items =
         [
@@ -510,7 +510,7 @@ internal static class ScreenshotTour
     private static void Text(DrawingContext dc, string text, double x, double y, double size, Brush brush, Typeface face) =>
         dc.DrawText(new FormattedText(text, CultureInfo.InvariantCulture, FlowDirection.LeftToRight, face, size, brush, 1.0), new Point(x, y));
 
-    private static void PumpUntil(Func<bool> condition)
+    internal static void PumpUntil(Func<bool> condition)
     {
         DateTime end = DateTime.UtcNow.AddSeconds(15);
         while (!condition() && DateTime.UtcNow < end)
@@ -519,7 +519,7 @@ internal static class ScreenshotTour
         }
     }
 
-    private static void Pump(int milliseconds)
+    internal static void Pump(int milliseconds)
     {
         DateTime end = DateTime.UtcNow.AddMilliseconds(milliseconds);
         do
