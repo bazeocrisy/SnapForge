@@ -14,8 +14,8 @@ public static class SfDisplay
     [StructLayout(LayoutKind.Sequential)] public struct PathInfo { public SourceInfo source; public TargetInfo target; public uint flags; }
     [StructLayout(LayoutKind.Sequential, Size = 64)] public struct ModeInfo { public uint infoType; }
     [StructLayout(LayoutKind.Sequential)] public struct Header { public int type; public uint size; public LUID adapterId; public uint id; }
-    [StructLayout(LayoutKind.Sequential)] public struct GetScale { public Header header; public int minRel; public int curRel; public int maxRel; }
-    [StructLayout(LayoutKind.Sequential)] public struct SetScale { public Header header; public int scaleRel; }
+    [StructLayout(LayoutKind.Sequential)] public struct GetScaleRequest { public Header header; public int minRel; public int curRel; public int maxRel; }
+    [StructLayout(LayoutKind.Sequential)] public struct SetScaleRequest { public Header header; public int scaleRel; }
 
     [StructLayout(LayoutKind.Sequential, CharSet = CharSet.Unicode)]
     public struct DEVMODE
@@ -32,8 +32,8 @@ public static class SfDisplay
 
     [DllImport("user32.dll")] static extern int GetDisplayConfigBufferSizes(uint flags, out uint paths, out uint modes);
     [DllImport("user32.dll")] static extern int QueryDisplayConfig(uint flags, ref uint paths, [Out] PathInfo[] p, ref uint modes, [Out] ModeInfo[] m, IntPtr topology);
-    [DllImport("user32.dll")] static extern int DisplayConfigGetDeviceInfo(ref GetScale request);
-    [DllImport("user32.dll")] static extern int DisplayConfigSetDeviceInfo(ref SetScale request);
+    [DllImport("user32.dll")] static extern int DisplayConfigGetDeviceInfo(ref GetScaleRequest request);
+    [DllImport("user32.dll")] static extern int DisplayConfigSetDeviceInfo(ref SetScaleRequest request);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern bool EnumDisplaySettings(string device, int mode, ref DEVMODE dm);
     [DllImport("user32.dll", CharSet = CharSet.Unicode)] static extern int ChangeDisplaySettings(ref DEVMODE dm, int flags);
 
@@ -55,9 +55,9 @@ public static class SfDisplay
     public static int[] Scale()
     {
         SourceInfo s = Primary();
-        var g = new GetScale();
+        var g = new GetScaleRequest();
         g.header.type = -3; // DISPLAYCONFIG_DEVICE_INFO_GET_DPI_SCALE
-        g.header.size = (uint)Marshal.SizeOf(typeof(GetScale));
+        g.header.size = (uint)Marshal.SizeOf(typeof(GetScaleRequest));
         g.header.adapterId = s.adapterId;
         g.header.id = s.id;
         int r = DisplayConfigGetDeviceInfo(ref g);
@@ -71,17 +71,17 @@ public static class SfDisplay
         int target = Array.IndexOf(Steps, percent);
         if (target < 0) return false;
         SourceInfo s = Primary();
-        var g = new GetScale();
+        var g = new GetScaleRequest();
         g.header.type = -3;
-        g.header.size = (uint)Marshal.SizeOf(typeof(GetScale));
+        g.header.size = (uint)Marshal.SizeOf(typeof(GetScaleRequest));
         g.header.adapterId = s.adapterId;
         g.header.id = s.id;
         if (DisplayConfigGetDeviceInfo(ref g) != 0) return false;
         int rec = -g.minRel;
         if (target > rec + g.maxRel) return false;
-        var set = new SetScale();
+        var set = new SetScaleRequest();
         set.header.type = -4; // DISPLAYCONFIG_DEVICE_INFO_SET_DPI_SCALE
-        set.header.size = (uint)Marshal.SizeOf(typeof(SetScale));
+        set.header.size = (uint)Marshal.SizeOf(typeof(SetScaleRequest));
         set.header.adapterId = s.adapterId;
         set.header.id = s.id;
         set.scaleRel = target - rec;
