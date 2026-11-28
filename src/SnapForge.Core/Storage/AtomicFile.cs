@@ -181,6 +181,38 @@ public static class AtomicFile
         return total;
     }
 
+    /// <summary>
+    /// True if some handle (in this or another process) has the file open, so it may be a write in progress: opening it
+    /// for exclusive access fails (a sharing violation on Windows, the advisory lock .NET takes on other systems).
+    /// </summary>
+    internal static bool IsOpenElsewhere(string path)
+    {
+        try
+        {
+            using var probe = new FileStream(path, FileMode.Open, FileAccess.Read, FileShare.None, 1);
+            return false;
+        }
+        catch (FileNotFoundException)
+        {
+            return false;
+        }
+        catch (DirectoryNotFoundException)
+        {
+            return false;
+        }
+        catch (IOException)
+        {
+            return true;
+        }
+        catch (UnauthorizedAccessException)
+        {
+            return true;
+        }
+    }
+
+    /// <summary>Deletes a file if it exists; false if it did not exist or could not be deleted.</summary>
+    internal static bool TryDeleteFile(string path) => TryDelete(path);
+
     private static bool TryDelete(string path)
     {
         try

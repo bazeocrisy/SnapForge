@@ -124,3 +124,9 @@ before adopting it.
 
 Additive, backward-compatible changes keep `version` and must be ignorable by older readers. Anything else increments
 `version`; older SnapForge builds then refuse the capture instead of misreading it.
+
+## Several SnapForge programs on one library
+
+SnapForge Capture and SnapForge Editor may open the same library at once. All writes, clean-up and recovery are
+serialised by a cross-process write gate; see [LIBRARY-COORDINATION.md](LIBRARY-COORDINATION.md). The format is
+unchanged.

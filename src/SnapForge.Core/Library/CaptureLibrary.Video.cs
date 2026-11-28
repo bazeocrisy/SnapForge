@@ -49,12 +49,16 @@ public sealed partial class CaptureLibrary
     {
         Guid id = Guid.NewGuid();
         string dir = VideoFolder(id);
-        Directory.CreateDirectory(dir);
-        AtomicFile.WriteAllBytes(Path.Combine(dir, InProgressMarker), JsonSerializer.SerializeToUtf8Bytes(new JsonObject
+        using (EnterWrite())
         {
-            ["format"] = VideoFormatId + ".inprogress",
-            ["startedUtc"] = CaptureFormat.Iso(startedUtc),
-        }));
+            Directory.CreateDirectory(dir);
+            AtomicFile.WriteAllBytes(Path.Combine(dir, InProgressMarker), JsonSerializer.SerializeToUtf8Bytes(new JsonObject
+            {
+                ["format"] = VideoFormatId + ".inprogress",
+                ["startedUtc"] = CaptureFormat.Iso(startedUtc),
+            }));
+        }
+
         return (id, Path.Combine(dir, RecordingFile));
     }
 
@@ -67,7 +71,18 @@ public sealed partial class CaptureLibrary
         ArgumentNullException.ThrowIfNull(info);
         string dir = VideoFolder(id);
         string video = Path.Combine(dir, VideoFile);
+
+        // The conversion (possibly minutes) runs outside the write gate: it only touches this recording's own files,
+        // which no other process changes while the in-progress marker is there. Everything after it is gated.
         string layout = FinishVideoFile(dir);
+        using (EnterWrite())
+        {
+            return CommitVideo(id, dir, video, layout, info, thumbnailSource, createdUtc, title);
+        }
+    }
+
+    private CaptureRecord CommitVideo(Guid id, string dir, string video, string layout, VideoInfo info, PixelBuffer? thumbnailSource, DateTime createdUtc, string? title)
+    {
         if (!File.Exists(video))
         {
             throw new FileNotFoundException("The recording has no video file.", video);
@@ -155,13 +170,22 @@ public sealed partial class CaptureLibrary
     public void AbandonVideo(Guid id)
     {
         string dir = VideoFolder(id);
-        if (Directory.Exists(dir) && !File.Exists(Path.Combine(dir, VideoManifestFile)))
+        using (EnterWrite())
         {
-            Directory.Delete(dir, recursive: true);
+            if (Directory.Exists(dir) && !File.Exists(Path.Combine(dir, VideoManifestFile)))
+            {
+                Directory.Delete(dir, recursive: true);
+            }
         }
     }
 
-    /// <summary>Recordings that were started but never completed (the app or PC stopped while recording).</summary>
+    /// <summary>
+    /// Recordings that were started but never completed (the app or PC stopped while recording). Read-only. A folder
+    /// being recorded right now by another process also has the in-progress marker and is listed too, so only one
+    /// process (SnapForge Capture, which records) may act on this list (recover or abandon), and only at its start-up,
+    /// before it starts recording; other processes must not call <see cref="CompleteVideo"/> or
+    /// <see cref="AbandonVideo"/> for these ids.
+    /// </summary>
     public IReadOnlyList<InterruptedRecording> InterruptedRecordings()
     {
         var list = new List<InterruptedRecording>();
@@ -221,17 +245,32 @@ public sealed partial class CaptureLibrary
 
         foreach (string dir in Directory.EnumerateDirectories(VideosDirectory))
         {
-            if (Guid.TryParse(Path.GetFileName(dir), out Guid id) && File.Exists(Path.Combine(dir, VideoManifestFile)))
+            // A folder without a manifest is an in-progress (or interrupted) recording: never touched by indexing.
+            if (!Guid.TryParse(Path.GetFileName(dir), out Guid id) || !File.Exists(Path.Combine(dir, VideoManifestFile)))
             {
-                // A manifest means the recording was completed; a marker left beside it (stopped between the two
-                // writes) is obsolete.
-                string marker = Path.Combine(dir, InProgressMarker);
-                if (File.Exists(marker) && !_inspectOnly)
-                {
-                    File.Delete(marker);
-                }
+                continue;
+            }
 
+            if (_inspectOnly)
+            {
                 found[id] = ReadVideoRecord(id, dir);
+                continue;
+            }
+
+            using (EnterWrite())
+            {
+                // Inside the gate CompleteVideo cannot be between writing the manifest and removing the marker, so a
+                // marker beside a manifest is left over from a stop between the two writes, and obsolete.
+                if (File.Exists(Path.Combine(dir, VideoManifestFile)))
+                {
+                    string marker = Path.Combine(dir, InProgressMarker);
+                    if (File.Exists(marker))
+                    {
+                        File.Delete(marker);
+                    }
+
+                    found[id] = ReadVideoRecord(id, dir);
+                }
             }
         }
     }

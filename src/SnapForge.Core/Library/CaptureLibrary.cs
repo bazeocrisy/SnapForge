@@ -29,6 +29,25 @@ public sealed class LibraryChangedEventArgs(IReadOnlyCollection<Guid> ids) : Eve
 /// every write is atomic, so a crash or full disk never corrupts an existing capture. Nothing here uses the network.
 /// Thread-safe: saves may run on background threads.
 /// </summary>
+/// <remarks>
+/// <para>Several processes may open the same Library folder at once (SnapForge Capture creates captures and records
+/// videos; SnapForge Editor edits, organises, backs up, restores and relocates). The rules
+/// (docs/LIBRARY-COORDINATION.md):</para>
+/// <list type="bullet">
+/// <item>Every write to the library folder (commits, metadata, deletes, video begin/complete/abandon, backup, restore,
+/// relocation) and every clean-up or recovery on open runs inside the <em>write gate</em>: this instance's monitor plus
+/// a named OS mutex derived from the root path, shared by every process. Waiting for another process is bounded
+/// (2 minutes, then an <see cref="IOException"/> saying the library is busy).</item>
+/// <item>Clean-up never touches another process's work: <c>.creating-</c> folders, uncommitted generation files and
+/// interrupted restores are only removed under the gate (when no other writer can be mid-commit), temporary files
+/// only when no handle has them open, and outside the item folders only when older than
+/// <see cref="TemporaryFileSafeAge"/>. Indexing never deletes or changes an in-progress recording's folder.</item>
+/// <item>Each process keeps its own index. To see another process's changes call <see cref="RefreshFromDisk"/> for an
+/// item, <see cref="Reindex"/> for everything, or run a <see cref="LibraryWatcher"/> that does it automatically.</item>
+/// <item>Only one process (SnapForge Capture) may act on <see cref="InterruptedRecordings"/> (recover or abandon):
+/// another process cannot tell a live recording from an interrupted one.</item>
+/// </list>
+/// </remarks>
 public sealed partial class CaptureLibrary
 {
     public const int ThumbnailSize = 320;
@@ -38,8 +57,11 @@ public sealed partial class CaptureLibrary
 
     private readonly object _gate = new();
 
-    /// <summary>Serialises commits and folder clean-up, so an index never deletes files of a save in progress.</summary>
-    private readonly object _writeLock = new();
+    /// <summary>
+    /// Serialises commits and folder clean-up within this process and across processes sharing the root, so an index
+    /// never deletes files of a save in progress (see the class remarks).
+    /// </summary>
+    private readonly LibraryWriteGate _writeGate;
     private readonly Dictionary<Guid, CaptureRecord> _records = [];
 
     /// <summary>Set for <see cref="OpenForInspection"/>: indexing reads only and never cleans up or recovers.</summary>
@@ -50,7 +72,24 @@ public sealed partial class CaptureLibrary
         Root = Path.GetFullPath(root);
         CapturesDirectory = Path.Combine(Root, "captures");
         VideosDirectory = Path.Combine(Root, VideosFolderName);
+        _writeGate = new LibraryWriteGate(Root);
     }
+
+    /// <summary>
+    /// Temporary files (<see cref="AtomicFile.TempSuffix"/>) outside the item folders are removed on open only when
+    /// older than this (and not open): another program sharing the library may be writing them.
+    /// </summary>
+    public static readonly TimeSpan TemporaryFileSafeAge = TimeSpan.FromMinutes(10);
+
+    /// <summary>How long a write waits for another SnapForge program to leave the write gate (tests shorten it).</summary>
+    internal TimeSpan WriteGateTimeout
+    {
+        get => _writeGate.Timeout;
+        set => _writeGate.Timeout = value;
+    }
+
+    /// <summary>Test hook: called inside the write gate of <see cref="Create"/> just before the commit rename.</summary>
+    internal static AsyncLocal<Action<string>?> CreateCommitHook { get; } = new();
 
     public event EventHandler<LibraryChangedEventArgs>? Changed;
 
@@ -107,7 +146,7 @@ public sealed partial class CaptureLibrary
 
         // Capture folders first: their leftovers (which may hold pre-sanitize pixels) are overwritten before deletion.
         Reindex();
-        AtomicFile.CleanupTemporaryFiles(Root);
+        CleanupTemporaryFiles();
         IsIndexed = true;
         Indexed?.Invoke(this, EventArgs.Empty);
     }
@@ -127,7 +166,11 @@ public sealed partial class CaptureLibrary
         }
     }
 
-    /// <summary>Re-reads every capture folder (used at start-up and after restore/import).</summary>
+    /// <summary>
+    /// Re-reads every capture folder (used at start-up, after restore/import, and to pick up changes made by another
+    /// process). Clean-up and recovery of each folder happen inside the write gate, so they never touch a commit that
+    /// is in progress in this or another process.
+    /// </summary>
     public void Reindex()
     {
         var found = new Dictionary<Guid, CaptureRecord>();
@@ -136,26 +179,40 @@ public sealed partial class CaptureLibrary
             string name = Path.GetFileName(dir);
             if (name.StartsWith(CreatingPrefix, StringComparison.Ordinal))
             {
-                // A capture whose creation never reached its commit point (the folder rename).
+                // A capture whose creation never reached its commit point (the folder rename). Only inside the gate
+                // is it certain that no process is still building it; it may also have been published meanwhile.
                 if (!_inspectOnly)
                 {
-                    lock (_writeLock)
+                    using (EnterWrite())
                     {
-                        SecureDeleteDirectory(dir);
+                        if (Directory.Exists(dir))
+                        {
+                            SecureDeleteDirectory(dir);
+                        }
                     }
                 }
             }
-            else if (Guid.TryParse(name, out Guid id) && File.Exists(Path.Combine(dir, CaptureFormat.ManifestFile)))
+            else if (Guid.TryParse(name, out Guid id))
             {
-                if (!_inspectOnly)
+                if (_inspectOnly)
                 {
-                    lock (_writeLock)
+                    if (File.Exists(Path.Combine(dir, CaptureFormat.ManifestFile)))
                     {
-                        RecoverCaptureFolder(dir);
+                        found[id] = ReadRecord(id, dir);
                     }
+
+                    continue;
                 }
 
-                found[id] = ReadRecord(id, dir);
+                using (EnterWrite())
+                {
+                    // Checked inside the gate: another process may have deleted or be committing it.
+                    if (File.Exists(Path.Combine(dir, CaptureFormat.ManifestFile)))
+                    {
+                        RecoverCaptureFolder(dir);
+                        found[id] = ReadRecord(id, dir);
+                    }
+                }
             }
         }
 
@@ -188,7 +245,7 @@ public sealed partial class CaptureLibrary
     {
         ArgumentNullException.ThrowIfNull(content);
         Guid id = Guid.NewGuid();
-        lock (_writeLock)
+        using (EnterWrite())
         {
             // Built complete in a staging folder, then published by one rename (the commit point); a crash before
             // the rename leaves a ".creating-" folder that the next open securely deletes.
@@ -198,6 +255,7 @@ public sealed partial class CaptureLibrary
             WriteMeta(staging, meta);
             bool reversible = content.Annotations.OfType<RedactionMaskAnnotation>().Any();
             CommitGeneration(staging, id, previous: null, content.BaseImage, content.Annotations, flattened, createdUtc, sanitizedUtc: null, reversible);
+            CreateCommitHook.Value?.Invoke(staging);
             MoveDirectory(staging, CaptureFolder(id));
             DurabilityFaults.Checkpoint("capture.create.published");
         }
@@ -216,7 +274,7 @@ public sealed partial class CaptureLibrary
         RequireImage(id);
         ArgumentNullException.ThrowIfNull(annotations);
         ArgumentNullException.ThrowIfNull(flattened);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             string dir = ExistingFolder(id);
             CaptureManifest previous = CaptureManifest.Read(dir);
@@ -248,7 +306,7 @@ public sealed partial class CaptureLibrary
         ArgumentNullException.ThrowIfNull(sanitizedBase);
         ArgumentNullException.ThrowIfNull(annotations);
         ArgumentNullException.ThrowIfNull(flattened);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             string dir = ExistingFolder(id);
             CaptureManifest previous = CaptureManifest.Read(dir);
@@ -348,9 +406,14 @@ public sealed partial class CaptureLibrary
     public CaptureRecord UpdateMetadata(Guid id, Func<CaptureMetadata, CaptureMetadata> update)
     {
         ArgumentNullException.ThrowIfNull(update);
-        string dir = ExistingFolder(id);
-        CaptureMetadata meta = update(ReadMeta(dir));
-        WriteMeta(dir, meta with { Tags = NormalizeTags(meta.Tags), Folder = meta.Folder.Trim(), Title = meta.Title.Trim() });
+        using (EnterWrite())
+        {
+            // Read-modify-write inside the gate, so a change made by another process at the same time is not lost.
+            string dir = ExistingFolder(id);
+            CaptureMetadata meta = update(ReadMeta(dir));
+            WriteMeta(dir, meta with { Tags = NormalizeTags(meta.Tags), Folder = meta.Folder.Trim(), Title = meta.Title.Trim() });
+        }
+
         return Refresh(id);
     }
 
@@ -395,7 +458,7 @@ public sealed partial class CaptureLibrary
         Guid[] list = ids.ToArray();
         foreach (Guid id in list)
         {
-            lock (_writeLock)
+            using (EnterWrite())
             {
                 SecureDeleteDirectory(FolderOf(id));
             }
@@ -479,16 +542,21 @@ public sealed partial class CaptureLibrary
     public CaptureRecord ImportPackage(string packagePath)
     {
         string staging = Path.Combine(Root, $".import-{Guid.NewGuid():N}");
-        try
+
+        // Inside the gate: opening the library in another process removes the ".import-" folders it finds.
+        using (EnterWrite())
         {
-            CaptureFormat.ExtractPackage(packagePath, staging);
-            return AdoptStagedCapture(staging, keepIdIfFree: false);
-        }
-        finally
-        {
-            if (Directory.Exists(staging))
+            try
             {
-                Directory.Delete(staging, recursive: true);
+                CaptureFormat.ExtractPackage(packagePath, staging);
+                return AdoptStagedCapture(staging, keepIdIfFree: false);
+            }
+            finally
+            {
+                if (Directory.Exists(staging))
+                {
+                    Directory.Delete(staging, recursive: true);
+                }
             }
         }
     }
@@ -511,7 +579,7 @@ public sealed partial class CaptureLibrary
         PixelCodec.Decode(CaptureFormat.ReadVerified(staging, manifest.Base));
         CaptureFormat.DeserializeAnnotations(CaptureFormat.ReadVerified(staging, manifest.Annotations));
 
-        lock (_writeLock)
+        using (EnterWrite())
         {
             MoveDirectory(staging, CaptureFolder(id));
         }
@@ -597,6 +665,11 @@ public sealed partial class CaptureLibrary
             string name = Path.GetFileName(file);
             if (!keep.Contains(name) && CaptureManifest.IsContentFileName(name))
             {
+                if (name.EndsWith(AtomicFile.TempSuffix, StringComparison.OrdinalIgnoreCase) && AtomicFile.IsOpenElsewhere(file))
+                {
+                    continue; // still being written by someone: never pulled from under a writer (removed on a later open)
+                }
+
                 AtomicFile.OverwriteAndDelete(file);
                 removed++;
             }
@@ -695,15 +768,111 @@ public sealed partial class CaptureLibrary
 
     private CaptureRecord Refresh(Guid id)
     {
-        string folder = FolderOf(id);
-        CaptureRecord record = IsVideoFolder(folder) ? ReadVideoRecord(id, folder) : ReadRecord(id, folder);
-        lock (_gate)
+        CaptureRecord record;
+        using (EnterWrite())
         {
-            _records[id] = record;
+            string folder = FolderOf(id);
+            record = IsVideoFolder(folder) ? ReadVideoRecord(id, folder) : ReadRecord(id, folder);
+            lock (_gate)
+            {
+                _records[id] = record;
+            }
         }
 
         RaiseChanged([id]);
         return record;
+    }
+
+    /// <summary>
+    /// Re-reads one item from disk, for changes made by another process sharing this library (or by any program):
+    /// updates its record, adds it if it is new, or removes it if its folder (or manifest) is gone, then raises
+    /// <see cref="Changed"/>. Returns the current record, or null if the item no longer exists. Never cleans up or
+    /// recovers anything; reads inside the write gate, so it never sees a commit half-done. Cheap (one folder).
+    /// </summary>
+    public CaptureRecord? RefreshFromDisk(Guid id)
+    {
+        CaptureRecord? record = null;
+        bool known;
+        using (EnterWrite())
+        {
+            string video = VideoFolder(id);
+            string capture = CaptureFolder(id);
+            if (File.Exists(Path.Combine(video, VideoManifestFile)))
+            {
+                record = ReadVideoRecord(id, video);
+            }
+            else if (File.Exists(Path.Combine(capture, CaptureFormat.ManifestFile)))
+            {
+                record = ReadRecord(id, capture);
+            }
+
+            lock (_gate)
+            {
+                known = _records.ContainsKey(id);
+                if (record is null)
+                {
+                    _records.Remove(id);
+                }
+                else
+                {
+                    _records[id] = record;
+                }
+            }
+        }
+
+        if (record is not null || known)
+        {
+            RaiseChanged([id]);
+        }
+
+        return record;
+    }
+
+    /// <summary>Enters the write gate (see the class remarks); dispose on the same thread, never across an await.</summary>
+    private LibraryWriteGate.Scope EnterWrite() => _writeGate.Enter();
+
+    /// <summary>
+    /// Removes temporary files of interrupted writes (<see cref="AtomicFile.TempSuffix"/>) under the root, inside the
+    /// write gate. A file that any handle still has open is never removed. Under <see cref="CapturesDirectory"/> and in
+    /// completed video folders every write happens inside the gate, so while this holds the gate a closed temporary
+    /// file there is a leftover; anywhere else (the root, an in-progress recording's folder, unknown folders) only
+    /// files older than <see cref="TemporaryFileSafeAge"/> are removed. Returns the number removed.
+    /// </summary>
+    internal int CleanupTemporaryFiles()
+    {
+        int count = 0;
+        using (EnterWrite())
+        {
+            if (!Directory.Exists(Root))
+            {
+                return 0;
+            }
+
+            DateTime cutoff = DateTime.UtcNow - TemporaryFileSafeAge;
+            foreach (string file in Directory.EnumerateFiles(Root, "*" + AtomicFile.TempSuffix, SearchOption.AllDirectories))
+            {
+                try
+                {
+                    bool gated = IsUnder(file, CapturesDirectory) || IsInCompletedVideoFolder(file);
+                    if ((gated || File.GetLastWriteTimeUtc(file) < cutoff) && !AtomicFile.IsOpenElsewhere(file) && AtomicFile.TryDeleteFile(file))
+                    {
+                        count++;
+                    }
+                }
+                catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+                {
+                    // Best effort: the next open tries again.
+                }
+            }
+        }
+
+        return count;
+    }
+
+    private bool IsInCompletedVideoFolder(string file)
+    {
+        string? dir = Path.GetDirectoryName(file);
+        return dir is not null && IsVideoFolder(dir) && File.Exists(Path.Combine(dir, VideoManifestFile)) && !File.Exists(Path.Combine(dir, InProgressMarker));
     }
 
     private static CaptureRecord ReadRecord(Guid id, string dir)
