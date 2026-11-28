@@ -15,14 +15,12 @@ namespace SnapForge.App;
 public partial class App : Application
 #pragma warning restore CA1001
 {
-    private const string InstanceName = "SnapForge-SingleInstance-7c1d";
-
     /// <summary>Single-instance key: one SnapForge per Windows session and data profile.</summary>
     // Published by the running copy and read by a second launch: one name for both (a mismatch made every second
     // launch of a --profile copy look like a pre-milestone-3 build and wait on a message box; CI run 111).
     private static string InstanceInfoName => $@"Local\{InstanceKey}-info";
 
-    private static string InstanceKey => ProductInfo.Profile is null ? InstanceName : $"{InstanceName}-p-{ProductInfo.Profile}";
+    private static string InstanceKey => Handoff.InstanceKey(Role);
 
     /// <summary>Removes <c>--profile &lt;name&gt;</c> from the arguments and selects that (or SNAPFORGE_PROFILE's) profile.</summary>
     internal static string[] ApplyProfile(string[] raw)
@@ -148,6 +146,15 @@ public partial class App : Application
         Interop.RunningMarker.Hold(); // lets the system-wide (un)installer see SnapForge running in any session
         _activateSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceKey}-activate");
         _exitSignal = new EventWaitHandle(false, EventResetMode.AutoReset, $@"Local\{InstanceKey}-exit");
+        if (!first && Role == AppRole.Editor)
+        {
+            // A second launch of SnapForge Editor: leave the request (or "show yourself") for the running Editor.
+            Handoff.Write(AppRole.Editor, Handoff.FromArguments(args) ?? new HandoffRequest(Handoff.ShowEditor));
+            Handoff.Signal(AppRole.Editor);
+            Shutdown(0);
+            return;
+        }
+
         if (!first && !TakeOverFromRunningInstance())
         {
             Shutdown(0);
@@ -155,7 +162,7 @@ public partial class App : Application
         }
 
         _instanceInfo = InstanceInfo.Publish(InstanceInfoName, InstanceInfo.Current());
-        ThreadPool.RegisterWaitForSingleObject(_activateSignal, (_, _) => Dispatcher.BeginInvoke(ShowPrimaryWindow), null, Timeout.Infinite, executeOnlyOnce: false);
+        ThreadPool.RegisterWaitForSingleObject(_activateSignal, (_, _) => Dispatcher.BeginInvoke(OnActivated), null, Timeout.Infinite, executeOnlyOnce: false);
         ThreadPool.RegisterWaitForSingleObject(_exitSignal, (_, _) => Dispatcher.BeginInvoke(() => _ = ExitAsync()), null, Timeout.Infinite, executeOnlyOnce: false);
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 
@@ -175,17 +182,23 @@ public partial class App : Application
         ReportSettingsLoad(services, startedHidden);
         services.SettingsSaveFailed += (_, message) => Current.Dispatcher.BeginInvoke(() => ReportSettingsSaveFailure(message));
         ThemeManager.Apply(services.Settings.Theme);
+        // RC3: the other SnapForge program may change settings.json; pick that up (hotkeys, QuickDock, theme…).
+        services.WatchSettings(() => Dispatcher.BeginInvoke(() => services.ReloadSettingsFromDisk()));
 
         // Leftover drag-and-drop copies from a previous session (e.g. after a crash) are removed in the background.
         _ = Task.Run(CaptureDragDrop.Sweep);
 
-        // FA-001 / SF-003: the Editor/Library shell is created (it owns the capture tray and autosave) but is shown
-        // only when the user asks for it. Windows startup (--background) shows the notification-area icon and, if
-        // enabled, the QuickDock only. A normal launch shows ONE compact window: the capture panel (or the Editor
-        // if the user chose that in Settings), or on the very first launch the welcome window instead.
-        var window = new MainWindow(services);
-        MainWindow = window;
-        window.RestoreToolSettings();
+        if (Role == AppRole.Editor)
+        {
+            // SnapForge Editor: its window only — no notification-area icon, hotkeys, QuickDock or recording.
+            StartEditor(services, args);
+            return;
+        }
+
+        // SnapForge Capture (RC3): no Editor window in this process — captures are handed to SnapForge Editor.
+        // FA-001 / SF-003: Windows startup (--background) shows the notification-area icon and, if enabled, the
+        // QuickDock only. A normal launch shows ONE compact window: the capture panel, or on the very first launch
+        // the welcome window instead.
         bool background = args.Contains(StartupRegistration.BackgroundArgument);
         StartedInBackground = background;
 
@@ -220,7 +233,7 @@ public partial class App : Application
         if (!services.Settings.PrivacyNoticeShown)
         {
             // First launch: the welcome window is the only window; it offers to open the capture panel.
-            window.Dispatcher.BeginInvoke(() =>
+            Dispatcher.BeginInvoke(() =>
             {
                 services.UpdateSettings(s => s with { PrivacyNoticeShown = true });
                 ShowWelcome(null, afterClose: ShowPrimaryWindow);
@@ -338,7 +351,7 @@ public partial class App : Application
     {
         if (AppServices.Current is { } services && !services.Settings.ShowCaptureWindowOnStart)
         {
-            MainShell?.BringToFront();
+            OpenInEditor(new HandoffRequest(Handoff.ShowEditor));
             return;
         }
 
@@ -476,8 +489,14 @@ public partial class App : Application
     /// </summary>
     internal static async Task CaptureScrollingAsync()
     {
+        if (Role == AppRole.Editor)
+        {
+            AskCapture(new HandoffRequest(Handoff.Capture, Mode: Handoff.ScrollingMode));
+            return;
+        }
+
         MainWindow? main = MainShell;
-        if (main is null || CaptureController.IsBusy || AppServices.Current is not { } services)
+        if (CaptureController.IsBusy || AppServices.Current is not { } services)
         {
             return;
         }
@@ -485,7 +504,7 @@ public partial class App : Application
         CaptureResult? first = await CaptureController.CaptureAsync(services.Settings.Capture with { Mode = Core.Capture.CaptureMode.Region, DelaySeconds = 0, CaptureCursor = false }).ConfigureAwait(true);
         if (first is null || CaptureController.LastSelection is not { } region)
         {
-            main.SetStatus("Scrolling capture cancelled.");
+            main?.SetStatus("Scrolling capture cancelled.");
             return;
         }
 
@@ -503,11 +522,18 @@ public partial class App : Application
 
         if (image is null)
         {
-            main.SetStatus("Scrolling capture cancelled.");
+            main?.SetStatus("Scrolling capture cancelled.");
             return;
         }
 
-        main.AcceptCapture(image, DateTime.Now, services.Settings.Capture with { PreviewInEditor = true, CopyToClipboard = false });
+        CaptureOptions options = services.Settings.Capture with { PreviewInEditor = true, CopyToClipboard = false };
+        if (main is null)
+        {
+            await AcceptCaptureInCaptureProgramAsync(services, image, DateTime.Now, options).ConfigureAwait(true);
+            return;
+        }
+
+        main.AcceptCapture(image, DateTime.Now, options);
         main.ShowEditorWorkspace();
         main.Activate();
         main.SetStatus($"Scrolling capture: {image.Width} × {image.Height}. Check it for gaps or repeats before sharing.");
@@ -516,9 +542,16 @@ public partial class App : Application
     /// <summary>Captures the same screen rectangle as the last capture, with the same options (no selection step).</summary>
     internal static Task RepeatLastCaptureAsync()
     {
+        if (Role == AppRole.Editor)
+        {
+            AskCapture(new HandoffRequest(Handoff.Capture, Mode: Handoff.RepeatMode));
+            return Task.CompletedTask;
+        }
+
         if (CaptureController.LastSelection is not { } region || CaptureController.LastOptions is not { } options)
         {
             MainShell?.SetStatus("Nothing to repeat yet — take a capture first.");
+            NotifyBalloon(ProgramName, "Nothing to repeat yet — take a capture first.");
             return Task.CompletedTask;
         }
 
@@ -527,13 +560,20 @@ public partial class App : Application
 
     internal static async Task CaptureWithOptionsAsync(CaptureOptions options, Core.Geometry.PixelRect? fixedRegion = null)
     {
+        if (Role == AppRole.Editor)
+        {
+            // Capturing belongs to SnapForge Capture: ask it (it saves the capture and hands it back to the Editor).
+            AskCapture(new HandoffRequest(Handoff.Capture, Mode: options.Mode.ToString()));
+            return;
+        }
+
         MainWindow? main = MainShell;
-        if (main is null || CaptureController.IsBusy)
+        if (CaptureController.IsBusy || AppServices.Current is not { } services)
         {
             return;
         }
 
-        bool mainWasVisible = main.IsVisible;
+        bool mainWasVisible = main?.IsVisible == true;
         CaptureResult? result;
         try
         {
@@ -549,7 +589,14 @@ public partial class App : Application
 
         if (result is null)
         {
-            main.SetStatus("Capture cancelled.");
+            main?.SetStatus("Capture cancelled.");
+            return;
+        }
+
+        if (main is null)
+        {
+            // SnapForge Capture: save, then hand the capture to SnapForge Editor (RC3).
+            await AcceptCaptureInCaptureProgramAsync(services, result.Image, result.CapturedAt, options).ConfigureAwait(true);
             return;
         }
 
@@ -670,6 +717,12 @@ public partial class App : Application
 
     internal static void ShowCaptureWindow()
     {
+        if (Role == AppRole.Editor)
+        {
+            AskCapture(new HandoffRequest(Handoff.CapturePanel));
+            return;
+        }
+
         if (AppServices.Current is not { } services)
         {
             return;
@@ -845,11 +898,11 @@ public partial class App : Application
             Add("_Hide QuickDock", () => AppServices.Current?.UpdateSettings(s => s with { Widget = s.Widget with { Enabled = false } }));
         }
         menu.Items.Add(new Separator());
-        Add("Open _Editor", () => { MainShell?.BringToFront(); MainShell?.ShowEditorWorkspace(); });
-        Add("Open _Library", () => { MainShell?.BringToFront(); MainShell?.ShowLibraryWorkspace(); });
+        Add("Open SnapForge _Editor", () => OpenInEditor(new HandoffRequest(Handoff.ShowEditor)));
+        Add("Open _Library", () => OpenInEditor(new HandoffRequest(Handoff.ShowLibrary)));
         Add("_Settings…", () => ShowSettings(null));
         menu.Items.Add(new Separator());
-        Add("E_xit SnapForge", () => _ = ExitAsync());
+        Add("E_xit SnapForge Capture", () => _ = ExitAsync());
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
         menu.IsOpen = true;
     }

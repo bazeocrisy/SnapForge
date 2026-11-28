@@ -63,7 +63,7 @@ public partial class MainWindow : Window
         _suppressUiEvents = true;
         InitializeComponent();
         _suppressUiEvents = false;
-        Title = ProductInfo.Name;
+        Title = App.EditorTitle;
         TrayItems.ItemsSource = _trayTiles;
         _autosaveTimer = new DispatcherTimer { Interval = TimeSpan.FromMilliseconds(1200) };
         _autosaveTimer.Tick += async (_, _) =>
@@ -1168,7 +1168,7 @@ public partial class MainWindow : Window
             ImageInfo.Text = $"{doc!.Image.Width} × {doc.Image.Height} px";
         }
 
-        Title = _current is null ? ProductInfo.Name : $"{_current.Title} – {ProductInfo.Name}";
+        Title = _current is null ? App.EditorTitle : $"{_current.Title} – {App.EditorTitle}";
         UpdateToolProperties();
         UpdateSaveState();
     }
@@ -1848,9 +1848,11 @@ public partial class MainWindow : Window
 
     private void OnShortcuts(object sender, RoutedEventArgs e) => ShowShortcuts(this);
 
-    internal void ShowShortcuts(Window owner) => MessageBox.Show(owner,
+    internal void ShowShortcuts(Window owner) => ShowShortcuts(owner, _services);
+
+    internal static void ShowShortcuts(Window owner, AppServices services) => MessageBox.Show(owner,
         "Capture: Ctrl+N (current settings) · Ctrl+1 Region · Ctrl+2 Window · Ctrl+3 Display · Ctrl+4 Full screen\n" +
-        $"Global capture hotkey: {_services.Settings.CaptureHotkey?.ToString() ?? "none"} (Settings → Hotkeys)\n\n" +
+        $"Global capture hotkey: {services.Settings.CaptureHotkey?.ToString() ?? "none"} (Settings → Hotkeys)\n\n" +
         "Workspaces: Ctrl+E Editor · Ctrl+L Library · Ctrl+, Settings\n\n" +
         "Tools: V Select · A Arrow · L Line · R Rectangle · E Ellipse · H Highlight · T Text · N Step · X Redact · C Crop\n" +
         "Edit: Ctrl+Z Undo · Ctrl+Y Redo · Del Delete · Esc Cancel\n" +

@@ -496,17 +496,9 @@ public partial class CaptureWindow : Window
         }
     }
 
-    private void OnOpenEditor(object sender, RoutedEventArgs e)
-    {
-        App.MainShell?.BringToFront();
-        App.MainShell?.ShowEditorWorkspace();
-    }
+    private void OnOpenEditor(object sender, RoutedEventArgs e) => App.OpenInEditor(new HandoffRequest(Handoff.ShowEditor));
 
-    private void OnOpenLibrary(object sender, RoutedEventArgs e)
-    {
-        App.MainShell?.BringToFront();
-        App.MainShell?.ShowLibraryWorkspace();
-    }
+    private void OnOpenLibrary(object sender, RoutedEventArgs e) => App.OpenInEditor(new HandoffRequest(Handoff.ShowLibrary));
 
     private void OnSettings(object sender, RoutedEventArgs e) => App.ShowSettings(this);
 
@@ -524,7 +516,7 @@ public partial class CaptureWindow : Window
     private void OnToggleTopmost(object sender, RoutedEventArgs e) =>
         _services.UpdateSettings(s => s with { CapturePanelTopmost = TopmostMenu.IsChecked });
 
-    private void OnShortcuts(object sender, RoutedEventArgs e) => App.MainShell?.ShowShortcuts(this);
+    private void OnShortcuts(object sender, RoutedEventArgs e) => MainWindow.ShowShortcuts(this, _services);
 
     private void OnPrivacy(object sender, RoutedEventArgs e) => App.ShowPrivacyNotice(this);
 

@@ -520,17 +520,9 @@ public partial class CaptureWidget : Window
         }
     }
 
-    private void OnEditor(object sender, RoutedEventArgs e) => Run(EditorButton, () =>
-    {
-        App.MainShell?.BringToFront();
-        App.MainShell?.ShowEditorWorkspace();
-    });
+    private void OnEditor(object sender, RoutedEventArgs e) => Run(EditorButton, () => App.OpenInEditor(new HandoffRequest(Handoff.ShowEditor)));
 
-    private void OnLibrary(object sender, RoutedEventArgs e) => Run(LibraryButton, () =>
-    {
-        App.MainShell?.BringToFront();
-        App.MainShell?.ShowLibraryWorkspace();
-    });
+    private void OnLibrary(object sender, RoutedEventArgs e) => Run(LibraryButton, () => App.OpenInEditor(new HandoffRequest(Handoff.ShowLibrary)));
 
     private void OnSettings(object sender, RoutedEventArgs e) => Run(SettingsButton, () => App.ShowSettings(null));
 

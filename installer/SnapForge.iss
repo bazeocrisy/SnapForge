@@ -1,5 +1,5 @@
-; SnapForge installer (Inno Setup 6). Built by CI from the same files as the portable ZIP:
-;   iscc /DAppVersion=1.0.0-rc.2 /DFileVersion=1.0.0.123 /DSourceDir=..\artifacts\portable\SnapForge /DOutputDir=..\artifacts\installer installer\SnapForge.iss
+; SnapForge installer (Inno Setup 6). Built by CI from the published folder holding both programs:
+;   iscc /DAppVersion=1.0.0-rc.3 /DFileVersion=1.0.0.123 /DSourceDir=..\artifacts\portable\SnapForge /DOutputDir=..\artifacts\installer installer\SnapForge.iss
 ;
 ; Design decisions (FA-002 / SF-002; see docs/INSTALLATION.md):
 ; * System-wide install for all users into the native 64-bit Program Files folder ({autopf} in 64-bit admin mode =
@@ -18,6 +18,14 @@
 ; * A running SnapForge in this session (Local\ mutex) or any other session (Global\ mutex) must be exited first. Setup
 ;   never kills it: it could be recording.
 ; * Upgrades install over the previous version (same AppId); repair = run the same setup again.
+; * RC3: two programs — SnapForge Capture (SnapForge.exe: QuickDock, notification-area icon, hotkeys, capture,
+;   recording; the only one that can start with Windows) and SnapForge Editor (SnapForgeEditor.exe: editing, playback,
+;   Library). Two Start menu shortcuts. The single "SnapForge" shortcut of 1.0.0-rc.2 is removed on upgrade. The
+;   executable of SnapForge Capture keeps its name and folder, so a "start with Windows" entry made by rc.2 keeps
+;   working and no second entry is created.
+; * Interrupted setup: Inno Setup rolls back the files it added when setup fails or is cancelled; if setup is killed
+;   or the PC loses power while files are being replaced, run the same setup again — it repairs the installation.
+;   User data is never touched by setup, so there is nothing of the user's to roll back.
 
 #ifndef AppVersion
   #define AppVersion "0.0.0-dev"
@@ -56,7 +64,7 @@ PrivilegesRequiredOverridesAllowed=
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.26100
-AppMutex=Local\SnapForge-SingleInstance-7c1d,Global\SnapForge-Running-7c1d
+AppMutex=Local\SnapForge-SingleInstance-7c1d,Local\SnapForge-Editor-SingleInstance-7c1d,Global\SnapForge-Running-7c1d
 CloseApplications=no
 RestartApplications=no
 LicenseFile={#SourceDir}\LICENSE.txt
@@ -74,22 +82,29 @@ SetupLogging=yes
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
 [Messages]
-SetupAppRunningError=SnapForge is running — in your session or in another user's session on this PC. Every user must exit it first: right-click the SnapForge icon in the notification area (next to the clock) and choose Exit SnapForge. If it is recording, stop the recording first. Setup never closes SnapForge by force.%n%nClick OK to check again, or Cancel to exit Setup.
-UninstallAppRunningError=SnapForge is running — in your session or in another user's session on this PC. Every user must exit it first (notification-area icon → Exit SnapForge).%n%nClick OK to check again, or Cancel to exit.
+SetupAppRunningError=SnapForge is running — in your session or in another user's session on this PC.%n%nIf it is recording, stop the recording first so it is saved. Then close SnapForge Editor and exit SnapForge Capture (right-click the SnapForge icon in the notification area next to the clock → Exit). Older versions are called just "SnapForge" and exit the same way. Every user on this PC must do this. Setup never closes SnapForge by force.%n%nClick OK to check again, or Cancel to exit Setup.
+UninstallAppRunningError=SnapForge is running — in your session or in another user's session on this PC. Stop any recording, close SnapForge Editor and exit SnapForge Capture (notification-area icon → Exit) first.%n%nClick OK to check again, or Cancel to exit.
 
 [Tasks]
-Name: "desktopicon"; Description: "Create a &desktop shortcut for all users"; GroupDescription: "Shortcuts:"; Flags: unchecked
+Name: "desktopicon"; Description: "Create &desktop shortcuts for all users"; GroupDescription: "Shortcuts:"; Flags: unchecked
+
+[InstallDelete]
+; The single all-users shortcut of 1.0.0-rc.2 (replaced by "SnapForge Capture" and "SnapForge Editor").
+Type: files; Name: "{autoprograms}\SnapForge.lnk"
+Type: files; Name: "{autodesktop}\SnapForge.lnk"
 
 [Files]
 Source: "{#SourceDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
-Name: "{autoprograms}\SnapForge"; Filename: "{app}\SnapForge.exe"; Comment: "Capture. Create. Share."
-Name: "{autodesktop}\SnapForge"; Filename: "{app}\SnapForge.exe"; Tasks: desktopicon; Comment: "Capture. Create. Share."
+Name: "{autoprograms}\SnapForge Capture"; Filename: "{app}\SnapForge.exe"; Comment: "Capture the screen and record — QuickDock, hotkeys and recording"
+Name: "{autoprograms}\SnapForge Editor"; Filename: "{app}\SnapForgeEditor.exe"; Comment: "Edit, play and organise your captures"
+Name: "{autodesktop}\SnapForge Capture"; Filename: "{app}\SnapForge.exe"; Tasks: desktopicon; Comment: "Capture the screen and record"
+Name: "{autodesktop}\SnapForge Editor"; Filename: "{app}\SnapForgeEditor.exe"; Tasks: desktopicon; Comment: "Edit, play and organise your captures"
 
 [Run]
 ; Started as the user who ran Setup (not as the administrator who approved it), and only when Setup is interactive.
-Filename: "{app}\SnapForge.exe"; Description: "Start SnapForge now"; Flags: nowait postinstall skipifsilent runasoriginaluser unchecked
+Filename: "{app}\SnapForge.exe"; Description: "Start SnapForge Capture now"; Flags: nowait postinstall skipifsilent runasoriginaluser unchecked
 
 [Code]
 function InitializeSetup(): Boolean;

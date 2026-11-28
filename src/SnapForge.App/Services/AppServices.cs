@@ -16,6 +16,7 @@ internal sealed class AppServices : IDisposable
         Settings = settings;
         SettingsLoad = load;
         SettingsReadOnly = load?.IsReadOnly ?? false;
+        _settingsStamp = StampOf(settingsPath);
         Library = library;
 
         // Before the first index finishes, only check that the capture folder exists; deleted/trashed items are
@@ -86,10 +87,140 @@ internal sealed class AppServices : IDisposable
     /// </summary>
     public bool UpdateSettings(Func<AppSettings, AppSettings> update)
     {
-        Settings = update(Settings);
-        bool saved = TrySaveSettings(Settings);
+        bool saved;
+        using (SettingsGate())
+        {
+            // RC3: SnapForge Capture and SnapForge Editor share settings.json. Re-read it first if the other program
+            // changed it, so this change is applied on top of theirs instead of overwriting it.
+            ReloadSettingsFromDisk(raiseChanged: false);
+            Settings = update(Settings);
+            saved = TrySaveSettings(Settings);
+        }
+
         SettingsChanged?.Invoke(this, EventArgs.Empty);
         return saved;
+    }
+
+    private (DateTime Written, long Length) _settingsStamp = (DateTime.MinValue, -1);
+
+    private static (DateTime, long) StampOf(string path)
+    {
+        try
+        {
+            var info = new FileInfo(path);
+            return info.Exists ? (info.LastWriteTimeUtc, info.Length) : (DateTime.MinValue, -1);
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            return (DateTime.MinValue, -1);
+        }
+    }
+
+    /// <summary>A named mutex per settings file, so the two SnapForge programs never interleave read-modify-write.</summary>
+    private GateRelease SettingsGate()
+    {
+        string name = "Local\\SnapForge-Settings-" + Convert.ToHexString(System.Security.Cryptography.SHA256.HashData(System.Text.Encoding.UTF8.GetBytes(Path.GetFullPath(SettingsPath).ToUpperInvariant())))[..32];
+        var mutex = new Mutex(false, name);
+        try
+        {
+            if (!mutex.WaitOne(TimeSpan.FromSeconds(10)))
+            {
+                mutex.Dispose();
+                return new GateRelease(null); // the other program is stuck: save anyway rather than lose the change
+            }
+        }
+        catch (AbandonedMutexException)
+        {
+            // The other program ended while saving; the file itself is written atomically.
+        }
+
+        return new GateRelease(mutex);
+    }
+
+    private sealed class GateRelease(Mutex? mutex) : IDisposable
+    {
+        public void Dispose()
+        {
+            if (mutex is not null)
+            {
+                mutex.ReleaseMutex();
+                mutex.Dispose();
+            }
+        }
+    }
+
+    /// <summary>
+    /// Re-reads settings.json when another SnapForge program changed it since this one last read or wrote it. Returns
+    /// true when the settings changed. Never reads in read-only mode (FA-019). When the Library location changed, the
+    /// Library is reopened at the new location (<see cref="LibraryReplaced"/>).
+    /// </summary>
+    public bool ReloadSettingsFromDisk(bool raiseChanged = true)
+    {
+        if (SettingsReadOnly)
+        {
+            return false;
+        }
+
+        (DateTime, long) stamp = StampOf(SettingsPath);
+        if (stamp == _settingsStamp || stamp.Item2 < 0)
+        {
+            return false;
+        }
+
+        SettingsLoadResult load = AppSettings.LoadWithStatus(SettingsPath);
+        if (load.Status != SettingsLoadStatus.Loaded)
+        {
+            return false;
+        }
+
+        _settingsStamp = stamp;
+        string oldRoot = Library.Root;
+        Settings = load.Settings;
+        string newRoot = Path.GetFullPath(Settings.EffectiveLibraryPath);
+        if (!string.Equals(newRoot, oldRoot, StringComparison.OrdinalIgnoreCase) && Directory.Exists(newRoot))
+        {
+            CaptureLibrary moved = CaptureLibrary.OpenDeferred(newRoot);
+            Library = moved;
+            Tray = RecentTray.Open(moved.Root, id => moved.IsIndexed ? moved.Find(id) is { IsDeleted: false } : moved.ExistsOnDisk(id));
+            Thumbnails.Clear();
+            _ = StartIndexingAsync();
+            LibraryReplaced?.Invoke(this, EventArgs.Empty);
+        }
+
+        if (raiseChanged)
+        {
+            SettingsChanged?.Invoke(this, EventArgs.Empty);
+        }
+
+        return true;
+    }
+
+    private FileSystemWatcher? _settingsWatcher;
+    private Timer? _settingsDebounce;
+
+    /// <summary>
+    /// Watches settings.json for changes made by the other SnapForge program and calls <paramref name="changed"/>
+    /// (on a thread-pool thread, debounced) — the caller marshals to the UI thread and calls
+    /// <see cref="ReloadSettingsFromDisk"/>.
+    /// </summary>
+    public void WatchSettings(Action changed)
+    {
+        string? dir = Path.GetDirectoryName(Path.GetFullPath(SettingsPath));
+        if (dir is null || !Directory.Exists(dir))
+        {
+            return;
+        }
+
+        _settingsDebounce = new Timer(_ => changed(), null, Timeout.Infinite, Timeout.Infinite);
+        _settingsWatcher = new FileSystemWatcher(dir, Path.GetFileName(SettingsPath))
+        {
+            NotifyFilter = NotifyFilters.LastWrite | NotifyFilters.FileName | NotifyFilters.Size,
+        };
+        void Kick(object? sender, FileSystemEventArgs e) => _settingsDebounce?.Change(300, Timeout.Infinite);
+        _settingsWatcher.Changed += Kick;
+        _settingsWatcher.Created += Kick;
+        _settingsWatcher.Renamed += (o, e) => Kick(o, e);
+        _settingsWatcher.EnableRaisingEvents = true;
     }
 
     private bool TrySaveSettings(AppSettings settings)
@@ -103,6 +234,7 @@ internal sealed class AppServices : IDisposable
         SettingsSaveResult result = settings.TrySave(SettingsPath);
         if (result.Succeeded)
         {
+            _settingsStamp = StampOf(SettingsPath); // our own write: not a change by the other program
             LastSettingsSaveError = null;
             return true;
         }
@@ -163,7 +295,12 @@ internal sealed class AppServices : IDisposable
         return new LibraryRelocationOutcome(copy, cleanup, null);
     }
 
-    public void Dispose() => Writer.Dispose();
+    public void Dispose()
+    {
+        _settingsWatcher?.Dispose();
+        _settingsDebounce?.Dispose();
+        Writer.Dispose();
+    }
 
     /// <summary>
     /// Indexes the library on the background writer (later saves queue behind it, so nothing races the index),

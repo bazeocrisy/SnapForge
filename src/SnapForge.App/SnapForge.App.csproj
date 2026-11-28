@@ -21,6 +21,7 @@
 
   <ItemGroup>
     <Resource Include="Assets\SnapForge.ico" />
+    <Resource Include="Assets\SnapForgeEditor.ico" />
   </ItemGroup>
 
   <ItemGroup>
