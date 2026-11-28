@@ -216,9 +216,11 @@ internal sealed class StudioWindow : Window
         };
         Loaded += (_, _) =>
         {
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
             LoadCameras();
             UpdateMode();
             UpdateMicrophone(v.RecordMicrophone);
+            LoadedWorkMs = System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds;
         };
         StateChanged += (_, _) =>
         {
@@ -246,6 +248,12 @@ internal sealed class StudioWindow : Window
 
     /// <summary>False only for the documentation screenshot tour (so the window can be photographed).</summary>
     internal bool ExcludeFromCapture { get; init; } = true;
+
+    /// <summary>Diagnostics (DEF-RC2-07): how long the Loaded work blocked the UI thread, and the camera listing part of it (ms; −1 = not run yet).</summary>
+    internal double LoadedWorkMs { get; private set; } = -1;
+
+    /// <inheritdoc cref="LoadedWorkMs"/>
+    internal double CameraListMs { get; private set; } = -1;
 
     /// <summary>Completes when the preview camera has been released (the recorder may then open it).</summary>
     public Task CameraReleased => _cameraReleased;
@@ -305,7 +313,9 @@ internal sealed class StudioWindow : Window
     {
         try
         {
+            long start = System.Diagnostics.Stopwatch.GetTimestamp();
             _cameras = _listCameras(); // listing does not open a camera
+            CameraListMs = System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds;
         }
         catch (NativeCallException)
         {
