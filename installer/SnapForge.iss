@@ -118,11 +118,9 @@ function SetEvent(hEvent: THandle): BOOL; external 'SetEvent@kernel32.dll stdcal
 function ResetEvent(hEvent: THandle): BOOL; external 'ResetEvent@kernel32.dll stdcall';
 function CloseHandle(hObject: THandle): BOOL; external 'CloseHandle@kernel32.dll stdcall';
 function GetCurrentProcessId(): DWORD; external 'GetCurrentProcessId@kernel32.dll stdcall';
+function CreateFileW(lpFileName: String; dwDesiredAccess, dwShareMode, lpSecurityAttributes, dwCreationDisposition, dwFlagsAndAttributes, hTemplateFile: Cardinal): Integer; external 'CreateFileW@kernel32.dll stdcall';
+function CloseFileHandle(hObject: Integer): BOOL; external 'CloseHandle@kernel32.dll stdcall';
 function ProcessIdToSessionId(dwProcessId: DWORD; var pSessionId: DWORD): BOOL; external 'ProcessIdToSessionId@kernel32.dll stdcall';
-
-var
-  ClosingPage: TOutputProgressPage;
-  ClosingTick: Integer;
 
 function MySession(): Integer;
 var
@@ -197,14 +195,16 @@ end;
 // True if no other program has the file open (Windows refuses an exclusive open of a running .exe).
 function CanReplace(FileName: String; var Reason: String): Boolean;
 var
-  F: TFileStream;
+  H: Integer;
 begin
   Result := True;
   if not FileExists(FileName) then Exit;
-  try
-    F := TFileStream.Create(FileName, fmOpenReadWrite or fmShareExclusive);
-    F.Free;
-  except
+  // GENERIC_READ or GENERIC_WRITE, no sharing, OPEN_EXISTING: fails while any process has the file open or mapped.
+  H := CreateFileW(FileName, $C0000000, 0, 0, 3, $80, 0);
+  if H <> -1 then
+    CloseFileHandle(H)
+  else
+  begin
     Result := False;
     Reason := 'The file ' + FileName + ' is still in use by another program, so Setup cannot replace it.' + #13#10 +
       'Close SnapForge everywhere (also in other signed-in Windows accounts) and try again. If nothing is open, ' +
@@ -213,20 +213,8 @@ begin
 end;
 
 procedure Animate(Ms: Integer);
-var
-  T: Integer;
 begin
-  T := 0;
-  while T < Ms do
-  begin
-    if (ClosingPage <> nil) and not IsUninstaller() then
-    begin
-      ClosingTick := (ClosingTick + 1) mod 100;
-      ClosingPage.SetProgress(ClosingTick, 100);
-    end;
-    Sleep(100);
-    T := T + 100;
-  end;
+  Sleep(Ms);
 end;
 
 // Closes every SnapForge of the installation in Dir gracefully. False (with Reason) if it cannot be done safely.
@@ -248,11 +236,6 @@ begin
     Retry := False;
     if Here > 0 then
     begin
-      if (ClosingPage <> nil) and not IsUninstaller() then
-      begin
-        ClosingPage.SetText('Closing SnapForge…', 'Setup has asked SnapForge Capture and SnapForge Editor to close. If SnapForge asks about a recording or unsaved work, answer it there (it may be behind this window).');
-        ClosingPage.Show();
-      end;
       Broadcast := SignalEvent('Local\SnapForge-SetupExit-7c1d');      // rc.4 and later, every data profile
       Animate(2000);
       ListSnapForge(Dir, Here, Away, Lines);
@@ -273,7 +256,6 @@ begin
         ResetEvent(Broadcast);
         CloseHandle(Broadcast);
       end;
-      if (ClosingPage <> nil) and not IsUninstaller() then ClosingPage.Hide();
       if Here > 0 then
       begin
         Reason := 'SnapForge is still open and did not close:' + #13#10 + Lines + #13#10 +
@@ -300,11 +282,6 @@ begin
   if not CanReplace(AddBackslash(Dir) + 'SnapForge.exe', Reason) then begin Log('SnapForge close: blocked (' + Reason + ')'); Exit; end;
   if not CanReplace(AddBackslash(Dir) + 'SnapForgeEditor.exe', Reason) then begin Log('SnapForge close: blocked (' + Reason + ')'); Exit; end;
   Result := True;
-end;
-
-procedure InitializeWizard();
-begin
-  ClosingPage := CreateOutputProgressPage('Closing SnapForge', 'Setup is closing SnapForge so it can update the program files.');
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
