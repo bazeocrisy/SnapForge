@@ -163,7 +163,7 @@ jobs:
     needs: windows
     if: ${{ !cancelled() && needs.windows.outputs.packaged == 'true' }}
     runs-on: windows-latest
-    timeout-minutes: 15
+    timeout-minutes: 20 # +5 for the video quality comparison (two 5 s recordings, decoding, PNG output)
     steps:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
@@ -344,6 +344,42 @@ jobs:
           Write-Output "Exit code: $($p.ExitCode)"
           if ($p.ExitCode -ne 0) { throw "Video self-test failed." }
 
+      # docs/VIDEO-QUALITY.md: the same deterministic 1920×1080 scene (small text, fine detail, scrolling text, a
+      # moving object, SYNTHETIC camera overlay) recorded with release candidate 2's settings and with the current
+      # default, decoded and compared with the source per region. Fails only if the new default is not better on
+      # small text (mean small-text PSNR of the static and scrolling sample frames ≥ RC2 + 1.0 dB, and mean SSIM not
+      # below RC2) or the new recording dropped more than 1 % of its frames.
+      - name: Video quality comparison (RC2 settings vs current default, per-region PSNR/SSIM, native-size PNG crops)
+        if: always()
+        timeout-minutes: 5
+        shell: pwsh
+        working-directory: portable
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "video-quality"
+          $p = Start-Process -FilePath .\SnapForge.exe -ArgumentList '--video-quality', "`"$out`"" -Wait -PassThru -RedirectStandardOutput "$env:RUNNER_TEMP\video-quality.txt"
+          Get-Content "$env:RUNNER_TEMP\video-quality.txt"
+          if (Test-Path "$out\quality-report.json") { Get-Content "$out\quality-report.json" } else { Write-Output "No quality report written." }
+          foreach ($f in Get-ChildItem $out -Filter 'quality-*.png' -ErrorAction SilentlyContinue | Sort-Object Name) {
+            $n = $f.BaseName
+            $b64 = [Convert]::ToBase64String([IO.File]::ReadAllBytes($f.FullName))
+            $hash = (Get-FileHash $f.FullName -Algorithm SHA256).Hash.ToLowerInvariant()
+            Write-Output "WEBPNG-BEGIN $n $hash"
+            for ($i = 0; $i -lt $b64.Length; $i += 4000) { Write-Output ("WEBPNG " + $b64.Substring($i, [Math]::Min(4000, $b64.Length - $i))) }
+            Write-Output "WEBPNG-END $n"
+          }
+          Select-String -Path "$env:RUNNER_TEMP\video-quality.txt" -Pattern '^QUALITY VERDICT' | ForEach-Object { $_.Line }
+          Write-Output "Exit code: $($p.ExitCode)"
+          if ($p.ExitCode -ne 0) { throw "Video quality comparison failed (see QUALITY VERDICT above)." }
+
+      - name: Upload video quality comparison (both MP4s, report, PNG crops)
+        if: always()
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: video-quality-${{ github.sha }}
+          path: ${{ runner.temp }}/video-quality
+          retention-days: 30
+          if-no-files-found: warn
+
       - name: Feature self-test (OCR, image transforms, GIF export, scrolling capture, video editing)
         if: always()
         timeout-minutes: 10
@@ -439,6 +475,8 @@ jobs:
           # Same for the self-test reports: only what failed, so the cause is readable at the end of the job.
           $video = Join-Path $env:RUNNER_TEMP 'video-selftest.txt'
           if (Test-Path $video) { Select-String -Path $video -Pattern 'FAIL|false|error|exception' -CaseSensitive:$false | ForEach-Object { "video self-test: $($_.Line.Trim())" } }
+          $quality = Join-Path $env:RUNNER_TEMP 'video-quality.txt'
+          if (Test-Path $quality) { Select-String -Path $quality -Pattern '^QUALITY (VERDICT|rc2|rc3)' | ForEach-Object { "video quality: $($_.Line.Trim())" } }
           $report = Join-Path $env:RUNNER_TEMP 'video-samples\report.json'
           if (Test-Path $report) { Select-String -Path $report -Pattern '"(passed|ok|pass)"\s*:\s*false' -Context 6,2 | ForEach-Object { $_.Context.PreContext + $_.Line + $_.Context.PostContext } | ForEach-Object { "video report: $_" } }
 

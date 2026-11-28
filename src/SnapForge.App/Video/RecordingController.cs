@@ -274,7 +274,7 @@ internal static partial class RecordingController
             string? cameraNotice = null;
             if (v.StudioMode != StudioMode.Screen)
             {
-                (camera, cameraNotice, bool proceed) = await OpenCameraAsync(v).ConfigureAwait(true);
+                (camera, cameraNotice, bool proceed) = await OpenCameraAsync(v, rect).ConfigureAwait(true);
                 if (!proceed)
                 {
                     return;
@@ -365,8 +365,10 @@ internal static partial class RecordingController
     /// it (privacy settings, another app using the camera) — nothing is retried silently. Screen + camera can continue
     /// without the camera if the user agrees. Returns (camera or null, notice for the toolbar, continue?).
     /// </summary>
-    private static async Task<(ICameraSource? Camera, string? Notice, bool Proceed)> OpenCameraAsync(VideoSettings v)
+    private static async Task<(ICameraSource? Camera, string? Notice, bool Proceed)> OpenCameraAsync(VideoSettings v, PixelRect recorded)
     {
+        // RC3: ask for a capture size that covers the overlay (or 1080p for camera-only), docs/VIDEO-QUALITY.md.
+        (int wantWidth, int wantHeight) = CameraFormatChooser.WantedSize(v.StudioMode, recorded.Width, recorded.Height, v.CameraShape, v.CameraSize);
         bool screenToo = v.StudioMode == StudioMode.ScreenAndCamera;
         string? notice = null;
         ICameraSource? camera = null;
@@ -395,7 +397,7 @@ internal static partial class RecordingController
                 }
             }
 
-            camera = (CameraFactory ?? ((id, name) => new MediaFoundationCameraSource(id, name)))(device.SymbolicLink is { Length: > 0 } link ? link : null, device.Name);
+            camera = (CameraFactory ?? ((id, name) => new MediaFoundationCameraSource(id, name, wantWidth, wantHeight, 30)))(device.SymbolicLink is { Length: > 0 } link ? link : null, device.Name);
             ICameraSource starting = camera;
             await Task.Run(starting.Start).ConfigureAwait(true);
             return (camera, notice, true);

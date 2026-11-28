@@ -1,3 +1,4 @@
+using SnapForge.Core.Imaging;
 using SnapForge.Core.Settings;
 
 namespace SnapForge.App.Video;
@@ -45,22 +46,50 @@ internal readonly record struct OverlayLayout(int X, int Y, int Width, int Heigh
     public double CornerRadius => Shape == CameraOverlayShape.Circle ? Width / 2.0 : Math.Round(Height * 0.16);
 }
 
+/// <summary>How the camera picture is scaled into the overlay.</summary>
+internal enum CameraScaling
+{
+    /// <summary>
+    /// Release candidate 2: two-tap bilinear sampling at every scale. When downscaling by more than 2× (a 720p or
+    /// 1080p camera into a 324-pixel 1080p overlay) it reads only some source pixels and skips the rest, so fine
+    /// detail and sensor noise alias into grain and shimmer. Kept to reproduce RC2 in the quality comparison.
+    /// </summary>
+    Bilinear,
+
+    /// <summary>Area average when downscaling (every source pixel counts by its coverage), bilinear when upscaling.</summary>
+    AreaAverage,
+}
+
 /// <summary>
 /// CPU compositor for the camera overlay: crops the camera picture to the overlay's aspect ratio (centre crop, no
-/// distortion), scales it bilinearly, optionally mirrors it, and blends it through an antialiased circle or
-/// rounded-rectangle mask. The sampling maps and the mask are cached per (layout, camera size) — per frame it is
-/// one bilinear sample and one blend per overlay pixel (≈ 0.1–0.2 Mpx at 1080p: well inside a 30 FPS budget).
+/// distortion), scales it (area average when downscaling, bilinear when upscaling — <see cref="ResampleKernel"/>),
+/// optionally mirrors it, and blends it through an antialiased circle or rounded-rectangle mask. The kernels and the
+/// mask are cached per (layout, camera size). Per frame the area path is separable: a vertical pass over the
+/// cropped source columns into a row buffer, then a horizontal pass (≈ 1–5 M multiply-adds for a 1080p overlay from
+/// a 720p/1080p camera: a few ms, well inside a 30 FPS budget).
 /// </summary>
 internal sealed unsafe class CameraCompositor
 {
     private OverlayLayout _layout;
     private int _camWidth, _camHeight;
+    private CameraScaling _preparedScaling;
     private int[] _x0 = [], _x1 = [], _fx = [];
     private int[] _y0 = [], _y1 = [], _fy = [];
+    private ResampleKernel? _kx, _ky;
+    private int _colFirst, _colCount;
+    private int[] _column = [];
     private byte[] _mask = [];
+
+    public CameraCompositor(CameraScaling scaling = CameraScaling.AreaAverage) => Scaling = scaling;
+
+    /// <summary>The scaling filter (RC3 default: area average; <see cref="CameraScaling.Bilinear"/> reproduces RC2).</summary>
+    public CameraScaling Scaling { get; set; }
 
     /// <summary>Coverage 0–255 of the mask at a box pixel (tests).</summary>
     internal byte MaskAt(int x, int y) => _mask[(y * _layout.Width) + x];
+
+    /// <summary>True when the last draw used the area-average path (tests, reports).</summary>
+    internal bool UsedAreaAverage => Scaling == CameraScaling.AreaAverage && (_kx?.IsAreaAverage == true || _ky?.IsAreaAverage == true);
 
     /// <summary>Draws the camera frame into <paramref name="frame"/> (BGRA, top-down) at <paramref name="layout"/>.</summary>
     public void Draw(byte* frame, int frameStride, int frameWidth, int frameHeight, ReadOnlySpan<byte> camera, int cameraWidth, int cameraHeight, OverlayLayout layout)
@@ -70,9 +99,15 @@ internal sealed unsafe class CameraCompositor
             return;
         }
 
-        if (layout != _layout || cameraWidth != _camWidth || cameraHeight != _camHeight || _mask.Length == 0)
+        if (layout != _layout || cameraWidth != _camWidth || cameraHeight != _camHeight || _mask.Length == 0 || Scaling != _preparedScaling)
         {
             Prepare(layout, cameraWidth, cameraHeight);
+        }
+
+        if (Scaling == CameraScaling.AreaAverage)
+        {
+            DrawArea(frame, frameStride, frameWidth, frameHeight, camera, cameraWidth, layout);
+            return;
         }
 
         int bw = layout.Width, bh = layout.Height;
@@ -117,6 +152,92 @@ internal sealed unsafe class CameraCompositor
         }
     }
 
+    /// <summary>
+    /// Separable resampling: for each overlay row, a vertical pass of that row's source rows over the cropped source
+    /// columns (12-bit weights, kept at 8 extra bits of precision), then a horizontal pass per overlay pixel; a flat
+    /// colour stays exactly flat because each kernel's weights sum to exactly one.
+    /// </summary>
+    private void DrawArea(byte* frame, int frameStride, int frameWidth, int frameHeight, ReadOnlySpan<byte> camera, int cameraWidth, OverlayLayout layout)
+    {
+        ResampleKernel kx = _kx!, ky = _ky!;
+        int bw = layout.Width, bh = layout.Height, colFirst = _colFirst, colCount = _colCount;
+        fixed (byte* cam = camera)
+        fixed (byte* mask = _mask)
+        fixed (int* col = _column)
+        fixed (int* kyIndex = ky.Index, kyWeight = ky.Weight, kxIndex = kx.Index, kxWeight = kx.Weight)
+        {
+            for (int by = 0; by < bh; by++)
+            {
+                int fy = by + layout.Y;
+                if (fy < 0 || fy >= frameHeight)
+                {
+                    continue;
+                }
+
+                byte* m = mask + ((long)by * bw);
+                bool any = false;
+                for (int bx = 0; bx < bw && !any; bx++)
+                {
+                    any = m[bx] != 0;
+                }
+
+                if (!any)
+                {
+                    continue;
+                }
+
+                int ys = ky.Start[by], yn = ky.Count[by];
+                for (int cx = 0; cx < colCount; cx++)
+                {
+                    int b = 0, g = 0, r = 0;
+                    byte* columnTop = cam + ((long)(colFirst + cx) * 4);
+                    for (int t = 0; t < yn; t++)
+                    {
+                        byte* p = columnTop + ((long)kyIndex[ys + t] * cameraWidth * 4);
+                        int w = kyWeight[ys + t];
+                        b += p[0] * w;
+                        g += p[1] * w;
+                        r += p[2] * w;
+                    }
+
+                    col[cx * 3] = (b + 8) >> 4;
+                    col[(cx * 3) + 1] = (g + 8) >> 4;
+                    col[(cx * 3) + 2] = (r + 8) >> 4;
+                }
+
+                byte* dst = frame + ((long)fy * frameStride);
+                for (int bx = 0; bx < bw; bx++)
+                {
+                    int a = m[bx];
+                    int fx = bx + layout.X;
+                    if (a == 0 || fx < 0 || fx >= frameWidth)
+                    {
+                        continue;
+                    }
+
+                    int xs = kx.Start[bx], xn = kx.Count[bx];
+                    int b = 0, g = 0, r = 0;
+                    for (int t = 0; t < xn; t++)
+                    {
+                        int* c = col + ((kxIndex[xs + t] - colFirst) * 3);
+                        int w = kxWeight[xs + t];
+                        b += c[0] * w;
+                        g += c[1] * w;
+                        r += c[2] * w;
+                    }
+
+                    byte* d = dst + (fx * 4);
+                    d[0] = Blend(Math.Min(255, (b + (1 << 19)) >> 20), d[0], a);
+                    d[1] = Blend(Math.Min(255, (g + (1 << 19)) >> 20), d[1], a);
+                    d[2] = Blend(Math.Min(255, (r + (1 << 19)) >> 20), d[2], a);
+                    d[3] = 255;
+                }
+            }
+        }
+    }
+
+    private static byte Blend(int v, int under, int a) => (byte)(((v * a) + (under * (255 - a)) + 127) / 255);
+
     private void Prepare(OverlayLayout layout, int camW, int camH)
     {
         _layout = layout;
@@ -138,8 +259,20 @@ internal sealed unsafe class CameraCompositor
             srcY = (camH - srcH) / 2;
         }
 
-        (_x0, _x1, _fx) = Map(bw, srcX, srcW, camW, layout.Mirror);
-        (_y0, _y1, _fy) = Map(bh, srcY, srcH, camH, mirror: false);
+        _preparedScaling = Scaling;
+        if (Scaling == CameraScaling.AreaAverage)
+        {
+            _kx = ResampleKernel.Create(bw, srcX, srcW, camW, layout.Mirror);
+            _ky = ResampleKernel.Create(bh, srcY, srcH, camH, mirror: false);
+            _colFirst = _kx.Index.Min();
+            _colCount = _kx.Index.Max() - _colFirst + 1;
+            _column = new int[_colCount * 3];
+        }
+        else
+        {
+            (_x0, _x1, _fx) = Map(bw, srcX, srcW, camW, layout.Mirror);
+            (_y0, _y1, _fy) = Map(bh, srcY, srcH, camH, mirror: false);
+        }
 
         _mask = new byte[bw * bh];
         double cx = bw / 2.0, cy = bh / 2.0, r = layout.CornerRadius;
@@ -232,6 +365,13 @@ internal sealed unsafe class CompositeFrameSource : IFrameSource
     public OverlayLayout Layout { get; }
 
     public ICameraSource Camera => _camera;
+
+    /// <summary>How the camera is scaled into the overlay (the quality comparison sets RC2's bilinear sampling).</summary>
+    public CameraScaling Scaling
+    {
+        get => _compositor.Scaling;
+        set => _compositor.Scaling = value;
+    }
 
     /// <summary>Toolbar toggle: show or hide the camera while recording.</summary>
     public bool OverlayVisible { get; set; } = true;

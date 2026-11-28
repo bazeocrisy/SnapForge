@@ -324,6 +324,26 @@ internal static class CameraFormatChooser
 
         return best;
     }
+
+    /// <summary>
+    /// The capture size to ask the camera for (RC3): camera-only recordings use the camera picture as the video, so
+    /// 1920×1080; for an overlay, 1280×720 while it gives at least 1.25× the overlay's height in source pixels (the
+    /// area-average downscale then has real detail to average), otherwise 1920×1080. Never more than 1080p (CPU and USB
+    /// bandwidth) — <see cref="Choose"/> then picks the closest format the camera offers at full frame rate, so tiny
+    /// defaults such as 160×120 or 320×240 are only used by cameras that offer nothing larger.
+    /// </summary>
+    public static (int Width, int Height) WantedSize(SnapForge.Core.Settings.StudioMode mode, int frameWidth, int frameHeight, SnapForge.Core.Settings.CameraOverlayShape shape, SnapForge.Core.Settings.CameraOverlaySize size)
+    {
+        if (mode == SnapForge.Core.Settings.StudioMode.Camera || frameWidth < 16 || frameHeight < 16)
+        {
+            return (1920, 1080);
+        }
+
+        // Circle: a square of the camera's full height is used; rounded rectangle: the 16:9 picture. Either way the
+        // camera height must cover the overlay height.
+        OverlayLayout box = OverlayLayout.For(frameWidth, frameHeight, shape, size, SnapForge.Core.Settings.CameraCorner.BottomRight, mirror: false);
+        return box.Height * 1.25 <= 720 ? (1280, 720) : (1920, 1080);
+    }
 }
 
 /// <summary>YUV → BGRA conversion for cameras whose reader does not offer RGB32 (BT.601 limited range).</summary>
@@ -672,16 +692,22 @@ internal sealed unsafe class MediaFoundationCameraSource : ICameraSource
             }
         }
 
+        bool nativeSet = false;
         if (CameraFormatChooser.Choose(formats, _wantWidth, _wantHeight, _wantFps) is { } chosen)
         {
             Format = chosen;
             nint native = Mf.GetNativeMediaType(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, chosen.Index);
             if (native != 0)
             {
-                _ = Mf.TrySetCurrentMediaType(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, native);
+                nativeSet = Mf.TrySetCurrentMediaType(reader, Mf.MF_SOURCE_READER_FIRST_VIDEO_STREAM, native) >= 0;
                 Com.Release(ref native);
             }
         }
+
+        // RC3 diagnostics: which native format was used (a refused native type leaves the driver's default, which
+        // the reader's video processor would then scale to the requested size — a soft or blocky camera picture).
+        RecordingLog.Write($"camera '{Name}': {formats.Count} native formats, wanted {_wantWidth}×{_wantHeight} at {_wantFps} FPS, chose "
+            + (Format is { } cf ? $"{cf.Width}×{cf.Height} at {cf.FramesPerSecond:0.##} FPS ({(cf.Subtype == Mf.VideoFormat_MJPG ? "MJPG" : cf.Subtype == Mf.VideoFormat_NV12 ? "NV12" : cf.Subtype == Mf.VideoFormat_YUY2 ? "YUY2" : cf.Subtype.ToString())}), {(nativeSet ? "set" : "NOT set — driver default in use")}" : "nothing (driver default in use)"));
 
         // Ask for RGB32 (the reader's video processor converts); fall back to formats converted here.
         foreach ((Guid subtype, Layout layout) in new[] { (Mf.VideoFormat_RGB32, Layout.Rgb32), (Mf.VideoFormat_NV12, Layout.Nv12), (Mf.VideoFormat_YUY2, Layout.Yuy2) })
@@ -721,6 +747,7 @@ internal sealed unsafe class MediaFoundationCameraSource : ICameraSource
                 // Contiguous buffers without MF_MT_DEFAULT_STRIDE: top-down, no row padding (as measured for the
                 // reader's RGB32 output on CI run 106). Buffers with IMF2DBuffer report their own pitch.
                 int pitch = Mf.GetInt32(current, Mf.MT_DEFAULT_STRIDE) ?? defaultPitch;
+                RecordingLog.Write($"camera '{Name}': reader delivers {Width}×{Height} as {layout}");
                 return (layout, pitch);
             }
             finally

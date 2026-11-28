@@ -51,8 +51,20 @@ internal static unsafe partial class Mf
     private static readonly Guid IID_IMFSinkWriterEx = new("588d72ab-5bc1-496a-8714-b70617141b25");
     public static readonly Guid PD_DURATION = new("6c990d33-bb8e-477a-8598-0d5d96fcd88a");
 
+    // codecapi.h (encoder properties set through ICodecAPI / the sink writer's encoding parameters).
+    public static readonly Guid CODECAPI_AVEncCommonRateControlMode = new("1c0608e9-370c-4710-8a58-cb6181c42423");
+    public static readonly Guid CODECAPI_AVEncCommonMeanBitRate = new("f7222374-2144-4815-b550-a37f8e12ee52");
+    public static readonly Guid CODECAPI_AVEncCommonMaxBitRate = new("9651eae4-39b9-4ebf-85ef-d7f444ec7465");
+    public static readonly Guid CODECAPI_AVEncMPVGOPSize = new("95f31b26-95a4-41aa-9303-246a7fc6eef1");
+    public static readonly Guid CODECAPI_AVEncMPVDefaultBPictureCount = new("8d390aac-dc5c-4200-b57f-814d04babab2");
+    public static readonly Guid CODECAPI_AVEncH264CABACEnable = new("ee6cad62-d305-4248-a50e-e1b255f7caf8");
+    public static readonly Guid CODECAPI_AVLowLatencyMode = new("9c27891a-ed7a-40e1-88e8-b22727a024ee"); // = MF_LOW_LATENCY
+    private static readonly Guid IID_ICodecAPI = new("901db4c7-31ce-41a2-85dc-8fa0bf41b8da");
+
     public const int MFVideoInterlace_Progressive = 2;
     public const int eAVEncH264VProfile_Main = 77;
+    public const int eAVEncH264VProfile_High = 100;
+    public const ushort VT_I4 = 3, VT_BOOL = 11, VT_UI4 = 19, VT_UI8 = 21, VT_I8 = 20, VT_UI2 = 18, VT_I2 = 2;
     public const uint MFT_ENUM_FLAG_SYNCMFT = 0x1;
     public const uint MFT_ENUM_FLAG_ASYNCMFT = 0x2;
     public const uint MFT_ENUM_FLAG_HARDWARE = 0x4;
@@ -68,8 +80,9 @@ internal static unsafe partial class Mf
     private const int AttrSetUINT32 = 21, AttrSetUINT64 = 22, AttrSetGUID = 24, AttrSetUnknown = 27;
     private const int SampleSetSampleTime = 36, SampleSetSampleDuration = 38, SampleAddBuffer = 42, SampleConvertToContiguous = 41, SampleGetSampleTime = 35;
     private const int BufferLock = 3, BufferUnlock = 4, BufferGetCurrentLength = 5, BufferSetCurrentLength = 6;
-    private const int SinkAddStream = 3, SinkSetInputMediaType = 4, SinkBeginWriting = 5, SinkWriteSample = 6, SinkSendStreamTick = 7, SinkFinalize = 11, SinkGetStatistics = 13, SinkExGetTransformForStream = 14;
+    private const int SinkAddStream = 3, SinkSetInputMediaType = 4, SinkBeginWriting = 5, SinkWriteSample = 6, SinkSendStreamTick = 7, SinkFinalize = 11, SinkGetServiceForStream = 12, SinkGetStatistics = 13, SinkExGetTransformForStream = 14;
     private const int TransformGetAttributes = 8;
+    private const int CodecApiGetValue = 8, CodecApiSetValue = 9;
     private const int ReaderSetStreamSelection = 4, ReaderGetCurrentMediaType = 6, ReaderSetCurrentMediaType = 7, ReaderReadSample = 9, ReaderGetPresentationAttribute = 12;
     private const int ActivateActivateObject = 33;
     private const int DxgiManagerResetDevice = 7;
@@ -254,8 +267,9 @@ internal static unsafe partial class Mf
         return (int)index;
     }
 
-    public static void SetInputMediaType(nint writer, int stream, nint mediaType) =>
-        Com.Check(((delegate* unmanaged[Stdcall]<nint, uint, nint, nint, int>)Com.Slot(writer, SinkSetInputMediaType))(writer, (uint)stream, mediaType, 0), "IMFSinkWriter.SetInputMediaType");
+    /// <param name="encodingParameters">Optional attribute store of CODECAPI_* values handed to the encoder (0 = none).</param>
+    public static void SetInputMediaType(nint writer, int stream, nint mediaType, nint encodingParameters = 0) =>
+        Com.Check(((delegate* unmanaged[Stdcall]<nint, uint, nint, nint, int>)Com.Slot(writer, SinkSetInputMediaType))(writer, (uint)stream, mediaType, encodingParameters), "IMFSinkWriter.SetInputMediaType");
 
     public static void BeginWriting(nint writer) => Com.Check(Com.Call(writer, SinkBeginWriting), "IMFSinkWriter.BeginWriting");
 
@@ -361,6 +375,83 @@ internal static unsafe partial class Mf
         {
             Com.Release(ref ex);
         }
+    }
+
+    /// <summary>
+    /// The ICodecAPI of the video encoder the sink writer chose for a stream (AddRef'd; release it), or 0 if the
+    /// encoder does not expose one. Valid after <see cref="SetInputMediaType"/> (the encoder exists from then on).
+    /// </summary>
+    public static nint GetEncoderCodecApi(nint writer, int stream)
+    {
+        nint ex = Com.TryQueryInterface(writer, IID_IMFSinkWriterEx);
+        if (ex != 0)
+        {
+            try
+            {
+                for (uint i = 0; i < 8; i++)
+                {
+                    Guid category;
+                    nint transform;
+                    if (((delegate* unmanaged[Stdcall]<nint, uint, uint, Guid*, nint*, int>)Com.Slot(ex, SinkExGetTransformForStream))(ex, (uint)stream, i, &category, &transform) < 0)
+                    {
+                        break;
+                    }
+
+                    try
+                    {
+                        if (category == MFT_CATEGORY_VIDEO_ENCODER)
+                        {
+                            return Com.TryQueryInterface(transform, IID_ICodecAPI);
+                        }
+                    }
+                    finally
+                    {
+                        Com.Release(ref transform);
+                    }
+                }
+            }
+            finally
+            {
+                Com.Release(ref ex);
+            }
+        }
+
+        // GetServiceForStream(GUID_NULL) asks the stream's encoder first, then the media sink.
+        Guid none = Guid.Empty, iid = IID_ICodecAPI;
+        nint api;
+        int hr = ((delegate* unmanaged[Stdcall]<nint, uint, Guid*, Guid*, nint*, int>)Com.Slot(writer, SinkGetServiceForStream))(writer, (uint)stream, &none, &iid, &api);
+        return hr >= 0 ? api : 0;
+    }
+
+    /// <summary>An encoder property read through ICodecAPI::GetValue as an integer (booleans: 1/0), or null with the HRESULT.</summary>
+    public static long? GetCodecValue(nint codecApi, Guid key, out int hr)
+    {
+        PropVariant v = default;
+        hr = ((delegate* unmanaged[Stdcall]<nint, Guid*, PropVariant*, int>)Com.Slot(codecApi, CodecApiGetValue))(codecApi, &key, &v);
+        if (hr < 0)
+        {
+            return null;
+        }
+
+        return v.Type switch
+        {
+            VT_BOOL => (short)(v.Value & 0xFFFF) != 0 ? 1 : 0,
+            VT_UI4 => (uint)v.Value,
+            VT_I4 => (int)(uint)v.Value,
+            VT_UI2 => (ushort)v.Value,
+            VT_I2 => (short)(ushort)v.Value,
+            VT_UI8 or VT_I8 => (long)v.Value,
+            _ => null,
+        };
+    }
+
+    /// <summary>Sets an encoder property through ICodecAPI::SetValue (VT_UI4, or VT_BOOL when <paramref name="boolean"/>). Returns the HRESULT.</summary>
+    public static int SetCodecValue(nint codecApi, Guid key, uint value, bool boolean)
+    {
+        PropVariant v = default;
+        v.Type = boolean ? VT_BOOL : VT_UI4;
+        v.Value = boolean ? (value != 0 ? 0xFFFFul : 0ul) : value;
+        return ((delegate* unmanaged[Stdcall]<nint, Guid*, PropVariant*, int>)Com.Slot(codecApi, CodecApiSetValue))(codecApi, &key, &v);
     }
 
     // ---- source reader (validation, thumbnails, tests)
