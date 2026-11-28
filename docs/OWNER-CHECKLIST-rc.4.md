@@ -1,4 +1,4 @@
-# Owner test checklist: SnapForge 1.0.0-rc.4 (build @BUILD@, unsigned test build)
+# Owner test checklist: SnapForge 1.0.0-rc.4 (build 177, unsigned test build)
 
 **Download:** the **Download Windows test build** button on https://bazeocrisy.github.io/SnapForge/ (GitHub sign-in needed). Unzip the package to get `SnapForge-1.0.0-rc.4-win-x64-setup.exe`.
 
@@ -8,7 +8,7 @@
 Get-FileHash .\SnapForge-1.0.0-rc.4-win-x64-setup.exe
 ```
 
-It must show `@SHA@`. Do not run a file whose checksum differs.
+It must show `9f42670a8299a4e9456a02ec51bcdc28ac1c31205a343ef7d1f35871287c3c4d`. Do not run a file whose checksum differs.
 
 **About the blue window.** When you start Setup, Windows shows the blue Microsoft Defender SmartScreen window **"Windows protected your PC"**. This is expected: the test installer is **not code-signed**. Trusted signing is tracked separately as REL-SIGN-01 and needs your decision.
 
@@ -22,8 +22,8 @@ It must show `@SHA@`. Do not run a file whose checksum differs.
 
 ## 2. Check the version in both apps
 
-6. [ ] **SnapForge Capture:** right-click the icon next to the clock and choose **About SnapForge Capture**. The first line reads **SnapForge Capture 1.0.0-rc.4 (build @BUILD@)**.
-7. [ ] **SnapForge Editor:** choose **Help → About SnapForge**. The first line reads **SnapForge Editor 1.0.0-rc.4 (build @BUILD@)**.
+6. [ ] **SnapForge Capture:** right-click the icon next to the clock and choose **About SnapForge Capture**. The first line reads **SnapForge Capture 1.0.0-rc.4 (build 177)**.
+7. [ ] **SnapForge Editor:** choose **Help → About SnapForge**. The first line reads **SnapForge Editor 1.0.0-rc.4 (build 177)**.
 8. [ ] **Settings → Apps → Installed apps** shows **SnapForge 1.0.0-rc.4**.
 
 ## 3. Record with your webcam and microphone

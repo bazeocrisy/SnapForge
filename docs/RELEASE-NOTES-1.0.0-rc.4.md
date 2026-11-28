@@ -1,4 +1,4 @@
-# SnapForge 1.0.0-rc.4: release notes (owner test build, build @BUILD@)
+# SnapForge 1.0.0-rc.4: release notes (owner test build, build 177)
 
 **Status:** not a public release and **not code-signed**. Public downloads stay disabled.
 
@@ -10,7 +10,7 @@
   * **You keep something open:** Setup offers Retry or Cancel.
   * **Another Windows session:** if SnapForge runs there, Setup names that session and changes nothing.
   * **Other copies:** only the installation being updated is touched. A portable copy or an old per-user copy stays open.
-* **The version is visible.** About in both programs shows "1.0.0-rc.4 (build @BUILD@)". This matches the installer file name, the Windows file version 1.0.0.@BUILD@ and Installed Apps.
+* **The version is visible.** About in both programs shows "1.0.0-rc.4 (build 177)". This matches the installer file name, the Windows file version 1.0.0.177 and Installed Apps.
 * **Website.** A "Download Windows test build" button links to the exact CI package that passed. The listing shows the version, build, file name, SHA-256 and signing status. The public download button stays disabled.
 
 **Blue screen**
@@ -23,4 +23,4 @@ The blue screen the owner reported is identified as **Microsoft Defender SmartSc
 * the compact Record panel with the live webcam preview;
 * the sharper recording defaults.
 
-**Verified in Windows CI** (run @RUN@): see PR #3. **Still needs your PC:** see [OWNER-CHECKLIST-rc.4.md](OWNER-CHECKLIST-rc.4.md).
+**Verified in Windows CI** (run 177, https://github.com/bazeocrisy/SnapForge/actions/runs/46143380997): see PR #3. **Still needs your PC:** see [OWNER-CHECKLIST-rc.4.md](OWNER-CHECKLIST-rc.4.md).

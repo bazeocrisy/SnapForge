@@ -14,14 +14,14 @@
   "_testBuild": "Release-candidate test packages for invited testers: only LINKS to GitHub Actions, never a file on this site. runUrl: https://github.com/bazeocrisy/SnapForge/actions/runs/<run id>; commit: the full 40-character commit SHA the run built. RC4: artifactUrl (the 'Download Windows test build' button) is the run's own package https://github.com/bazeocrisy/SnapForge/actions/runs/<run id>/artifacts/<artifact id>, with build (the CI run number), fileName, sha256 (the installer's, from the run's SHA256SUMS.txt), signed (always false) and expires (the artifact's expiry date). Each verified candidate REPLACES the previous values (website/HANDOFF.md, 'Test build link'). Leave null until that run passed every Windows job.",
   "testBuild": {
     "version": "1.0.0-rc.4",
-    "build": null,
-    "runUrl": null,
-    "artifactUrl": null,
-    "commit": null,
-    "fileName": null,
-    "sha256": null,
+    "build": 177,
+    "runUrl": "https://github.com/bazeocrisy/SnapForge/actions/runs/46143380997",
+    "artifactUrl": "https://github.com/bazeocrisy/SnapForge/actions/runs/46143380997/artifacts/15262932902",
+    "commit": "309f40ca596b995df1f0f8d18549cf1f9abd134e",
+    "fileName": "SnapForge-1.0.0-rc.4-win-x64-setup.exe",
+    "sha256": "9f42670a8299a4e9456a02ec51bcdc28ac1c31205a343ef7d1f35871287c3c4d",
     "signed": false,
-    "expires": null
+    "expires": "2026-12-28"
   },
   "_release": "A future public release: one GitHub Release (tag) with one or two assets of the SAME version, each verified separately by tools/verify-release.py. publisher.subject is the signing certificate's full Subject string, publisher.thumbprints the allowed SHA-1 thumbprints (40 upper-case hex); both are required for any signed asset.",
   "release": {

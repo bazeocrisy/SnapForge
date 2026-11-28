@@ -647,7 +647,8 @@ class BuildGateTests(unittest.TestCase):
 
     def test_sf012_test_build_link_rendered_when_configured(self):
         cfg = json.loads((WEBSITE / "config.json").read_text())
-        cfg["testBuild"].update(runUrl="https://github.com/bazeocrisy/SnapForge/actions/runs/123", commit="a" * 40)
+        cfg["testBuild"].update(runUrl="https://github.com/bazeocrisy/SnapForge/actions/runs/123", commit="a" * 40,
+                                artifactUrl=None)  # the run-page-only mode
         c, v = self.write(cfg)
         out = self.tmp / "site"
         build.build(build.load_config(c, v), out)
