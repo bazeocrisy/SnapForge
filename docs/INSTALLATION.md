@@ -156,7 +156,23 @@ all metadata).
 
 Other users of the same PC who had their own rc.1 copy see the same question when they first start the new copy.
 
-**Installer (rc.2 and later)**: exit SnapForge in every user session, then run the new installer.
+**Installer (rc.4 and later): SnapForge is closed for you.** Run the new installer while SnapForge Capture and
+SnapForge Editor are open; you don't need to exit them first. Setup asks every SnapForge started from this
+installation in your Windows session to close (SnapForge rc.1–rc.3 understand this request too), waits until they have
+exited and the program files can be replaced, then continues. It works the same for reinstall, repair and upgrade, and
+for uninstall. Setup never closes SnapForge by force:
+
+* **Recording in progress:** SnapForge asks whether to stop and save the recording. Answer **No** to keep recording;
+  Setup then explains that SnapForge is still open and offers **Retry** (after you stop the recording) or **Cancel**.
+* **Work not yet saved:** edits are saved to the Library before the Editor closes. A capture taken without history
+  that was never exported makes the Editor ask before discarding it; keep it open and Setup offers Retry / Cancel.
+* **SnapForge running for another signed-in Windows user:** Setup cannot ask it, so it names that session and stops
+  without changing anything. Ask that user to exit SnapForge (or sign them out), then run Setup again.
+* A portable copy or an old per-user rc.1 copy in another folder is not closed: it does not use the installed files.
+
+Captures, recordings, editable projects, settings and your Library location are never touched by Setup.
+
+**Installer rc.2 and rc.3**: exit SnapForge in every user session, then run the new installer.
 
 **Portable**: exit SnapForge, replace the files in your SnapForge folder with those from the new ZIP. If **Launch
 SnapForge when I sign in** is on and the new copy is in a different folder, turn the setting off and on again.

@@ -1,6 +1,12 @@
-# "Blue screen" while testing SnapForge: triage (DEF-RC3-07, open)
+# "Blue screen" while testing SnapForge: identified as SmartScreen (DEF-RC3-07)
 
-**Status:** open. The owner reports a blue screen during RC3 testing, but what triggers it is not confirmed yet. "Blue screen" can mean three very different things, and each needs a different fix. This issue stays open until the symptom is identified and the outcome is verified.
+**Status: identified on 28 November 2026, owner report.** The blue screen is **case A**, the Microsoft Defender SmartScreen window **"Windows protected your PC"**. It appears when the owner launches the **unsigned** SnapForge installer.
+
+It is not a crash, a stop error or a SnapForge display problem. Cases B and C were not observed.
+
+The issue is now tracked under **installer signing**: release task **REL-SIGN-01**, which stays open (see [SIGNING.md](SIGNING.md)). Until the installer is signed with a trusted certificate and that signature builds reputation, SmartScreen will keep showing this window for every test build. The website and PR label each test installer **"Not code-signed"**.
+
+The rest of this page is kept for reference, in case a different blue screen (B or C) appears later.
 
 ## Which one is it?
 
@@ -11,7 +17,7 @@
 | Cause | The test installer is **not code-signed**. SmartScreen does this for every unsigned program it has not seen often. It is not an error in SnapForge. | A SnapForge or graphics-driver issue in a specific workflow | A driver or hardware fault in Windows. An ordinary app like SnapForge cannot cause one on its own, but it can trigger a faulty graphics, camera or audio driver. |
 | What we need | Which file was started, and whether it was the CI package with the published SHA-256 | Which window or recording, what you did just before, and a photo or screenshot | The **stop code** and the time it happened |
 
-**The one detail still missing:** which of A, B or C you saw. A phone photo of the screen is the quickest way to tell. For C, the stop code is printed at the bottom of the blue screen.
+**Owner's answer (28 Nov 2026): A.**
 
 ## Collect diagnostics (all three cases, read-only)
 

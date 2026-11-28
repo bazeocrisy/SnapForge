@@ -76,3 +76,12 @@ new timings the entry was waiting for: a freshly shown test window on its own ST
 screen on the runner. Next diagnostic step (added, no check loosened): when the window is not painted, the failure now
 records DWM cloaking, visibility, minimised and foreground state and the colour on screen. Stays **open**.
 
+## rc.4
+
+| ID | Severity | Area | Symptom | Cause | Status / fix | Evidence |
+|---|---|---|---|---|---|---|
+| DEF-RC3-07 | Medium | Installer (signing) | Owner sees a blue screen when testing RC3 | **Identified (owner, 28 Nov 2026): the Microsoft Defender SmartScreen window "Windows protected your PC"** shown when launching the **unsigned** test installer. Not a crash, stop error or app/recording defect | **Closed as identified; moved to release task REL-SIGN-01 (trusted code signing, open)**. Test builds are labelled "Not code-signed" on the website and in the PR; no bypass instructions are given; no self-signed substitute | `docs/BLUE-SCREEN-TRIAGE.md`; `Get-AuthenticodeSignature` → NotSigned for every CI build |
+| REL-SIGN-01 | High for public release (not a test-build blocker) | Release | SmartScreen warns on every unsigned SnapForge installer | No trusted code-signing certificate yet | **Open — owner decision**: choose SignPath Foundation (free OSS, application) / Microsoft Artifact Signing (paid, identity verification) / OV certificate; then sign both programs and the installer in CI with timestamping and record the publisher on the website. See `docs/SIGNING.md` | — |
+| DEF-RC4-01 | Medium | Installer | Reinstalling RC3 while SnapForge was open stopped and asked the owner to exit SnapForge manually | RC3 Setup used Inno Setup's AppMutex check, which can only refuse | Setup now closes SnapForge gracefully (see `docs/INSTALLATION.md`) | pending CI (installer job) |
+| DEF-RC4-02 | Low | Installer build | rc.4 installer did not compile in CI (runs 163, 165): the CI's Inno Setup rejects the wizard progress-page types used for a "Closing SnapForge" page | Compiler/script incompatibility | Page removed; Setup waits on its standard "Preparing to install" page | `ff8bb06`; pending CI |
+
