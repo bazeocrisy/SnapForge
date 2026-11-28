@@ -756,6 +756,7 @@ jobs:
           $p = Start-Process -FilePath "$machine\SnapForge.exe" -ArgumentList '--library-check', "`"$env:RUNNER_TEMP\rc2-library-check.txt`"", '--expect-images', '3', '--expect-videos', '1' -Wait -PassThru
           Get-Content "$env:RUNNER_TEMP\rc2-library-check.txt"
           if ($p.ExitCode -ne 0) { throw "rc.2 could not open the seeded Library" }
+          if (-not (Test-Path $runKey)) { New-Item -Path $runKey -Force | Out-Null } # absent on a fresh runner profile
           Set-ItemProperty $runKey -Name 'SnapForge' -Value "`"$machine\SnapForge.exe`" --background"
           $before = DataHash
 
@@ -796,6 +797,7 @@ jobs:
           $p = Start-Process -FilePath $old -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /LOG=rc1-install.log' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "rc.1 install failed" }
           if (-not (Test-Path "$perUser\SnapForge.exe")) { throw "rc.1 not installed per-user" }
+          if (-not (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run')) { New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' | Out-Null }
           Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SnapForge' -Value "`"$perUser\SnapForge.exe`" --background"
           $before = DataHash
           Write-Output "PASS real rc.1 installed per-user next to the system-wide rc.3, with a start-with-Windows entry pointing at it"
