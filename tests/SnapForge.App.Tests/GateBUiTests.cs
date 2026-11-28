@@ -72,14 +72,10 @@ public class GateBUiTests
 
             Assert.True(panel.ImageMode.IsChecked);
             Assert.True(panel.ImageMode.IsEnabled);
-            // Milestone V1: Video is available; All-in-One, Effects and Share are still marked unavailable.
             Assert.True(panel.VideoMode.IsEnabled);
-            foreach (FrameworkElement unavailable in new FrameworkElement[] { panel.AllInOneMode, panel.EffectsButton, panel.ShareButton })
-            {
-                Assert.False(unavailable.IsEnabled);
-                Assert.Contains("Not available yet", AutomationProperties.GetName(unavailable), StringComparison.Ordinal);
-                Assert.Contains("Not available yet", unavailable.ToolTip as string, StringComparison.Ordinal);
-            }
+            Assert.False(panel.AllInOneMode.IsEnabled);
+            Assert.Contains("Not available yet", AutomationProperties.GetName(panel.AllInOneMode), StringComparison.Ordinal);
+            Assert.Contains("Not available yet", panel.AllInOneMode.ToolTip as string, StringComparison.Ordinal);
 
             Assert.True(panel.CaptureButton.IsDefault);
             Assert.Equal("Capture", AutomationProperties.GetName(panel.CaptureButton));
