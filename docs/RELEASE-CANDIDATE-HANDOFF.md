@@ -11,12 +11,12 @@ SF-001…SF-015, QA-001…QA-010) is tracked with evidence in [FORENSIC-REMEDIAT
 | Item | Link |
 |---|---|
 | Integration pull request (`release/v1.0-candidate` → `main`, **draft — do not merge without approval**) | [PR #3](https://github.com/bazeocrisy/SnapForge/pull/3) |
-| Exact source commit of the verified packages | [`a70ae88`](https://github.com/bazeocrisy/SnapForge/commit/a70ae88f1ce98fd6f962178a6a203540fad33b74) (`a70ae88f1ce98fd6f962178a6a203540fad33b74`). Later commits on the branch change only documentation and the website — check with `git diff --stat a70ae88 release/v1.0-candidate -- src tests installer .github` (empty) |
-| CI run for that commit (push; all 6 jobs) | [CI run 135](https://github.com/bazeocrisy/SnapForge/actions/runs/46083178881); independent repeat of the same commit (pull-request run), also all green: [CI run 136](https://github.com/bazeocrisy/SnapForge/actions/runs/46083184232) |
-| Windows packages (portable ZIP, **all-users installer**, SBOM, `SHA256SUMS.txt`) | Artifact `SnapForge-1.0.0-rc.2-packages-a70ae88…` on run 135 ([direct link](https://github.com/bazeocrisy/SnapForge/actions/runs/46083178881/artifacts/15238530646)). GitHub sign-in required; Actions artifacts expire after 14–30 days. This is **not a public download** and not "owner-only": anyone who can see the repository's Actions can fetch it |
-| Portable build only | Artifact `SnapForge-portable-win-x64-dev-a70ae88…` on run 135 |
-| Test results (TRX + coverage) | Artifact `test-results` on run 135 |
-| Screenshots (1920×1080 tour, rc.2 designs) | Artifact `screenshots-a70ae88…`; the same images are on the website gallery |
+| Exact source commit of the verified packages | [`616345d`](https://github.com/bazeocrisy/SnapForge/commit/616345d33f35af23c025f953c1622e34bd4885e5) (`616345d33f35af23c025f953c1622e34bd4885e5`). Later commits on the branch change only documentation and the website — check with `git diff --stat 616345d release/v1.0-candidate -- src tests installer .github` (empty) |
+| CI run for that commit (push; all 6 jobs) | [CI run 139](https://github.com/bazeocrisy/SnapForge/actions/runs/46086423983); independent repeat of the same commit (pull-request run), also all green: [CI run 140](https://github.com/bazeocrisy/SnapForge/actions/runs/46086432994) |
+| Windows packages (portable ZIP, **all-users installer**, SBOM, `SHA256SUMS.txt`) | Artifact `SnapForge-1.0.0-rc.2-packages-616345d…` on run 139 ([direct link](https://github.com/bazeocrisy/SnapForge/actions/runs/46086423983/artifacts/15238854722)). GitHub sign-in required; Actions artifacts expire after 14–30 days. This is **not a public download** and not "owner-only": anyone who can see the repository's Actions can fetch it |
+| Portable build only | Artifact `SnapForge-portable-win-x64-dev-616345d…` on run 139 |
+| Test results (TRX + coverage) | Artifact `test-results` on run 139 |
+| Screenshots (1920×1080 tour, rc.2 designs) | Artifact `screenshots-616345d…`; the same images are on the website gallery |
 | Forensic remediation (finding → change → test → status) | [FORENSIC-REMEDIATION.md](FORENSIC-REMEDIATION.md) |
 | Requirements traceability | [PRODUCT-REQUIREMENTS-TRACEABILITY.md](PRODUCT-REQUIREMENTS-TRACEABILITY.md) |
 | Defect register (incl. defects found while getting rc.2 green) | [DEFECT-REGISTER.md](DEFECT-REGISTER.md) |
@@ -26,21 +26,21 @@ SF-001…SF-015, QA-001…QA-010) is tracked with evidence in [FORENSIC-REMEDIAT
 | Threat model, signing, legal/IP review | [THREAT-MODEL.md](THREAT-MODEL.md), [SIGNING.md](SIGNING.md), [LICENSING-REVIEW.md](LICENSING-REVIEW.md), [IP-AND-DESIGN-REVIEW.md](IP-AND-DESIGN-REVIEW.md) |
 | Website (built output on `gh-pages`; Pages not switched on; download disabled) | see §7 |
 
-**Package checksums** (from the CI log of run 135; verify with `Get-FileHash` against `SHA256SUMS.txt`):
+**Package checksums** (from the CI log of run 139; verify with `Get-FileHash` against `SHA256SUMS.txt`):
 
 | File | SHA-256 |
 |---|---|
-| `SnapForge-1.0.0-rc.2-win-x64-portable.zip` | `45d5f4443ff2e9cfdcffcd11273b14194433fc320daf93841d308869cc80b89a` |
-| `SnapForge-1.0.0-rc.2-win-x64-setup.exe` | `bba1e52889e328ce1a11b60eb5ad8d059b8fb26c61b9613c0011565dca795125` |
-| `SnapForge-1.0.0-rc.2-sbom.cdx.json` (CycloneDX 1.5, 14 components) | `ea17077b2791ebb36ed5b4fa4b3a37833284f7dc394abdba2580ce2869186479` |
-| `SnapForge.exe` inside the portable build | `661b0a553c0a6198dc2e59475c8e098eb0513b02cfebcdbdc8cd485b0adca170` |
+| `SnapForge-1.0.0-rc.2-win-x64-portable.zip` | `62c54bd32549d5c0b24481bad2249bca92e724fbb80e3fe043247d99341cc713` |
+| `SnapForge-1.0.0-rc.2-win-x64-setup.exe` | `ca18415ad27a3867e4dccef711763ee8709ea09e49f3503f19782e5272755983` |
+| `SnapForge-1.0.0-rc.2-sbom.cdx.json` (CycloneDX 1.5, 14 components) | `9e2143bd21b431191b476e9f08681af231adbe904dbbc81d892079e324d7b9b3` |
+| `SnapForge.exe` inside the portable build | `c368ee0b76c193d0d569225fa3c5c86c119824abf39fc8d0328019c86b3f6337` |
 
-File version 1.0.0.135; product version 1.0.0-rc.2; channel "Release candidate (not approved for public release)".
+File version 1.0.0.139; product version 1.0.0-rc.2; channel "Release candidate (not approved for public release)".
 **Unsigned** — Windows SmartScreen may warn; no bypass advice is given ([SIGNING.md](SIGNING.md)).
 
 ## 2. What CI proved for this commit
 
-CI run 135 (`a70ae88`), every job passed; numbers copied from the job logs. Run 136 (same commit, pull-request build) passed every job as well.
+CI run 139 (`616345d`), every job passed; numbers copied from the job logs. Run 140 (same commit, pull-request build) passed every job as well.
 
 | Job | Result |
 |---|---|
@@ -49,12 +49,12 @@ CI run 135 (`a70ae88`), every job passed; numbers copied from the job logs. Run 
 | Windows tests | Core 449 / 449 and App 137 / 137 passed — real mouse/keyboard input, real screen capture, clipboard, OLE drag-and-drop into the same and a separate process, real-wheel scrolling capture, recorder fault injection |
 | Portable build, every .NET installation hidden | `--self-test` PASS |
 | Start-up windows (FA-001), isolated profiles | Windows start-up (`--background`): **0** windows; first launch: **1** (Welcome); normal launch: **1** (capture panel); second launch hands over, still **1**; profiles wrote only to `SnapForge-Profiles` |
-| Video self-test | PASS — 21 checks passed; camera enumeration *unavailable* (no camera on the runner). A/V error 0.07 ms max, drift −0.05 ms/min; 361 frames / 12.0 s constant frame rate; exact and regular timestamps in the final progressive MP4; pause/resume 8.0 s recorded, A/V error 0.78 ms; 60 FPS 300 frames, 0 dropped; real screen 150 frames / 5.0 s; recording toolbar 100 % absent (control 0 %); cancel discards; **SYNTHETIC** camera overlay 100 % in its corner, 0 % elsewhere, SnapForge Studio window 100 % absent; camera-only 1280×720 and camera released; double stop, encoder stall (Stop returned in 2.04 s) and disk-full save outside the Library all handled |
-| Feature self-test | PASS. OCR en-US: 3 lines in order; tall image 160 of 160 lines. Video trim + cut 6.0 s → 4.0 s, parts in order, audio kept; GIF export; frame extraction. 4K image operations 759 ms (target < 10 s); GIF encoder 278 ms (target < 3 s); transforms with undo restore the exact original |
-| Crash recovery (process killed while recording) | Recovered 8.4 s of the interrupted recording at the next start |
+| Video self-test | PASS — 22 checks passed; camera enumeration *unavailable* (no camera on the runner). A/V error 0.07 ms max, drift −0.05 ms/min; 361 frames / 12.0 s constant frame rate; exact and regular timestamps in the final progressive MP4; pause/resume 8.0 s recorded, A/V error 0.84 ms; 60 FPS 300 frames, 0 dropped; real screen 150 frames / 5.0 s; recording toolbar 100 % absent (control 0 %); cancel discards; **SYNTHETIC** camera overlay 100 % in its corner, 0 % elsewhere, SnapForge Studio window 100 % absent; opening Studio blocked its UI thread 6 ms (limit 500 ms; camera listing 4 ms); camera-only 1280×720 and camera released; double stop, encoder stall (Stop returned in 2.01 s) and disk-full save outside the Library all handled |
+| Feature self-test | PASS. OCR en-US: 3 lines in order; tall image 160 of 160 lines. Video trim + cut 6.0 s → 4.0 s, parts in order, audio kept; GIF export; frame extraction. 4K image operations 922 ms (target < 10 s); GIF encoder 301 ms (target < 3 s); transforms with undo restore the exact original |
+| Crash recovery (process killed while recording) | Recovered 8.7 s of the interrupted recording at the next start |
 | Screenshot tour (1920×1080) | 18 full-resolution PNGs, SHA-256 verified, on the website gallery |
 | Installer (every .NET installation hidden) | Real **rc.1** per-user installer (built from `748eedb`) installed with an rc.1-format Library (3 images incl. Trash, 1 video, 1 damaged item) → rc.2 **system-wide** install to `C:\Program Files\SnapForge`, HKLM Installed-apps entry, all-users Start-menu shortcut; Program Files not writable by Users/Everyone/Authenticated Users; **user data byte-identical** after install and after migration of the old per-user copy; installed app's self-test and `--library-check --expect-images 3 --expect-videos 1` pass; a running SnapForge blocks setup and is **not** killed; repair; a **second Windows user** gets their own data folder and leaves the first user's data unchanged; uninstall removes program, entry and shortcut and **keeps both users' data** |
-| Library scale benchmarks | Completed (artifact `benchmarks-a70ae88…`) |
+| Library scale benchmarks | Completed (artifact `benchmarks-616345d…`) |
 
 All figures come from a GitHub-hosted Windows Server 2025 runner (4 vCPU, **no GPU, no audio or camera devices, one
 1024×768 virtual display; 1920×1080 for the screenshot tour**). They are not physical-PC results.
@@ -69,7 +69,7 @@ All figures come from a GitHub-hosted Windows Server 2025 runner (4 vCPU, **no G
 | Pause/resume A/V test failed when a sync marker coincided with the resume instant | Test design | Pause moved between markers; measured A/V error after resume 1.8–2.4 ms (limit 20 ms). A frame-snapping change was tried, made things worse and was reverted |
 | "Active window" label cut off (DEF-RC2-05) | App (UI) | Column widened; test measures every capture-type label |
 | Multi-item drag test intermittently got no drop (DEF-RC2-06) | **Test harness** | The drop target was placed partly off the 1024×768 CI screen; Windows clamps the pointer to the edge, where the runner's console window took the drop. Evidence-based root cause (window under the pointer logged; tooltip hypothesis tested and rejected; no application change shipped). Targets now kept on screen and checked; single and multi-item drags repeated 3× each with a pause and adjustment |
-| SnapForge Studio self-test intermittently recorded no test background (**DEF-RC2-07, open**) | Unknown (under investigation) | `studio-screen-plus-camera-synthetic` / `studio-window-not-recorded` failed in runs 132 and 133 and passed in 131, 134, 135 and 136. Ruled out: another window over the test area (hit-test precondition found only the test's windows). The self-test now reports a direct screen capture taken just before recording and a colour grid of the recorded frame, so the next occurrence separates screen state from the recording pipeline. Not a claim of a fix |
+| SnapForge Studio self-test intermittently recorded no test background (**DEF-RC2-07, open — narrowed**) | Test environment (test window not yet painted) — not a recording defect on present evidence | Failed in runs 132, 133 and 138. Run 138's direct screen capture showed the **screen itself** had 0 % of the test colour although Windows reported the test window on top, and the recording matched the screen — the recording pipeline is faithful. Ruled out: a covering window; Studio blocking its UI thread (measured 4–6 ms, camera listing 3–4 ms; new check `studio-ui-not-blocked` ≤ 500 ms). The self-test now waits up to 5 s for the test window to be painted (measured 25–27 ms in runs 139/140) and fails with the timing if it never is. Kept open until a failing occurrence with these timings is seen |
 | Installer test issues | Test | Registry lookup by AppId in both views; ACL check limited to write/delete/ownership rights; second user started with their own profile environment |
 
 ## 3. Status by owner requirement
@@ -81,7 +81,7 @@ All figures come from a GitHub-hosted Windows Server 2025 runner (4 vCPU, **no G
 | Simplified start-up (FA-001) | Fixed | Window counts of the real process | Real Windows sign-in |
 | Window positioning and closing (FA-003, SF-007, SF-008) | Fixed | `WindowFit` + `WorkAreaGuard` tests; Close window vs Exit | 125–200 % scaling, multi-monitor, taskbar positions |
 | Original QuickDock and capture panel (SF-004, SF-005, FA-004) | Fixed | UI tests, keyboard-mode test, screenshots | Owner visual review; Narrator/NVDA |
-| Webcam recording and SnapForge Studio | Implemented | Self-test with a **synthetic** camera: overlay position/shape, camera-only, Studio not recorded, camera released. **Open: DEF-RC2-07** (intermittent CI result, 2 of the last 6 runs) | **Real cameras** (none on CI) — MANUAL-ACCEPTANCE; confirm Studio is never in a recording |
+| Webcam recording and SnapForge Studio | Implemented | Self-test with a **synthetic** camera: overlay position/shape, camera-only, Studio not recorded, camera released. **Open: DEF-RC2-07** (intermittent CI self-test result in 3 runs; narrowed to the test window not being painted — recording verified faithful) | **Real cameras** (none on CI) — MANUAL-ACCEPTANCE; confirm Studio is never in a recording |
 | Native drag-and-drop | Fixed | Real OLE drags (tray, Editor, Library single/multi ×3, video into a separate process); FA-009 retention | Outlook, Word, PowerPoint, Teams, browsers, Explorer |
 | Complete Library backup and restore | Fixed | `FA005`/`FA017`/`FA023` tests | Large real libraries |
 | Trusted code-signing preparation | Prepared (nothing signed) | [SIGNING.md](SIGNING.md) plan; `website/tools/verify-release.py` checks Authenticode signatures and publisher before any download is enabled; no signing step in CI yet | Owner: provider/certificate; then add the signing step |
@@ -100,7 +100,7 @@ All figures come from a GitHub-hosted Windows Server 2025 runner (4 vCPU, **no G
 
 ## 5. Review instructions
 
-1. Read this page and FORENSIC-REMEDIATION.md. 2. Download the packages artifact from run 135 and verify the checksums
+1. Read this page and FORENSIC-REMEDIATION.md. 2. Download the packages artifact from run 139 and verify the checksums
 above. 3. On a Windows 11 24H2+ x64 PC: install the setup (UAC prompt), or unzip the portable build; to test without
 touching your real data, start a copy with `SnapForge.exe --profile review`. 4. Follow MANUAL-ACCEPTANCE-1.0.md and file
 failures in DEFECT-REGISTER.md. 5. Decide: approve, request changes, or defer items with justification. Nothing is
@@ -115,7 +115,7 @@ Earlier branches are preserved unchanged (`main`, `claude/pensive-euler-ulw6m4`,
 
 Built from `release/v1.0-candidate` and published to the `gh-pages` branch with `website/tools/publish-gh-pages.sh`
 (`build-info.json` on that branch names the source commit). GitHub Pages is **not** switched on (owner setting);
-the Download button stays **disabled** (`release.ownerApproved: false`). The site shows the rc.2 screenshots from run 135
-and says the test-build link will be added: per the site's rules the maintainer sets `testBuild.runUrl` (run 135) and
-`testBuild.commit` (`a70ae88f1ce98fd6f962178a6a203540fad33b74`) in `website/config.json` after checking that run — a
+the Download button stays **disabled** (`release.ownerApproved: false`). The site shows the rc.2 screenshots from run 135 (the UI is unchanged in the candidate)
+and says the test-build link will be added: per the site's rules the maintainer sets `testBuild.runUrl` (run 139) and
+`testBuild.commit` (`616345d33f35af23c025f953c1622e34bd4885e5`) in `website/config.json` after checking that run — a
 link to GitHub, never a file on the site. Website checks: `build.py` validation, 65 unit tests and the Playwright + axe browser check all passed locally.
