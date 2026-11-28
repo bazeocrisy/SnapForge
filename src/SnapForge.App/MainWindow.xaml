@@ -303,7 +303,7 @@
                             <RadioButton x:Name="HighlightTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Highlight" Checked="OnToolChecked" ToolTip="Highlight (H)" AutomationProperties.Name="Highlight tool">
                                 <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconHighlight}" /><TextBlock Text="Highlight" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
-                            <RadioButton x:Name="TextTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Text" Checked="OnToolChecked" ToolTip="Text (T) — Enter to finish, Shift+Enter for a new line" AutomationProperties.Name="Text tool">
+                            <RadioButton x:Name="TextTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Text" Checked="OnToolChecked" ToolTip="Text (T) — click to type or drag a box; Enter to finish, Shift+Enter for a new line" AutomationProperties.Name="Text tool">
                                 <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconText}" /><TextBlock Text="Text" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="StepTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="StepMarker" Checked="OnToolChecked" ToolTip="Numbered step (N)" AutomationProperties.Name="Step tool">

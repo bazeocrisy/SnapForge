@@ -10,6 +10,8 @@ public sealed record TextAnnotation(PointD Position, string Text, double FontSiz
 {
     public const double Padding = 6;
 
+    public double WrapWidth { get; init; }
+
     public PointD MeasuredSize { get; init; }
 
     public override RectD Bounds =>

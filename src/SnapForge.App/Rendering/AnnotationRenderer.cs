@@ -65,10 +65,15 @@ internal static class AnnotationRenderer
     }
 
     /// <summary>Size of the text block as it will be drawn (used to store hit-test bounds).</summary>
-    public static PointD MeasureText(string text, double fontSize)
+    public static PointD MeasureText(string text, double fontSize, double wrapWidth = 0)
     {
         FormattedText ft = Format(text, fontSize, Brushes.Black);
-        return new PointD(ft.WidthIncludingTrailingWhitespace, ft.Height);
+        if (wrapWidth > 0)
+        {
+            ft.MaxTextWidth = wrapWidth;
+        }
+
+        return new PointD(wrapWidth > 0 ? wrapWidth : ft.WidthIncludingTrailingWhitespace, ft.Height);
     }
 
     /// <summary>A contrasting color for outlines and labels drawn over <paramref name="c"/>.</summary>
@@ -110,6 +115,11 @@ internal static class AnnotationRenderer
 
         Brush fill = Frozen(new SolidColorBrush(BitmapConversion.ToMediaColor(t.Color)));
         FormattedText ft = Format(t.Text, t.FontSize, fill);
+        if (t.WrapWidth > 0)
+        {
+            ft.MaxTextWidth = t.WrapWidth;
+        }
+
         Geometry glyphs = ft.BuildGeometry(P(t.Position));
         glyphs.Freeze();
 

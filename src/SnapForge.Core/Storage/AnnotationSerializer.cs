@@ -56,6 +56,10 @@ public static class AnnotationSerializer
                     o["text"] = x.Text;
                     o["fontSize"] = x.FontSize;
                     o["measuredSize"] = Point(x.MeasuredSize);
+                    if (x.WrapWidth > 0)
+                    {
+                        o["wrapWidth"] = x.WrapWidth;
+                    }
                     break;
                 case StepMarkerAnnotation x:
                     o["type"] = "step";
@@ -109,7 +113,7 @@ public static class AnnotationSerializer
                 "rectangle" => new RectangleAnnotation(Rect(o, "rect")),
                 "ellipse" => new EllipseAnnotation(Rect(o, "rect")),
                 "highlight" => new HighlightAnnotation(Rect(o, "rect")) { Opacity = Num(o, "opacity") },
-                "text" => new TextAnnotation(Point(o, "position"), Str(o, "text"), Num(o, "fontSize")) { MeasuredSize = Point(o, "measuredSize") },
+                "text" => new TextAnnotation(Point(o, "position"), Str(o, "text"), Num(o, "fontSize")) { MeasuredSize = Point(o, "measuredSize"), WrapWidth = o.ContainsKey("wrapWidth") ? Math.Max(0, Num(o, "wrapWidth")) : 0 },
                 "step" => new StepMarkerAnnotation(Point(o, "center"), (int)Num(o, "number"), Num(o, "radius")),
                 "redaction" => new RedactionMaskAnnotation(Region(o)),
                 "freehand" => new FreehandAnnotation(FreehandPoints(o)),

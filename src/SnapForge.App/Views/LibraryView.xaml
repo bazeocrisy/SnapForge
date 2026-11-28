@@ -26,6 +26,7 @@
                                 <ContextMenu Opened="OnTileContextOpened">
                                     <MenuItem Header="_Open in Editor" Tag="open" Click="OnOpenSelected" FontWeight="SemiBold" InputGestureText="Enter" />
                                     <MenuItem Header="_Edit video (trim, frames, GIF)…" Tag="video-only" Click="OnEditVideo" />
+                                    <MenuItem Header="_Copy file" Tag="copy-file" Click="OnCopyFiles" />
                                     <MenuItem Header="_Rename…" Click="OnRename" InputGestureText="F2" />
                                     <MenuItem Header="_Duplicate" Tag="image-only" Click="OnDuplicate" />
                                     <MenuItem Header="Toggle _favorite" Click="OnToggleFavorite" />
@@ -171,6 +172,7 @@
                         <Button x:Name="MoreButton" Content="More ▾" Click="OnMore" Margin="0,0,10,0" IsEnabled="False">
                             <Button.ContextMenu>
                                 <ContextMenu>
+                                    <MenuItem Header="_Copy file" Tag="copy-file" Click="OnCopyFiles" />
                                     <MenuItem Header="_Rename…" Click="OnRename" InputGestureText="F2" />
                                     <MenuItem Header="_Duplicate" Click="OnDuplicate" />
                                     <MenuItem Header="_Combine images side by side" Tag="Horizontal" Click="OnCombine" />
