@@ -398,4 +398,21 @@ public partial class App
             });
         }
     }
+
+    /// <summary>About box of the running program (SnapForge Capture or SnapForge Editor): version, build and paths.</summary>
+    internal static void ShowAbout(Window? owner)
+    {
+        string text = $"{ProgramName} — Capture. Create. Share.\n\n{InstanceInfo.Describe()}\n\n" +
+            $"Program: {Environment.ProcessPath}\nLibrary: {AppServices.Current?.Library.Root}\n\n" +
+            "Free and open source under the MIT License — Copyright (c) 2026 bazeocrisy. Third-party notices: THIRD-PARTY-NOTICES.md.\n" +
+            "No network access, no telemetry, no account.";
+        if (owner is null)
+        {
+            MessageBox.Show(text, $"About {ProgramName}", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        else
+        {
+            MessageBox.Show(owner, text, $"About {ProgramName}", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+    }
 }

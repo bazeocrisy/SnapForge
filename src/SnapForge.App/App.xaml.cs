@@ -924,6 +924,7 @@ public partial class App : Application
         Add("Open _Library", () => OpenInEditor(new HandoffRequest(Handoff.ShowLibrary)));
         Add("_Settings…", () => ShowSettings(null));
         menu.Items.Add(new Separator());
+        Add("_About SnapForge Capture", () => ShowAbout(null));
         Add("E_xit SnapForge Capture", () => _ = ExitAsync());
         menu.Placement = System.Windows.Controls.Primitives.PlacementMode.MousePoint;
         menu.IsOpen = true;

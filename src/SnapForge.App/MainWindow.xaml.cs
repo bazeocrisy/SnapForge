@@ -1869,12 +1869,7 @@ public partial class MainWindow : Window
 
     private void OnGettingStarted(object sender, RoutedEventArgs e) => App.ShowWelcome(this);
 
-    private void OnAbout(object sender, RoutedEventArgs e) => MessageBox.Show(this,
-        $"{ProductInfo.Name} — Capture. Create. Share.\n\n{SnapForge.App.Services.InstanceInfo.Describe()}\n\n" +
-        $"Program: {Environment.ProcessPath}\nLibrary: {_services.Library.Root}\n\n" +
-        "Free and open source under the MIT License — Copyright (c) 2026 bazeocrisy. Third-party notices: THIRD-PARTY-NOTICES.md.\n" +
-        "No network access, no telemetry, no account.",
-        $"About {ProductInfo.Name}", MessageBoxButton.OK, MessageBoxImage.Information);
+    private void OnAbout(object sender, RoutedEventArgs e) => App.ShowAbout(this);
 
     private void DescribeDisplays()
     {
