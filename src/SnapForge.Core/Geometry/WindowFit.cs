@@ -26,6 +26,45 @@ public static class WindowFit
         return new PixelRect(x, y, w, h);
     }
 
+    /// <summary>
+    /// RC3 camera preview: keeps a small floating window fully inside the usable area of the monitor it mostly lies on
+    /// (or, if it is off every monitor, the work area whose centre is nearest), whatever the monitor layout or scaling.
+    /// </summary>
+    public static PixelRect KeepOnScreen(PixelRect window, IReadOnlyList<PixelRect> workAreas)
+    {
+        ArgumentNullException.ThrowIfNull(workAreas);
+        if (workAreas.Count == 0)
+        {
+            return window;
+        }
+
+        PixelRect best = workAreas[0];
+        long bestOverlap = -1;
+        foreach (PixelRect area in workAreas)
+        {
+            long overlap = window.Intersect(area).Area;
+            if (overlap > bestOverlap)
+            {
+                best = area;
+                bestOverlap = overlap;
+            }
+        }
+
+        if (bestOverlap <= 0)
+        {
+            long cx = window.X + (window.Width / 2), cy = window.Y + (window.Height / 2);
+            best = workAreas.OrderBy(a => Square(a.X + (a.Width / 2) - cx) + Square(a.Y + (a.Height / 2) - cy)).First();
+        }
+
+        return Fit(window, best);
+    }
+
+    /// <summary>Bottom-right corner of a work area, <paramref name="margin"/> pixels in from both edges.</summary>
+    public static PixelRect BottomRight(PixelRect workArea, int width, int height, int margin) =>
+        Fit(new PixelRect(workArea.Right - width - margin, workArea.Bottom - height - margin, width, height), workArea);
+
+    private static long Square(long v) => v * v;
+
     /// <summary>True if the title-bar strip (top <paramref name="captionHeight"/> pixels) is fully inside the work area.</summary>
     public static bool CaptionVisible(PixelRect window, PixelRect workArea, int captionHeight) =>
         window.X >= workArea.X && window.Right <= workArea.Right && window.Y >= workArea.Y && window.Y + captionHeight <= workArea.Bottom;

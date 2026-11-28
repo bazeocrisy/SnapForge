@@ -83,9 +83,11 @@ internal sealed class RecordingOutline : Window
 }
 
 /// <summary>
-/// The floating recording toolbar: recording indicator and elapsed time, Pause/Resume, Stop and save,
-/// Cancel and discard, system-audio and microphone toggles with level meters, resolution and frame rate, and a line
-/// for notices (device changes, low disk space). Excluded from the recording; does not take focus when clicked.
+/// RC3 recording control strip: recording dot and elapsed time, microphone activity, Pause/Resume and Stop — and a
+/// "More" menu with the rest (camera preview, camera in the recording, computer audio, microphone, discard). Excluded
+/// from the recording; never takes focus from the app being recorded. The same Stop, Pause and "show controls"
+/// commands are in the notification-area menu, so the recording can always be stopped even if the strip is hidden
+/// or off screen.
 /// </summary>
 internal sealed class RecordingToolbar : Window
 {
@@ -93,15 +95,22 @@ internal sealed class RecordingToolbar : Window
     private readonly TextBlock _time;
     private readonly TextBlock _status;
     private readonly Button _pause;
-    private readonly ToggleButton _systemToggle;
-    private readonly ToggleButton _micToggle;
-    private readonly ProgressBar _systemLevel;
     private readonly ProgressBar _micLevel;
-    private readonly ToggleButton? _cameraToggle;
+    private readonly TextBlock _micLabel;
+    private readonly Button _more;
+    private readonly bool _audioTrack;
+    private readonly bool _cameraOverlay;
+    private bool _system;
+    private bool _mic;
+    private bool _camera = true;
+    private bool _cameraAvailable = true;
+    private string? _cameraReason;
+    private bool _hasPreview;
+    private bool _previewVisible;
     private bool _blink;
 
     /// <param name="excludeFromCapture">Always true in the app; false only for documentation screenshots and the control half of the exclusion test.</param>
-    /// <param name="cameraOverlay">Screen + camera: show the camera overlay toggle.</param>
+    /// <param name="cameraOverlay">Screen + camera: offer the "camera in the recording" switch.</param>
     public RecordingToolbar(string format, bool audioTrack, bool system, bool mic, string? stopHotkey, string? pauseHotkey, bool excludeFromCapture = true, bool cameraOverlay = false)
     {
         WindowStyle = WindowStyle.None;
@@ -114,51 +123,37 @@ internal sealed class RecordingToolbar : Window
         SetResourceReference(BackgroundProperty, "SurfaceRaisedBrush");
         SetResourceReference(ForegroundProperty, "TextBrush");
         FontFamily = (FontFamily)Application.Current.FindResource("UiFont");
-        AutomationProperties_SetName(this, "Recording toolbar");
+        AutomationProperties_SetName(this, "Recording controls");
+        _audioTrack = audioTrack;
+        _system = system && audioTrack;
+        _mic = mic && audioTrack;
+        _cameraOverlay = cameraOverlay;
 
-        _dot = new TextBlock { Text = "●", Foreground = new SolidColorBrush(Color.FromRgb(0xE5, 0x39, 0x35)), FontSize = 16, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
-        _time = new TextBlock { Text = "0:00:00", FontSize = 15, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, MinWidth = 64, FontFamily = new FontFamily("Consolas, Segoe UI") };
+        _dot = new TextBlock { Text = "●", Foreground = new SolidColorBrush(Color.FromRgb(0xE5, 0x39, 0x35)), FontSize = 15, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 6, 0) };
+        _time = new TextBlock { Text = "0:00:00", FontSize = 15, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, MinWidth = 62, FontFamily = new FontFamily("Consolas, Segoe UI"), ToolTip = format };
         AutomationProperties_SetName(_time, "Elapsed recording time");
-        var formatText = new TextBlock { Text = format, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(8, 0, 8, 0), Opacity = 0.75 };
-        AutomationProperties_SetName(formatText, "Resolution and frame rate: " + format);
+
+        _micLabel = new TextBlock { Text = "Mic", FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 4, 0) };
+        _micLevel = new ProgressBar { Width = 46, Height = 6, Minimum = 0, Maximum = 100, Margin = new Thickness(0, 1, 8, 0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+        _micLevel.SetResourceReference(StyleProperty, "LevelMeter");
+        AutomationProperties_SetName(_micLevel, "Microphone level");
 
         _pause = MakeButton("Pause", "Pause recording" + Hint(pauseHotkey), (_, _) => PauseClicked?.Invoke(this, EventArgs.Empty));
-        Button stop = MakeButton("Stop", "Stop and save" + Hint(stopHotkey), (_, _) => StopClicked?.Invoke(this, EventArgs.Empty));
+        Button stop = MakeButton("■  Stop", "Stop and save" + Hint(stopHotkey), (_, _) => StopClicked?.Invoke(this, EventArgs.Empty));
         stop.FontWeight = FontWeights.SemiBold;
-        Button cancel = MakeButton("Cancel", "Cancel and discard the recording", (_, _) => CancelClicked?.Invoke(this, EventArgs.Empty));
+        _more = MakeButton("More ▾", "More recording controls", (_, _) => ShowMoreMenu());
 
-        (_systemToggle, _systemLevel) = MakeToggle("System audio", system, audioTrack, (on) => SystemToggled?.Invoke(this, on));
-        (_micToggle, _micLevel) = MakeToggle("Microphone", mic, audioTrack, (on) => MicToggled?.Invoke(this, on));
-
-        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 6, 10, 4) };
+        var row = new StackPanel { Orientation = Orientation.Horizontal, Margin = new Thickness(10, 6, 8, 6) };
         row.Children.Add(_dot);
         row.Children.Add(_time);
-        row.Children.Add(formatText);
+        row.Children.Add(_micLabel);
+        row.Children.Add(_micLevel);
         row.Children.Add(_pause);
         row.Children.Add(stop);
-        row.Children.Add(cancel);
-        row.Children.Add(new Separator { Width = 1, Margin = new Thickness(6, 2, 6, 2) });
-        row.Children.Add(Pair(_systemToggle, _systemLevel));
-        row.Children.Add(Pair(_micToggle, _micLevel));
-        if (cameraOverlay)
-        {
-            var camera = new ToggleButton
-            {
-                Content = "Camera",
-                IsChecked = true,
-                Margin = new Thickness(4, 0, 2, 0),
-                Padding = new Thickness(8, 3, 8, 3),
-                Focusable = false,
-                ToolTip = "Show or hide the camera in the recording",
-            };
-            camera.SetResourceReference(StyleProperty, "ToolbarToggle");
-            AutomationProperties_SetName(camera, "Camera overlay");
-            camera.Click += (_, _) => CameraToggled?.Invoke(this, camera.IsChecked == true);
-            row.Children.Add(camera);
-            _cameraToggle = camera;
-        }
+        row.Children.Add(_more);
+        UpdateMicLabel();
 
-        _status = new TextBlock { FontSize = 11.5, TextWrapping = TextWrapping.Wrap, MaxWidth = 560, Margin = new Thickness(12, 0, 12, 6), Visibility = Visibility.Collapsed };
+        _status = new TextBlock { FontSize = 11.5, TextWrapping = TextWrapping.Wrap, MaxWidth = 420, Margin = new Thickness(12, 0, 12, 6), Visibility = Visibility.Collapsed };
         _status.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
         var stack = new StackPanel();
         stack.Children.Add(row);
@@ -173,6 +168,7 @@ internal sealed class RecordingToolbar : Window
             if (e.OriginalSource is not ButtonBase)
             {
                 DragMove();
+                KeepOnScreen();
             }
         };
         SourceInitialized += (_, _) =>
@@ -192,33 +188,40 @@ internal sealed class RecordingToolbar : Window
 
     public event EventHandler<bool>? MicToggled;
 
-    /// <summary>Screen + camera: the user showed (true) or hid (false) the camera overlay.</summary>
+    /// <summary>Screen + camera: the user showed (true) or hid (false) the camera overlay in the recording.</summary>
     public event EventHandler<bool>? CameraToggled;
 
-    /// <summary>The camera was lost: the overlay toggle is switched off and disabled.</summary>
-    public void SetCameraUnavailable(string reason)
-    {
-        if (_cameraToggle is { } t)
-        {
-            t.IsChecked = false;
-            t.IsEnabled = false;
-            t.ToolTip = reason;
-        }
-    }
+    /// <summary>The user showed (true) or hid (false) the local camera preview (the recording does not change).</summary>
+    public event EventHandler<bool>? PreviewToggled;
 
     /// <summary>True if Windows confirmed the toolbar is excluded from screen capture.</summary>
     public bool Excluded { get; private set; }
 
+    /// <summary>Whether the camera preview menu entry is offered, and its current state.</summary>
+    public void SetPreview(bool available, bool visible)
+    {
+        _hasPreview = available;
+        _previewVisible = visible;
+    }
+
+    /// <summary>The camera was lost: the overlay switch is turned off and disabled.</summary>
+    public void SetCameraUnavailable(string reason)
+    {
+        _camera = false;
+        _cameraAvailable = false;
+        _cameraReason = reason;
+    }
+
     public void Update(TimeSpan elapsed, bool paused, float systemLevel, float micLevel)
     {
+        _ = systemLevel;
         _time.Text = elapsed.ToString(@"h\:mm\:ss", CultureInfo.InvariantCulture);
         _blink = !_blink;
         _dot.Opacity = paused ? 0.35 : (_blink ? 1 : 0.55);
         _dot.Text = paused ? "❚❚" : "●";
         _pause.Content = paused ? "Resume" : "Pause";
         AutomationProperties_SetName(_pause, paused ? "Resume recording" : "Pause recording");
-        _systemLevel.Value = _systemToggle.IsChecked == true ? Math.Sqrt(systemLevel) * 100 : 0;
-        _micLevel.Value = _micToggle.IsChecked == true ? Math.Sqrt(micLevel) * 100 : 0;
+        _micLevel.Value = _mic && !paused ? Math.Sqrt(micLevel) * 100 : 0;
     }
 
     public void ShowStatus(string text)
@@ -234,12 +237,19 @@ internal sealed class RecordingToolbar : Window
         IsEnabled = false;
     }
 
+    /// <summary>Brings the strip back onto the screen (from the notification-area menu).</summary>
+    public void Reveal()
+    {
+        Show();
+        KeepOnScreen();
+    }
+
     /// <summary>Places the toolbar centred below the recorded area, or above it / inside it if there is no room.</summary>
     public void PlaceNear(PixelRect recorded, PixelRect monitorWork)
     {
         UpdateLayout();
         PixelRect? b = PhysicalPlacement.GetBounds(this);
-        int w = b?.Width ?? 520, h = b?.Height ?? 44;
+        int w = b?.Width ?? 420, h = b?.Height ?? 44;
         int x = Math.Clamp(recorded.X + ((recorded.Width - w) / 2), monitorWork.X, Math.Max(monitorWork.X, monitorWork.Right - w));
         int y = recorded.Bottom + 10;
         if (y + h > monitorWork.Bottom)
@@ -255,6 +265,75 @@ internal sealed class RecordingToolbar : Window
         PhysicalPlacement.SetBounds(this, new PixelRect(x, y, w, h), resize: false);
     }
 
+    private void KeepOnScreen()
+    {
+        if (PhysicalPlacement.GetBounds(this) is { } b)
+        {
+            PixelRect fitted = SnapForge.Core.Geometry.WindowFit.KeepOnScreen(b, PhysicalPlacement.Layout().Monitors.Select(m => m.WorkArea).ToList());
+            if (fitted != b)
+            {
+                PhysicalPlacement.SetBounds(this, fitted, resize: false);
+            }
+        }
+    }
+
+    private void UpdateMicLabel()
+    {
+        _micLabel.Text = !_audioTrack || !_mic ? "Mic off" : "Mic";
+        _micLabel.Opacity = _mic ? 1 : 0.6;
+        _micLevel.Visibility = _mic ? Visibility.Visible : Visibility.Collapsed;
+        AutomationProperties_SetName(_micLabel, _mic ? "Microphone on" : "Microphone off");
+    }
+
+    private void ShowMoreMenu()
+    {
+        var menu = new ContextMenu { PlacementTarget = _more, Placement = PlacementMode.Bottom };
+        MenuItem Item(string header, bool isChecked, bool enabled, string? tip, Action click)
+        {
+            var item = new MenuItem { Header = header, IsCheckable = true, IsChecked = isChecked, IsEnabled = enabled, ToolTip = tip };
+            item.Click += (_, _) => click();
+            menu.Items.Add(item);
+            return item;
+        }
+
+        if (_hasPreview)
+        {
+            Item("Show camera _preview", _previewVisible, true, "Only for you — the recording does not change.", () =>
+            {
+                _previewVisible = !_previewVisible;
+                PreviewToggled?.Invoke(this, _previewVisible);
+            });
+        }
+
+        if (_cameraOverlay)
+        {
+            Item("_Camera in the recording", _camera, _cameraAvailable, _cameraAvailable ? "Turn the camera off or on in the saved video." : _cameraReason, () =>
+            {
+                _camera = !_camera;
+                CameraToggled?.Invoke(this, _camera);
+            });
+        }
+
+        string noAudio = "Audio was off when the recording started.";
+        Item("_Microphone", _mic, _audioTrack, _audioTrack ? null : noAudio, () =>
+        {
+            _mic = !_mic;
+            UpdateMicLabel();
+            MicToggled?.Invoke(this, _mic);
+        });
+        Item("Computer _audio", _system, _audioTrack, _audioTrack ? null : noAudio, () =>
+        {
+            _system = !_system;
+            SystemToggled?.Invoke(this, _system);
+        });
+        menu.Items.Add(new Separator());
+        var discard = new MenuItem { Header = "_Discard recording…" };
+        discard.Click += (_, _) => CancelClicked?.Invoke(this, EventArgs.Empty);
+        menu.Items.Add(discard);
+        _more.ContextMenu = menu;
+        menu.IsOpen = true;
+    }
+
     private static string Hint(string? hotkey) => hotkey is null ? string.Empty : $" ({hotkey})";
 
     private static Button MakeButton(string text, string tooltip, RoutedEventHandler click)
@@ -264,35 +343,6 @@ internal sealed class RecordingToolbar : Window
         AutomationProperties_SetName(b, tooltip);
         b.Click += click;
         return b;
-    }
-
-    private static (ToggleButton, ProgressBar) MakeToggle(string name, bool on, bool available, Action<bool> changed)
-    {
-        var t = new ToggleButton
-        {
-            Content = name,
-            IsChecked = on && available,
-            IsEnabled = available,
-            Margin = new Thickness(4, 0, 2, 0),
-            Padding = new Thickness(8, 3, 8, 3),
-            Focusable = false,
-            ToolTip = available ? $"Record {name.ToLowerInvariant()} (click to turn off or on)" : "Audio was off when the recording started. Turn on system audio or the microphone before recording.",
-        };
-        t.SetResourceReference(StyleProperty, "ToolbarToggle");
-        AutomationProperties_SetName(t, name);
-        t.Click += (_, _) => changed(t.IsChecked == true);
-        var level = new ProgressBar { Width = 44, Height = 6, Minimum = 0, Maximum = 100, Margin = new Thickness(4, 2, 6, 0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
-        level.SetResourceReference(StyleProperty, "LevelMeter");
-        AutomationProperties_SetName(level, name + " level");
-        return (t, level);
-    }
-
-    private static StackPanel Pair(UIElement a, UIElement b)
-    {
-        var p = new StackPanel { Orientation = Orientation.Horizontal };
-        p.Children.Add(a);
-        p.Children.Add(b);
-        return p;
     }
 
     private static void AutomationProperties_SetName(DependencyObject element, string name) =>

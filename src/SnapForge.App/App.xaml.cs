@@ -889,7 +889,28 @@ public partial class App : Application
             menu.Items.Add(item);
         }
 
-        Add("_Capture", () => _ = CaptureWithOptionsAsync(AppServices.Current!.Settings.Capture), bold: true);
+        if (Video.RecordingController.IsRecording)
+        {
+            // RC3: the recording can always be stopped from here, even if its controls are hidden or off screen.
+            bool paused = Video.RecordingController.Phase == Video.RecordingPhase.Paused;
+            Add("■  _Stop recording and save", () => _ = Video.RecordingController.StopAsync(), bold: true);
+            Add(paused ? "_Resume recording" : "_Pause recording", Video.RecordingController.TogglePause);
+            Add("Show recording _controls", Video.RecordingController.ShowControls);
+            if (Video.RecordingController.HasPreview)
+            {
+                bool hidden = Video.RecordingController.PreviewHidden;
+                Add(hidden ? "Show camera pre_view" : "Hide camera pre_view", () => Video.RecordingController.SetPreviewVisible(hidden));
+            }
+
+            menu.Items.Add(new Separator());
+        }
+
+        Add("_Capture", () => _ = CaptureWithOptionsAsync(AppServices.Current!.Settings.Capture), bold: !Video.RecordingController.IsRecording);
+        if (!Video.RecordingController.IsActive)
+        {
+            Add("_Record…", Video.RecordingController.OpenStudio);
+        }
+
         Add("Capture _panel…", ShowCaptureWindow);
         Add("Show _QuickDock", ShowWidget);
         nint previousForeground = Interop.NativeMethods.GetForegroundWindow();

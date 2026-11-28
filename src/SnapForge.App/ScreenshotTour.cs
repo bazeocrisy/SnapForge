@@ -111,12 +111,32 @@ internal static class ScreenshotTour
                     log.Add("OCR screenshot skipped: no OCR language installed on this machine.");
                 }
 
-                // SnapForge Studio (recording set-up), screen-only default: no camera is opened for the tour.
+                // RC3 Record panel as it first opens (Camera and Mic off), then with Camera and Mic on: the floating
+                // camera preview shows the SYNTHETIC test camera (CI has no real camera; labelled in the caption).
                 var studio = new Video.StudioWindow(services, listCameras: () => []) { ExcludeFromCapture = false };
                 studio.Show();
                 Pump(700);
                 SaveScreen(studio, null, Path.Combine(outputFolder, $"studio-{suffix}.png"), log);
+                SaveScreen(studio, null, Path.Combine(outputFolder, $"record-panel-{suffix}.png"), log);
                 studio.Close();
+                Video.RecordingController.SessionCamera = true;
+                Video.RecordingController.SessionMicrophone = true;
+                var withCamera = new Video.StudioWindow(services, (_, _) => new Video.SyntheticCameraSource(640, 360, 30), () => [new Video.Interop.Mf.VideoDevice("SnapForge test camera (synthetic)", "synthetic")]) { ExcludeFromCapture = false };
+                withCamera.Show();
+                Pump(1800);
+                if (withCamera.Preview is { } preview)
+                {
+                    SaveScreen(preview, 8, Path.Combine(outputFolder, $"camera-preview-{suffix}.png"), log);
+                    if (Bounds(withCamera) is { } pb && Bounds(preview) is { } cb)
+                    {
+                        SaveRegion(PixelRect.Union([new PixelRect(pb.X - 12, pb.Y - 12, pb.Width + 24, pb.Height + 24), new PixelRect(cb.X - 12, cb.Y - 12, cb.Width + 24, cb.Height + 24)]), Path.Combine(outputFolder, $"record-panel-camera-{suffix}.png"), log);
+                    }
+                }
+
+                SaveScreen(withCamera, null, Path.Combine(outputFolder, $"record-panel-on-{suffix}.png"), log);
+                withCamera.Close();
+                Video.RecordingController.SessionCamera = false;
+                Video.RecordingController.SessionMicrophone = false;
 
                 main.ShowLibraryWorkspace();
                 main.LibraryPane.SelectIds(services.Library.Records.OrderByDescending(r => r.CreatedUtc).Take(2).Select(r => r.Id));
@@ -175,10 +195,11 @@ internal static class ScreenshotTour
                     var recorded = new PixelRect(area.X + 120, area.Y + 120, Math.Min(640, area.Width - 240), Math.Min(360, area.Height - 260));
                     var outline = new Video.RecordingOutline(recorded, excludeFromCapture: false);
                     outline.Show();
-                    var toolbar = new Video.RecordingToolbar($"{recorded.Width}×{recorded.Height} · 30 FPS", true, true, false, "Shift+F10", "Shift+F9", excludeFromCapture: false);
+                    var toolbar = new Video.RecordingToolbar($"{recorded.Width}×{recorded.Height} · 30 FPS", true, true, true, "Shift+F10", "Shift+F9", excludeFromCapture: false, cameraOverlay: true);
+                    toolbar.SetPreview(available: true, visible: true);
                     toolbar.Show();
                     toolbar.PlaceNear(recorded, work);
-                    toolbar.Update(TimeSpan.FromSeconds(83), false, 0.45f, 0);
+                    toolbar.Update(TimeSpan.FromSeconds(83), false, 0.2f, 0.45f);
                     Pump(400);
                     SaveScreen(toolbar, 12, Path.Combine(outputFolder, $"recording-toolbar-{suffix}.png"), log);
                     if (Bounds(toolbar) is { } tb)
@@ -188,6 +209,13 @@ internal static class ScreenshotTour
 
                     toolbar.Close();
                     outline.Close();
+
+                    // RC3: the compact confirmation after Stop (not tied to a real file here: no Show in folder).
+                    var saved = new Video.RecordingSavedWindow("Recording saved", "Recording saved: 0:01:23, 1920×1080.", Guid.NewGuid(), null, ok: true, excludeFromCapture: false);
+                    saved.Show();
+                    Pump(500);
+                    SaveScreen(saved, 12, Path.Combine(outputFolder, $"recording-saved-{suffix}.png"), log);
+                    saved.Close();
                 }
 
                 // QuickDock: collapsed pill at the top centre (wide context and close-up), expanded, keyboard mode

@@ -20,8 +20,10 @@ internal static partial class VideoSelfTest
         // Screen + SYNTHETIC camera composited into a real screen recording; Studio on screen at the same time.
         try
         {
-            (StudioOverlayResult o, double studioGreen, string? studioError, string? covered, string diagnostics, double loadedWorkMs, double limeVisibleMs) = ScreenPlusSyntheticCamera(dir);
+            var preview = new PreviewEvidence();
+            (StudioOverlayResult o, double studioGreen, string? studioError, string? covered, string diagnostics, double loadedWorkMs, double limeVisibleMs) = ScreenPlusSyntheticCamera(dir, preview);
             report["studioScreenPlusCamera"] = new { synthetic = true, o.InsideShare, o.OtherCorners, o.GreenElsewhere, o.Layout, result = Summary(o.Result), studioWindowGreen = studioGreen, studioError, coveredBy = covered, diagnostics };
+            report["cameraPreview"] = new { synthetic = true, preview.Excluded, preview.FramesShown, rect = preview.Rect?.ToString(), preview.SyntheticInRecording, preview.Caption, preview.Error };
             string precondition = covered is not null ? $" — PRECONDITION NOT MET: the test area was covered by {covered}"
                 : limeVisibleMs < 0 ? " — PRECONDITION NOT MET: the test window was not painted within 5 s" : string.Empty;
             double dropped = o.Result.FramesWritten == 0 ? 1 : o.Result.FramesDropped / (double)(o.Result.FramesWritten + o.Result.FramesDropped);
@@ -30,6 +32,12 @@ internal static partial class VideoSelfTest
                 $"SYNTHETIC camera in the bottom-right {o.Layout}: {o.InsideShare:P1} of the overlay shows the synthetic pattern, other corners {string.Join(" / ", o.OtherCorners.Select(c => c.ToString("P1", System.Globalization.CultureInfo.InvariantCulture)))}, screen elsewhere {o.GreenElsewhere:P1} unchanged; {o.Result.FramesWritten} frames, {dropped:P2} dropped{precondition} — {diagnostics}");
             check("studio-window-not-recorded", studioError is null && studioGreen >= 0.98,
                 studioError ?? $"the Studio window's area is {studioGreen:P1} background in the recording (Studio is excluded from capture){precondition}");
+            // RC3: the floating camera preview (showing the SAME synthetic camera) sits over the recorded area, away from
+            // the overlay corner. It must be live, excluded from capture, and the camera must appear in the video once.
+            check("camera-preview-live-and-not-recorded",
+                preview.Error is null && preview.Excluded && preview.FramesShown > 0 && preview.SyntheticInRecording <= 0.02 && o.InsideShare >= 0.9,
+                preview.Error ?? $"SYNTHETIC camera preview over the recorded area at {preview.Rect}: {preview.FramesShown} live frames shown, excluded from capture: {preview.Excluded}, " +
+                $"synthetic pattern where the preview was: {preview.SyntheticInRecording:P1} (camera composed once, in the overlay: {o.InsideShare:P1}); caption \"{preview.Caption}\"{precondition}");
             // The app must not freeze while Studio looks for cameras (DEF-RC2-07 investigation).
             check("studio-ui-not-blocked", loadedWorkMs >= 0 && loadedWorkMs <= 500,
                 $"opening SnapForge Studio blocked its UI thread for {loadedWorkMs:0} ms (limit 500 ms; includes listing cameras)");
@@ -201,8 +209,28 @@ internal static partial class VideoSelfTest
     /// Shows a lime window and SnapForge Studio over part of it, records the lime area with the SYNTHETIC camera
     /// composited in the bottom-right corner, decodes a frame and measures where the synthetic pattern appears.
     /// </summary>
-    private static (StudioOverlayResult Overlay, double StudioGreen, string? StudioError, string? Covered, string Diagnostics, double LoadedWorkMs, double LimeVisibleMs) ScreenPlusSyntheticCamera(string dir)
+    /// <summary>What the camera-preview part of <see cref="ScreenPlusSyntheticCamera"/> observed.</summary>
+    private sealed class PreviewEvidence
     {
+        public bool Excluded { get; set; }
+
+        public int FramesShown { get; set; }
+
+        public PixelRect? Rect { get; set; }
+
+        public double SyntheticInRecording { get; set; } = 1;
+
+        public string? Caption { get; set; }
+
+        public string? Error { get; set; }
+    }
+
+    private static (StudioOverlayResult Overlay, double StudioGreen, string? StudioError, string? Covered, string Diagnostics, double LoadedWorkMs, double LimeVisibleMs) ScreenPlusSyntheticCamera(string dir, PreviewEvidence previewEvidence)
+    {
+        // One SYNTHETIC camera, as in the app: the preview shows the camera the recorder composes.
+        var camera = new SyntheticCameraSource(640, 360, 30);
+        camera.Start();
+        CameraPreviewWindow? previewWindow = null;
         PixelRect area = default;
         var ours = new List<nint>();
         System.Windows.Window? limeWindow = null;
@@ -248,6 +276,31 @@ internal static partial class VideoSelfTest
                 {
                     studioError = "Windows did not confirm the Studio window's exclusion from capture.";
                 }
+
+                try
+                {
+                    var preview = new CameraPreviewWindow();
+                    preview.SetShape(CameraOverlayShape.Circle, mirror: true);
+                    preview.SetState("In the recording · bottom right", inRecording: true);
+                    preview.Show();
+                    preview.SetSource(camera);
+                    previewWindow = preview;
+                    ours.Add(new System.Windows.Interop.WindowInteropHelper(preview).Handle);
+                    // After its own first placement (Loaded): put it over the top-right part of the recorded area.
+                    _ = preview.Dispatcher.BeginInvoke(System.Windows.Threading.DispatcherPriority.ContextIdle, () =>
+                    {
+                        if (SnapForge.App.Interop.PhysicalPlacement.GetBounds(preview) is { } pb)
+                        {
+                            SnapForge.App.Interop.PhysicalPlacement.SetBounds(preview, new PixelRect(area.Right - pb.Width - 10, area.Y + 6, pb.Width, pb.Height), resize: false);
+                        }
+                    });
+                }
+#pragma warning disable CA1031
+                catch (Exception ex)
+#pragma warning restore CA1031
+                {
+                    previewEvidence.Error = "The camera preview could not be shown: " + ex.Message;
+                }
             }
 #pragma warning disable CA1031
             catch (Exception ex)
@@ -262,6 +315,7 @@ internal static partial class VideoSelfTest
             {
                 if (close.IsSet)
                 {
+                    previewWindow?.Close();
                     studio?.Close();
                     lime.Close();
                     services?.Dispose();
@@ -315,8 +369,12 @@ internal static partial class VideoSelfTest
         try
         {
             nint monitor = MonitorFromPoint(PackPoint(area.X + 5, area.Y + 5), 2);
-            var camera = new SyntheticCameraSource(640, 360, 30);
-            camera.Start();
+            if (previewWindow is { } pw)
+            {
+                (previewEvidence.Excluded, previewEvidence.Rect, previewEvidence.Caption) =
+                    pw.Dispatcher.Invoke(() => (pw.Excluded, SnapForge.App.Interop.PhysicalPlacement.GetBounds(pw), pw.Describe()));
+            }
+
             var composite = new CompositeFrameSource(new ScreenFrameSource(monitor, false, (area.X, area.Y, area.Width, area.Height), false), camera,
                 CameraOverlayShape.Circle, CameraOverlaySize.Medium, CameraCorner.BottomRight, mirror: true);
             layout = composite.Layout;
@@ -327,6 +385,11 @@ internal static partial class VideoSelfTest
         }
         finally
         {
+            if (previewWindow is { } pw2)
+            {
+                previewEvidence.FramesShown = pw2.Dispatcher.Invoke(() => pw2.FramesShown);
+            }
+
             close.Set();
             thread.Join(TimeSpan.FromSeconds(5));
             try
@@ -357,6 +420,13 @@ internal static partial class VideoSelfTest
         if (studioRect is { } s && studioError is null)
         {
             studioGreen = Share(frame, s.X - area.X, s.Y - area.Y, Math.Min(s.Width, layout.X - (s.X - area.X)), Math.Min(s.Height, h - (s.Y - area.Y)), Lime);
+        }
+
+        if (previewEvidence.Rect is { } pr && previewEvidence.Error is null)
+        {
+            int px = Math.Clamp(pr.X - area.X, 0, w - 1), py = Math.Clamp(pr.Y - area.Y, 0, h - 1);
+            int pwid = Math.Min(pr.Width, w - px), phgt = Math.Min(Math.Min(pr.Height, h - py), Math.Max(1, layout.Y - py - 4)); // never the overlay itself
+            previewEvidence.SyntheticInRecording = Math.Round(Share(frame, px, py, pwid, phgt, Synthetic), 4);
         }
 
         File.Delete(path);

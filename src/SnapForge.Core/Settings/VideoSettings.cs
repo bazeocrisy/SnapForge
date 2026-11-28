@@ -84,8 +84,8 @@ public sealed record VideoSettings
 
     public RecordingSource Source { get; init; } = RecordingSource.Region;
 
-    /// <summary>Opens the finished recording in the Library player.</summary>
-    public bool OpenAfterRecording { get; init; } = true;
+    /// <summary>RC3: opens the finished recording in SnapForge Editor (off by default: a compact "Recording saved" message is shown instead).</summary>
+    public bool OpenAfterRecording { get; init; }
 
     /// <summary>Recording stops (and is saved) when free space on the library drive falls below this.</summary>
     public int MinimumFreeSpaceMegabytes { get; init; } = 500;

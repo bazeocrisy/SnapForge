@@ -40,6 +40,7 @@ internal static partial class RecordingController
     private static StudioWindow? _studio;
     private static Task _studioCameraReleased = Task.CompletedTask;
     private static Task _ending = Task.CompletedTask;
+    private static CameraPreviewWindow? _pendingPreview;
 
     [LibraryImport("user32.dll")]
     private static partial nint MonitorFromPoint(long point, uint flags);
@@ -53,6 +54,31 @@ internal static partial class RecordingController
     /// <summary>Raised on the UI thread whenever <see cref="Phase"/> changes.</summary>
     public static event EventHandler? ActiveChanged;
 
+    /// <summary>
+    /// RC3: Camera switched on in the Record panel during this SnapForge Capture session. Starts off in every session:
+    /// the camera is only ever used after a deliberate "Camera on" (also for the record hotkey).
+    /// </summary>
+    internal static bool SessionCamera { get; set; }
+
+    /// <summary>RC3: Mic switched on in the Record panel during this session (starts off, like <see cref="SessionCamera"/>).</summary>
+    internal static bool SessionMicrophone { get; set; }
+
+    /// <summary>RC3: the user hid the local camera preview (the recording is unchanged); remembered for this session.</summary>
+    internal static bool PreviewHidden { get; set; }
+
+    /// <summary>The camera preview of the running recording, if any (self-tests, screenshots).</summary>
+    internal static CameraPreviewWindow? ActivePreview => _session?.Preview;
+
+    /// <summary>
+    /// The saved Record settings combined with this session's Camera and Mic switches: camera off = screen only; camera
+    /// on = screen + camera, or camera only when "Record the camera only" is chosen; microphone only when Mic is on.
+    /// </summary>
+    internal static VideoSettings Effective(VideoSettings v) => v with
+    {
+        StudioMode = !SessionCamera ? StudioMode.Screen : v.StudioMode == StudioMode.Camera ? StudioMode.Camera : StudioMode.ScreenAndCamera,
+        RecordMicrophone = SessionMicrophone,
+    };
+
     /// <summary>Creates camera sources (tests may substitute the synthetic camera). Arguments: symbolic link, name.</summary>
     internal static Func<string?, string, ICameraSource>? CameraFactory { get; set; }
 
@@ -64,7 +90,7 @@ internal static partial class RecordingController
     {
         if (Life.IsActive)
         {
-            _session?.Toolbar.Activate();
+            _session?.Toolbar.Reveal();
             return;
         }
 
@@ -90,6 +116,8 @@ internal static partial class RecordingController
         studio.StartRequested += (_, _) =>
         {
             _studioCameraReleased = studio.CameraReleased;
+            _pendingPreview?.Close();
+            _pendingPreview = studio.TakePreview(); // stays on screen: "see yourself" before and during the recording
             studio.Close();
             _ = StartAsync();
         };
@@ -142,11 +170,13 @@ internal static partial class RecordingController
         {
             s.Recorder.Pause();
             s.ReleaseCamera(); // camera light off while paused
+            s.UpdatePreview(paused: true);
         }
         else if (Life.TryResume())
         {
             s.Recorder.Resume();
             s.RestartCamera();
+            s.UpdatePreview(paused: false);
         }
 
         RaiseChanged();
@@ -158,11 +188,11 @@ internal static partial class RecordingController
     {
         if (Life.IsActive || CaptureController.IsBusy || AppServices.Current is not { } services)
         {
-            _session?.Toolbar.Activate();
+            _session?.Toolbar.Reveal();
             return;
         }
 
-        VideoSettings v = services.Settings.Video;
+        VideoSettings v = Effective(services.Settings.Video);
         if (!MediaFoundationAvailable())
         {
             MessageBox.Show("Recording needs the Windows media components (Media Foundation), which are not installed on this PC. " +
@@ -190,7 +220,21 @@ internal static partial class RecordingController
             if (_studio is { } studio)
             {
                 _studioCameraReleased = studio.CameraReleased;
+                _pendingPreview?.Close();
+                _pendingPreview = studio.TakePreview();
                 studio.Close();
+            }
+
+            if (v.StudioMode != StudioMode.Screen && _pendingPreview is null)
+            {
+                // Record hotkey with Camera on: show the preview too.
+                _pendingPreview = new CameraPreviewWindow();
+                _pendingPreview.SetShape(v.CameraShape, v.CameraMirror);
+                _pendingPreview.SetState(CameraPreviewWindow.Placement(v), inRecording: true, placeholder: "Starting the recording…");
+                if (!PreviewHidden)
+                {
+                    _pendingPreview.Show();
+                }
             }
 
             HideOwnWindows();
@@ -234,6 +278,15 @@ internal static partial class RecordingController
                 if (!proceed)
                 {
                     return;
+                }
+
+                if (camera is null)
+                {
+                    ClosePendingPreview(); // recording the screen without the camera, as the user chose
+                }
+                else
+                {
+                    _pendingPreview?.SetSource(camera); // you can see yourself during the countdown
                 }
             }
 
@@ -293,11 +346,18 @@ internal static partial class RecordingController
 
             if (_session is null)
             {
+                ClosePendingPreview();
                 RestoreOwnWindows();
             }
 
             RaiseChanged();
         }
+    }
+
+    private static void ClosePendingPreview()
+    {
+        _pendingPreview?.Close();
+        _pendingPreview = null;
     }
 
     /// <summary>
@@ -479,8 +539,26 @@ internal static partial class RecordingController
         string format = $"{recorder.Width}×{recorder.Height} · {v.FramesPerSecond} FPS";
         var toolbar = new RecordingToolbar(format, options.AudioTrack, v.RecordSystemAudio, v.RecordMicrophone,
             v.StopHotkey is { } st ? st.ToString() : null, v.RecordHotkey is { } p ? p.ToString() : null, cameraOverlay: composite is not null);
-        var session = new Session(recorder, toolbar, id, startedUtc, camera, composite, v.StudioMode == StudioMode.Camera);
+        var session = new Session(recorder, toolbar, id, startedUtc, camera, composite, v.StudioMode == StudioMode.Camera)
+        {
+            Preview = camera is null ? null : _pendingPreview,
+            Placement = CameraPreviewWindow.Placement(v),
+        };
+        if (camera is null)
+        {
+            ClosePendingPreview();
+        }
+
+        _pendingPreview = null;
         _session = session;
+        if (session.Preview is { } preview)
+        {
+            preview.SetSource(camera);
+            preview.HideRequested += (_, _) => SetPreviewVisible(false);
+            toolbar.SetPreview(available: true, visible: !PreviewHidden);
+            toolbar.PreviewToggled += (_, on) => SetPreviewVisible(on);
+            session.UpdatePreview(paused: false);
+        }
 
         recorder.Notice += (_, message) => Application.Current.Dispatcher.BeginInvoke(() => session.Toolbar.ShowStatus(message));
         recorder.StoppedBySelf += (_, _) => Application.Current.Dispatcher.BeginInvoke(() => _ = StopAsync());
@@ -491,6 +569,8 @@ internal static partial class RecordingController
                 // Screen + camera: the recording continues without the overlay. Camera only: the recorder stops by itself.
                 session.Toolbar.ShowStatus(reason);
                 session.Toolbar.SetCameraUnavailable(reason);
+                session.Preview?.SetSource(null);
+                session.Preview?.SetState("Camera disconnected — not in the recording from here on", inRecording: false, placeholder: reason);
             });
         }
 
@@ -505,7 +585,11 @@ internal static partial class RecordingController
         toolbar.CancelClicked += (_, _) => CancelWithConfirmation();
         toolbar.SystemToggled += (_, on) => session.Recorder.SetSourceEnabled(0, on);
         toolbar.MicToggled += (_, on) => session.Recorder.SetSourceEnabled(1, on);
-        toolbar.CameraToggled += (_, on) => session.SetOverlayVisible(on);
+        toolbar.CameraToggled += (_, on) =>
+        {
+            session.SetOverlayVisible(on);
+            session.UpdatePreview(Life.Phase == RecordingPhase.Paused);
+        };
         toolbar.Show();
         toolbar.PlaceNear(recorded ?? new PixelRect(work.X + (work.Width / 2) - 1, work.Bottom - 120, 2, 2), work);
         if (!toolbar.Excluded)
@@ -597,19 +681,40 @@ internal static partial class RecordingController
 
         Cleanup(session);
         RestoreOwnWindows();
+        string? outside = null;
         if (services is not null && saved is { } inLibrary && !services.Settings.Video.SaveToLibrary)
         {
-            (CaptureRecord? kept, string note) = await SaveOutsideLibraryAsync(services, inLibrary).ConfigureAwait(true);
+            (CaptureRecord? kept, string note, outside) = await SaveOutsideLibraryAsync(services, inLibrary).ConfigureAwait(true);
             saved = kept;
             message = kept is null ? note : message + " " + note;
         }
 
         Life.Finish(faulted: !result.Finalized);
         RaiseChanged();
-        App.NotifyBalloon("SnapForge recording", message, warning: !result.Finalized || result.EndReason is not null);
-        if (saved is not null && services?.Settings.Video.OpenAfterRecording == true)
+        bool ok = result.Finalized && (saved is not null || outside is not null);
+        string? file = outside ?? (services is null ? null : ExistingVideoFile(services, saved?.Id ?? session.VideoId));
+        if (ok && saved is not null && services?.Settings.Video.OpenAfterRecording == true)
         {
-            App.ShowVideo(saved.Id);
+            App.NotifyBalloon("SnapForge recording", message, warning: result.EndReason is not null);
+            App.OpenInEditor(new HandoffRequest(Handoff.EditVideo, saved.Id));
+            return;
+        }
+
+        string title = ok ? "Recording saved" : result.Stalled ? "Recording is being recovered" : "The recording could not be finished";
+        RecordingSavedWindow.ShowNew(title, message, ok ? saved?.Id : null, file, ok);
+    }
+
+    /// <summary>The recording's MP4 in the Library, if the file exists (also for one kept for recovery).</summary>
+    private static string? ExistingVideoFile(AppServices services, Guid id)
+    {
+        try
+        {
+            string path = services.Library.VideoPath(id);
+            return File.Exists(path) ? path : null;
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidOperationException)
+        {
+            return null;
         }
     }
 
@@ -636,7 +741,7 @@ internal static partial class RecordingController
     /// outside, or (the record, note) if it stays in the Library (dialog cancelled, or the copy failed — then the
     /// Library copy and any existing file at the destination are untouched).
     /// </summary>
-    private static async Task<(CaptureRecord? Record, string Note)> SaveOutsideLibraryAsync(AppServices services, CaptureRecord saved)
+    private static async Task<(CaptureRecord? Record, string Note, string? Path)> SaveOutsideLibraryAsync(AppServices services, CaptureRecord saved)
     {
         var dialog = new SaveFileDialog
         {
@@ -648,7 +753,7 @@ internal static partial class RecordingController
         };
         if (dialog.ShowDialog() != true)
         {
-            return (saved, "It was kept in the Library because no location was chosen.");
+            return (saved, "It was kept in the Library because no location was chosen.", null);
         }
 
         string target = dialog.FileName;
@@ -661,7 +766,7 @@ internal static partial class RecordingController
         {
             MessageBox.Show($"The recording could not be saved to {target}:\n\n{ex.Message}\n\nIt was kept in the Library, and nothing at that location was changed.",
                 "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
-            return (saved, "It could not be saved to the chosen location and was kept in the Library.");
+            return (saved, "It could not be saved to the chosen location and was kept in the Library.", null);
         }
 
         try
@@ -670,10 +775,10 @@ internal static partial class RecordingController
         }
         catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
         {
-            return (saved, $"Saved to {target}; the Library copy could not be removed ({ex.Message}).");
+            return (saved, $"Saved to {target}; the Library copy could not be removed ({ex.Message}).", target);
         }
 
-        return (null, $"Recording saved to {target} (not kept in the Library).");
+        return (null, $"Recording saved to {target} (not kept in the Library).", target);
     }
 
     private static void CancelWithConfirmation()
@@ -767,6 +872,7 @@ internal static partial class RecordingController
     public static void StopForExit()
     {
         _studio?.Close();
+        ClosePendingPreview();
         if (Life.Phase == RecordingPhase.Starting)
         {
             Life.TryBeginCancel(); // nothing was recorded yet: the start is abandoned
@@ -884,12 +990,57 @@ internal static partial class RecordingController
         _ = Task.Run(session.Recorder.Dispose);
     }
 
+    /// <summary>Shows or hides the local camera preview; the recording itself is not changed.</summary>
+    internal static void SetPreviewVisible(bool visible)
+    {
+        PreviewHidden = !visible;
+        if (_session is not { Preview: { } preview } s)
+        {
+            return;
+        }
+
+        if (visible)
+        {
+            preview.Show();
+            preview.KeepOnScreen();
+        }
+        else
+        {
+            preview.Hide();
+        }
+
+        s.Toolbar.SetPreview(available: true, visible: visible);
+    }
+
+    /// <summary>Notification-area menu: brings the recording controls (and the preview, unless hidden) back on screen.</summary>
+    internal static void ShowControls()
+    {
+        if (_session is not { } s)
+        {
+            OpenStudio();
+            return;
+        }
+
+        s.Toolbar.Reveal();
+        if (!PreviewHidden && s.Preview is { } p)
+        {
+            p.Show();
+            p.KeepOnScreen();
+        }
+    }
+
+    /// <summary>True while the recording runs or is paused (not while starting or saving).</summary>
+    internal static bool IsRecording => Life.IsRecording;
+
+    /// <summary>True while the running recording has a camera preview.</summary>
+    internal static bool HasPreview => _session?.Preview is not null;
+
     private static void RaiseChanged() => ActiveChanged?.Invoke(null, EventArgs.Empty);
 
     private static void HideOwnWindows()
     {
         Hidden.Clear();
-        foreach (Window w in Application.Current.Windows.Cast<Window>().Where(w => w.IsVisible).ToList())
+        foreach (Window w in Application.Current.Windows.Cast<Window>().Where(w => w.IsVisible && w is not CameraPreviewWindow).ToList())
         {
             Hidden.Add((w, w.WindowState));
             w.Hide();
@@ -940,6 +1091,34 @@ internal static partial class RecordingController
         public RecordingToolbar Toolbar { get; } = toolbar;
 
         public RecordingOutline? Outline { get; set; }
+
+        /// <summary>RC3: the floating camera preview (camera on), closed with the other recording windows.</summary>
+        public CameraPreviewWindow? Preview { get; init; }
+
+        /// <summary>Where the camera appears in the recording (preview caption).</summary>
+        public string Placement { get; init; } = string.Empty;
+
+        /// <summary>Tells the preview whether the camera is in the recording right now.</summary>
+        public void UpdatePreview(bool paused)
+        {
+            if (Preview is not { } p || camera is not { } c || c.LostReason is not null)
+            {
+                return;
+            }
+
+            if (paused)
+            {
+                p.SetState("Paused — nothing is being recorded", inRecording: false, placeholder: "The camera is off while the recording is paused.");
+            }
+            else if (composite is not null && !_overlayWanted)
+            {
+                p.SetState("Camera hidden — not in the recording", inRecording: false, placeholder: "Turn \"Camera in the recording\" back on under More in the recording controls.");
+            }
+            else
+            {
+                p.SetState("● Recording · " + Placement.Replace("In the recording · ", "camera at the ", StringComparison.Ordinal), inRecording: true);
+            }
+        }
 
         public DispatcherTimer? Timer { get; set; }
 
@@ -1012,6 +1191,8 @@ internal static partial class RecordingController
             Toolbar.Close();
             Outline?.Close();
             Outline = null;
+            Preview?.SetSource(null);
+            Preview?.Close();
         }
     }
 }

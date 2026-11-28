@@ -4,7 +4,6 @@ using System.Windows.Controls;
 using System.Windows.Controls.Primitives;
 using System.Windows.Input;
 using System.Windows.Media;
-using System.Windows.Media.Imaging;
 using System.Windows.Shapes;
 using System.Windows.Threading;
 using Microsoft.Win32;
@@ -17,43 +16,58 @@ using SnapForge.Core.Settings;
 namespace SnapForge.App.Video;
 
 /// <summary>
-/// SnapForge Studio (SF-006): the recording set-up window — what to record (screen, screen + camera, camera), the
-/// capture area, the camera and its overlay (shape, size, corner, mirror) with a live preview, sound, and video
-/// options. Every choice is saved in <see cref="VideoSettings"/> as it is made. The camera is opened only while a
-/// camera mode is selected and the preview is on; closing the window, choosing Screen only, locking the PC or
-/// starting the recording releases it. The window is excluded from screen capture.
+/// RC3 Record panel (replaces the long SnapForge Studio form of rc.2): what to record (Screen / Window / Area), three
+/// clear switches — Camera, Mic, Computer audio — and Start recording. Everything else (camera only, devices, frame
+/// rate, quality, countdown, camera overlay look and position, pointer, Library, opening the Editor afterwards) is under
+/// "More options". The target type and the options are remembered; Camera and Mic start OFF in every new SnapForge
+/// Capture session and must be turned on deliberately (<see cref="RecordingController.SessionCamera"/>,
+/// <see cref="RecordingController.SessionMicrophone"/>).
+/// <para>Camera on opens the camera and shows the floating <see cref="CameraPreviewWindow"/> at once, so you can see
+/// yourself before recording; the preview stays on screen for the whole recording. Mic on shows a live level meter, so
+/// you can check the microphone picks up sound. The panel and the preview are excluded from screen capture. Closing
+/// the panel, locking the PC or starting the recording releases the camera and the microphone (the recorder opens its
+/// own); the preview window is handed to the recording (<see cref="TakePreview"/>).</para>
 /// </summary>
+#pragma warning disable CA1001 // The microphone meter is released when the window closes (StopMeter in Closed).
 internal sealed class StudioWindow : Window
+#pragma warning restore CA1001
 {
-    private const double PreviewWidth = 384;
-    private const double PreviewHeight = 216;
+    private static readonly Geometry CameraIcon = Geometry.Parse("M2,6 h12 a2,2 0 0 1 2,2 v1.5 l5,-3 v11 l-5,-3 V16 a2,2 0 0 1 -2,2 H2 a2,2 0 0 1 -2,-2 V8 a2,2 0 0 1 2,-2 z");
+    private static readonly Geometry MicIcon = Geometry.Parse("M12,2 a3,3 0 0 1 3,3 v6 a3,3 0 0 1 -6,0 V5 a3,3 0 0 1 3,-3 z M5,10 h2 a5,5 0 0 0 10,0 h2 a7,7 0 0 1 -6,6.9 V20 h3 v2 H8 v-2 h3 v-3.1 A7,7 0 0 1 5,10 z");
+    private static readonly Geometry SpeakerIcon = Geometry.Parse("M3,9 h4 l5,-5 v16 l-5,-5 H3 z M15,8 a5,5 0 0 1 0,8 l-1,-1.5 a3.2,3.2 0 0 0 0,-5 z M17,4.5 a9,9 0 0 1 0,15 l-1,-1.6 a7,7 0 0 0 0,-11.8 z");
 
     private readonly AppServices _services;
     private readonly Func<string?, string, ICameraSource> _cameraFactory;
     private readonly Func<IReadOnlyList<Mf.VideoDevice>> _listCameras;
-    private readonly StackPanel _targetSection;
-    private readonly StackPanel _cameraSection;
-    private readonly StackPanel _cursorRow;
-    private readonly TextBlock _cameraText;
-    private readonly Button _cameraButton;
-    private readonly Canvas _preview;
-    private readonly Border _screenMock;
-    private readonly Image _cameraImage;
-    private readonly TextBlock _previewStatus;
-    private readonly Button _previewButton;
+    private readonly Border _targetRow;
+    private readonly TextBlock _targetHeader;
+    private readonly ToggleButton _cameraToggle;
+    private readonly ToggleButton _micToggle;
+    private readonly ToggleButton _systemToggle;
+    private readonly StackPanel _cameraInfo;
+    private readonly TextBlock _cameraStatus;
+    private readonly Button _previewToggle;
     private readonly TextBlock _cameraError;
     private readonly Button _cameraPrivacy;
+    private readonly StackPanel _micInfo;
+    private readonly ProgressBar _micLevel;
+    private readonly TextBlock _micStatus;
     private readonly TextBlock _micError;
     private readonly Button _micPrivacy;
+    private readonly TextBlock _cameraText;
+    private readonly Button _cameraButton;
     private readonly Button _micButton;
+    private readonly CheckBox _cameraOnly;
+    private readonly StackPanel _cursorRow;
     private readonly Button _start;
-    private readonly DispatcherTimer _frameTimer;
+    private readonly DispatcherTimer _meterTimer;
     private IReadOnlyList<Mf.VideoDevice> _cameras = [];
     private ICameraSource? _camera;
-    private WriteableBitmap? _bitmap;
-    private long _shownSequence = -1;
+    private CameraPreviewWindow? _preview;
+    private MicrophoneMeter? _meter;
     private int _generation;
     private Task _cameraReleased = Task.CompletedTask;
+    private bool _starting;
 
     /// <param name="cameraFactory">Creates the preview camera (symbolic link, name); tests pass the synthetic camera.</param>
     /// <param name="listCameras">Lists cameras without opening them; tests pass a fixed list.</param>
@@ -62,8 +76,8 @@ internal sealed class StudioWindow : Window
         _services = services;
         _cameraFactory = cameraFactory ?? ((id, name) => new MediaFoundationCameraSource(id, name));
         _listCameras = listCameras ?? MediaFoundationCameraSource.Enumerate;
-        Title = "SnapForge Studio";
-        Width = 448;
+        Title = "SnapForge — Record";
+        Width = 392;
         SizeToContent = SizeToContent.Height;
         MaxHeight = SystemParameters.WorkArea.Height - 24;
         ResizeMode = ResizeMode.CanMinimize;
@@ -71,129 +85,157 @@ internal sealed class StudioWindow : Window
         SetResourceReference(BackgroundProperty, "SurfaceBrush");
         SetResourceReference(ForegroundProperty, "TextBrush");
         FontFamily = (FontFamily)FindResource("UiFont");
-        AutomationProperties.SetName(this, "SnapForge Studio recording setup");
+        AutomationProperties.SetName(this, "SnapForge Record panel");
 
         VideoSettings v = Settings;
-        var root = new StackPanel { Margin = new Thickness(20, 14, 20, 16) };
-
-        var heading = new TextBlock { Text = "SnapForge Studio", FontSize = 18, FontWeight = FontWeights.SemiBold };
-        var sub = new TextBlock { Text = "Set up your recording. Choices are remembered.", FontSize = 12, Margin = new Thickness(0, 2, 0, 0) };
-        sub.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
-        root.Children.Add(heading);
-        root.Children.Add(sub);
+        var root = new StackPanel { Margin = new Thickness(18, 12, 18, 14) };
 
         // ---- What to record
-        root.Children.Add(Header("RECORD"));
-        root.Children.Add(Segments("Record", "mode",
-            [("Screen", "Screen only", StudioMode.Screen), ("Screen + camera", "Screen and camera", StudioMode.ScreenAndCamera), ("Camera", "Camera only", StudioMode.Camera)],
-            v.StudioMode, m => Save(s => s with { StudioMode = m }, modeChanged: true)));
+        _targetHeader = Header("WHAT TO RECORD");
+        _targetHeader.Margin = new Thickness(0, 0, 0, 6);
+        root.Children.Add(_targetHeader);
+        _targetRow = Segments("What to record", "target",
+            [("Screen", "A whole screen", RecordingSource.Display), ("Window", "One window", RecordingSource.Window), ("Area", "An area you draw", RecordingSource.Region)],
+            v.Source, t => Save(s => s with { Source = t }), stretch: true);
+        root.Children.Add(_targetRow);
 
-        // ---- Capture area
-        _targetSection = new StackPanel();
-        _targetSection.Children.Add(Header("CAPTURE AREA"));
-        _targetSection.Children.Add(Segments("Capture area", "target",
-            [("Region", "Select a region", RecordingSource.Region), ("Window", "A window", RecordingSource.Window), ("Display", "A whole display", RecordingSource.Display)],
-            v.Source, t => Save(s => s with { Source = t })));
-        root.Children.Add(_targetSection);
+        // ---- Camera, Mic, Computer audio
+        var switches = new UniformGrid { Columns = 3, Margin = new Thickness(0, 12, 0, 0) };
+        _cameraToggle = Switch("Camera", CameraIcon, RecordingController.SessionCamera, "Camera: show yourself in the recording");
+        _micToggle = Switch("Mic", MicIcon, RecordingController.SessionMicrophone, "Microphone: record your voice");
+        _systemToggle = Switch("Computer audio", SpeakerIcon, v.RecordSystemAudio, "Computer audio: record what you hear");
+        _cameraToggle.Click += (_, _) => SetCamera(_cameraToggle.IsChecked == true);
+        _micToggle.Click += (_, _) => SetMicrophone(_micToggle.IsChecked == true);
+        _systemToggle.Click += (_, _) =>
+        {
+            Save(s => s with { RecordSystemAudio = _systemToggle.IsChecked == true });
+            UpdateSwitch(_systemToggle);
+        };
+        switches.Children.Add(_cameraToggle);
+        switches.Children.Add(_micToggle);
+        switches.Children.Add(_systemToggle);
+        root.Children.Add(switches);
 
-        // ---- Camera
-        _cameraSection = new StackPanel();
-        _cameraSection.Children.Add(Header("CAMERA"));
-        _cameraText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        _cameraButton = Dropdown(_cameraText, "Camera device");
-        _cameraButton.Click += (_, _) => ShowCameraMenu();
-        _cameraSection.Children.Add(_cameraButton);
-
-        _screenMock = new Border { Width = PreviewWidth, Height = PreviewHeight, CornerRadius = new CornerRadius(6), BorderThickness = new Thickness(1) };
-        _screenMock.SetResourceReference(Border.BackgroundProperty, "CanvasBackdropBrush");
-        _screenMock.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
-        _cameraImage = new Image { Stretch = Stretch.UniformToFill, RenderTransformOrigin = new Point(0.5, 0.5) };
-        AutomationProperties.SetName(_cameraImage, "Camera preview");
-        _previewStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, TextAlignment = TextAlignment.Center, Width = PreviewWidth - 40, FontSize = 12 };
-        _previewStatus.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
-        _previewButton = new Button { Content = "Show camera _preview", Padding = new Thickness(10, 4, 10, 4) };
-        _previewButton.SetResourceReference(StyleProperty, "ToolbarButton");
-        AutomationProperties.SetName(_previewButton, "Turn on the camera preview");
-        _previewButton.Click += (_, _) => StartPreview();
-        _preview = new Canvas { Width = PreviewWidth, Height = PreviewHeight, Margin = new Thickness(0, 8, 0, 6), ClipToBounds = true, HorizontalAlignment = HorizontalAlignment.Left };
-        _preview.Children.Add(_screenMock);
-        _preview.Children.Add(_cameraImage);
-        _preview.Children.Add(_previewStatus);
-        _preview.Children.Add(_previewButton);
-        _cameraSection.Children.Add(_preview);
-
-        _cameraError = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 0, 0, 4) };
+        // ---- Camera status (where it will appear) and problems
+        _cameraInfo = new StackPanel { Margin = new Thickness(0, 10, 0, 0), Visibility = Visibility.Collapsed };
+        var cameraLine = new DockPanel();
+        _previewToggle = new Button { Content = "Hide preview", Padding = new Thickness(8, 2, 8, 2), Margin = new Thickness(6, 0, 0, 0) };
+        _previewToggle.SetResourceReference(StyleProperty, "ToolbarButton");
+        _previewToggle.Click += (_, _) => TogglePreviewVisible();
+        DockPanel.SetDock(_previewToggle, Dock.Right);
+        cameraLine.Children.Add(_previewToggle);
+        _cameraStatus = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, VerticalAlignment = VerticalAlignment.Center };
+        AutomationProperties.SetName(_cameraStatus, "Camera status");
+        cameraLine.Children.Add(_cameraStatus);
+        _cameraInfo.Children.Add(cameraLine);
+        _cameraError = new TextBlock { TextWrapping = TextWrapping.Wrap, FontSize = 12, Visibility = Visibility.Collapsed, Margin = new Thickness(0, 4, 0, 0) };
         _cameraError.SetResourceReference(TextBlock.ForegroundProperty, "WarningBrush");
         _cameraPrivacy = Link("Open camera privacy settings", () => PrivacySettings.Open(PrivacySettings.CameraUri));
-        _cameraSection.Children.Add(_cameraError);
-        _cameraSection.Children.Add(_cameraPrivacy);
+        _cameraInfo.Children.Add(_cameraError);
+        _cameraInfo.Children.Add(_cameraPrivacy);
+        root.Children.Add(_cameraInfo);
 
-        _cameraSection.Children.Add(Labeled("Shape", Segments("Camera shape", "shape",
-            [("Circle", "Circle", CameraOverlayShape.Circle), ("Rounded", "Rounded rectangle", CameraOverlayShape.RoundedRectangle)],
-            v.CameraShape, x => Save(s => s with { CameraShape = x }))));
-        _cameraSection.Children.Add(Labeled("Size", Segments("Camera size", "size",
-            [("S", "Small", CameraOverlaySize.Small), ("M", "Medium", CameraOverlaySize.Medium), ("L", "Large", CameraOverlaySize.Large)],
-            v.CameraSize, x => Save(s => s with { CameraSize = x }))));
-        _cameraSection.Children.Add(Labeled("Position", Segments("Camera position", "corner",
-            [("↖", "Top left", CameraCorner.TopLeft), ("↗", "Top right", CameraCorner.TopRight), ("↙", "Bottom left", CameraCorner.BottomLeft), ("↘", "Bottom right", CameraCorner.BottomRight)],
-            v.CameraCorner, x => Save(s => s with { CameraCorner = x }))));
-        var mirror = new CheckBox { Content = "_Mirror the camera picture", IsChecked = v.CameraMirror, Margin = new Thickness(0, 4, 0, 0) };
-        mirror.Click += (_, _) => Save(s => s with { CameraMirror = mirror.IsChecked == true });
-        _cameraSection.Children.Add(mirror);
-        root.Children.Add(_cameraSection);
-
-        // ---- Sound
-        root.Children.Add(Header("SOUND"));
-        var system = new CheckBox { Content = "_System audio (what you hear)", IsChecked = v.RecordSystemAudio };
-        system.Click += (_, _) => Save(s => s with { RecordSystemAudio = system.IsChecked == true });
-        root.Children.Add(system);
-        var micText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
-        _micButton = Dropdown(micText, "Microphone device");
-        var mic = new CheckBox { Content = "Mi_crophone", IsChecked = v.RecordMicrophone, Margin = new Thickness(0, 6, 0, 0) };
+        // ---- Microphone level and problems
+        _micInfo = new StackPanel { Margin = new Thickness(0, 8, 0, 0), Visibility = Visibility.Collapsed };
+        var micLine = new DockPanel();
+        var micLabel = new TextBlock { Text = "Mic level", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(0, 0, 8, 0) };
+        micLabel.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+        DockPanel.SetDock(micLabel, Dock.Left);
+        micLine.Children.Add(micLabel);
+        _micLevel = new ProgressBar { Height = 8, Minimum = 0, Maximum = 100, VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
+        _micLevel.SetResourceReference(StyleProperty, "LevelMeter");
+        AutomationProperties.SetName(_micLevel, "Microphone level");
+        micLine.Children.Add(_micLevel);
+        _micInfo.Children.Add(micLine);
+        _micStatus = new TextBlock { FontSize = 11.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0), Text = "Say something — the bar moves when the microphone hears you." };
+        _micStatus.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
+        _micInfo.Children.Add(_micStatus);
         _micError = new TextBlock { Text = PrivacySettings.MicrophoneBlockedMessage, TextWrapping = TextWrapping.Wrap, FontSize = 12, Visibility = Visibility.Collapsed };
         _micError.SetResourceReference(TextBlock.ForegroundProperty, "WarningBrush");
         _micPrivacy = Link("Open microphone privacy settings", () => PrivacySettings.Open(PrivacySettings.MicrophoneUri));
-        mic.Click += (_, _) =>
-        {
-            Save(s => s with { RecordMicrophone = mic.IsChecked == true });
-            UpdateMicrophone(mic.IsChecked == true);
-        };
-        SetUpMicrophoneMenu(micText);
-        root.Children.Add(mic);
-        root.Children.Add(_micButton);
-        root.Children.Add(_micError);
-        root.Children.Add(_micPrivacy);
+        _micInfo.Children.Add(_micError);
+        _micInfo.Children.Add(_micPrivacy);
+        root.Children.Add(_micInfo);
 
-        // ---- Video
-        root.Children.Add(Header("VIDEO"));
-        root.Children.Add(Labeled("Frame rate", Segments("Frame rate", "fps",
+        // ---- More options
+        var more = new StackPanel { Margin = new Thickness(0, 4, 0, 0) };
+        _cameraOnly = new CheckBox { Content = "Record the camera _only (no screen)", IsChecked = v.StudioMode == StudioMode.Camera, Margin = new Thickness(0, 4, 0, 4) };
+        _cameraOnly.Click += (_, _) =>
+        {
+            bool only = _cameraOnly.IsChecked == true;
+            Save(s => s with { StudioMode = only ? StudioMode.Camera : StudioMode.ScreenAndCamera });
+            if (only && _cameraToggle.IsChecked != true)
+            {
+                _cameraToggle.IsChecked = true;
+                SetCamera(true);
+            }
+
+            UpdateMode();
+        };
+        more.Children.Add(_cameraOnly);
+
+        more.Children.Add(SubHeader("Camera"));
+        _cameraText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        _cameraButton = Dropdown(_cameraText, "Camera device");
+        _cameraButton.Click += (_, _) => ShowCameraMenu();
+        more.Children.Add(_cameraButton);
+        more.Children.Add(Labeled("Position", Segments("Camera position in the recording", "corner",
+            [("↖", "Top left", CameraCorner.TopLeft), ("↗", "Top right", CameraCorner.TopRight), ("↙", "Bottom left", CameraCorner.BottomLeft), ("↘", "Bottom right", CameraCorner.BottomRight)],
+            v.CameraCorner, x => Save(s => s with { CameraCorner = x }))));
+        more.Children.Add(Labeled("Shape", Segments("Camera shape", "shape",
+            [("Circle", "Circle", CameraOverlayShape.Circle), ("Rounded", "Rounded rectangle", CameraOverlayShape.RoundedRectangle)],
+            v.CameraShape, x => Save(s => s with { CameraShape = x }))));
+        more.Children.Add(Labeled("Size", Segments("Camera size", "size",
+            [("S", "Small", CameraOverlaySize.Small), ("M", "Medium", CameraOverlaySize.Medium), ("L", "Large", CameraOverlaySize.Large)],
+            v.CameraSize, x => Save(s => s with { CameraSize = x }))));
+        var mirror = new CheckBox { Content = "_Mirror the camera picture", IsChecked = v.CameraMirror, Margin = new Thickness(0, 4, 0, 0) };
+        mirror.Click += (_, _) => Save(s => s with { CameraMirror = mirror.IsChecked == true });
+        more.Children.Add(mirror);
+
+        more.Children.Add(SubHeader("Microphone"));
+        var micText = new TextBlock { VerticalAlignment = VerticalAlignment.Center, TextTrimming = TextTrimming.CharacterEllipsis };
+        _micButton = Dropdown(micText, "Microphone device");
+        SetUpMicrophoneMenu(micText);
+        more.Children.Add(_micButton);
+
+        more.Children.Add(SubHeader("Video"));
+        more.Children.Add(Labeled("Frame rate", Segments("Frame rate", "fps",
             [("30 FPS", "30 frames per second", 30), ("60 FPS", "60 frames per second", 60)],
             v.FramesPerSecond, x => Save(s => s with { FramesPerSecond = x }))));
-        root.Children.Add(Labeled("Quality", Segments("Quality", "quality",
+        more.Children.Add(Labeled("Quality", Segments("Quality", "quality",
             [("Standard", "Standard quality", VideoQuality.Standard), ("High", "High quality (larger files)", VideoQuality.High)],
             v.Quality, x => Save(s => s with { Quality = x }))));
-        root.Children.Add(Labeled("Countdown", Segments("Countdown", "countdown",
+        more.Children.Add(Labeled("Countdown", Segments("Countdown", "countdown",
             [("Off", "No countdown", 0), ("3 s", "3 seconds", 3), ("5 s", "5 seconds", 5), ("10 s", "10 seconds", 10)],
             v.Countdown ? v.CountdownSeconds : 0, x => Save(s => s with { Countdown = x > 0, CountdownSeconds = x > 0 ? x : s.CountdownSeconds }))));
         _cursorRow = new StackPanel();
         var cursor = new CheckBox { Content = "Show the mouse _pointer", IsChecked = v.CaptureCursor, Margin = new Thickness(0, 4, 0, 0) };
         cursor.Click += (_, _) => Save(s => s with { CaptureCursor = cursor.IsChecked == true });
         _cursorRow.Children.Add(cursor);
-        root.Children.Add(_cursorRow);
-        var keep = new CheckBox { Content = "_Keep recordings in the Library", IsChecked = v.SaveToLibrary, Margin = new Thickness(0, 4, 0, 0), ToolTip = "Off = you choose where to save each recording when it stops (no history is kept)." };
+        more.Children.Add(_cursorRow);
+
+        more.Children.Add(SubHeader("After recording"));
+        var keep = new CheckBox { Content = "_Keep recordings in the Library", IsChecked = v.SaveToLibrary, Margin = new Thickness(0, 2, 0, 0), ToolTip = "Off = you choose where to save each recording when it stops (no history is kept)." };
         keep.Click += (_, _) => Save(s => s with { SaveToLibrary = keep.IsChecked == true });
-        root.Children.Add(keep);
-        var open = new CheckBox { Content = "_Open the recording when it is saved", IsChecked = v.OpenAfterRecording, Margin = new Thickness(0, 4, 0, 0) };
+        more.Children.Add(keep);
+        var open = new CheckBox { Content = "Open in the _Editor after recording", IsChecked = v.OpenAfterRecording, Margin = new Thickness(0, 4, 0, 0), ToolTip = "Off = a small \"Recording saved\" message with Play, Open in Editor and Show in folder." };
         open.Click += (_, _) => Save(s => s with { OpenAfterRecording = open.IsChecked == true });
-        root.Children.Add(open);
+        more.Children.Add(open);
+
+        var expander = new Expander { Header = "More options", Content = more, Margin = new Thickness(0, 12, 0, 0), IsExpanded = false };
+        AutomationProperties.SetName(expander, "More recording options");
+        root.Children.Add(expander);
 
         // ---- Footer
-        string hint = string.Join("  ·  ", new[] { v.RecordHotkey is { } r ? $"{r} pause/resume" : null, v.StopHotkey is { } st ? $"{st} stop" : null }.OfType<string>());
+        string hint = string.Join("  ·  ", new[] { v.RecordHotkey is { } r ? $"{r} pause" : null, v.StopHotkey is { } st ? $"{st} stop" : null }.OfType<string>());
         var hintText = new TextBlock { Text = hint, FontSize = 11, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
         hintText.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
-        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 84, Padding = new Thickness(12, 5, 12, 5), Margin = new Thickness(0, 0, 8, 0) };
+        var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 76, Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(0, 0, 8, 0) };
         cancel.Click += (_, _) => Close();
-        _start = new Button { Content = "_Start recording", IsDefault = true, MinWidth = 132, Padding = new Thickness(14, 5, 14, 5) };
+        var startContent = new StackPanel { Orientation = Orientation.Horizontal };
+        startContent.Children.Add(new Ellipse { Width = 10, Height = 10, Fill = new SolidColorBrush(Color.FromRgb(0xFF, 0x5A, 0x52)), Margin = new Thickness(0, 0, 8, 0), VerticalAlignment = VerticalAlignment.Center });
+        startContent.Children.Add(new TextBlock { Text = "Start recording", FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center });
+        _start = new Button { Content = startContent, IsDefault = true, MinWidth = 150, Padding = new Thickness(14, 7, 14, 7) };
         _start.SetResourceReference(StyleProperty, "AccentButton");
         AutomationProperties.SetName(_start, "Start recording");
         _start.Click += (_, _) => RequestStart();
@@ -208,7 +250,7 @@ internal sealed class StudioWindow : Window
 
         Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Focusable = false };
 
-        _frameTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(33), DispatcherPriority.Render, (_, _) => ShowFrame(), Dispatcher);
+        _meterTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(50), DispatcherPriority.Render, (_, _) => UpdateMeter(), Dispatcher);
         SourceInitialized += (_, _) =>
         {
             WindowChrome.UseDarkTitleBar(this, ThemeManager.IsDark);
@@ -219,14 +261,24 @@ internal sealed class StudioWindow : Window
             long start = System.Diagnostics.Stopwatch.GetTimestamp();
             LoadCameras();
             UpdateMode();
-            UpdateMicrophone(v.RecordMicrophone);
+            UpdateSwitch(_systemToggle);
+            if (RecordingController.SessionCamera)
+            {
+                StartPreview(); // Camera was turned on earlier in this session
+            }
+
+            if (RecordingController.SessionMicrophone)
+            {
+                StartMeter();
+            }
+
             LoadedWorkMs = System.Diagnostics.Stopwatch.GetElapsedTime(start).TotalMilliseconds;
         };
         StateChanged += (_, _) =>
         {
             if (WindowState == WindowState.Minimized)
             {
-                StopPreview("The camera preview was turned off while Studio was minimized.");
+                StopPreview("The camera was turned off while the Record panel was minimized.");
             }
         };
         SystemEvents.SessionSwitch += OnSessionSwitch;
@@ -235,12 +287,18 @@ internal sealed class StudioWindow : Window
         {
             SystemEvents.SessionSwitch -= OnSessionSwitch;
             SystemEvents.PowerModeChanged -= OnPowerModeChanged;
-            _frameTimer.Stop();
+            StopMeter();
             StopPreview(null);
+            if (!_starting)
+            {
+                _preview?.Close();
+            }
+
+            _preview = null;
         };
     }
 
-    /// <summary>The user pressed Start: settings are saved and the camera is being released.</summary>
+    /// <summary>The user pressed Start: settings are saved and the camera and microphone are being released.</summary>
     public event EventHandler? StartRequested;
 
     /// <summary>True if Windows confirmed the window is excluded from screen capture.</summary>
@@ -261,53 +319,128 @@ internal sealed class StudioWindow : Window
     /// <summary>The preview camera, if one is running (tests).</summary>
     internal ICameraSource? PreviewCamera => _camera;
 
+    /// <summary>The floating camera preview, if Camera is on (tests, screenshots).</summary>
+    internal CameraPreviewWindow? Preview => _preview;
+
     private VideoSettings Settings => _services.Settings.Video;
 
-    private void Save(Func<VideoSettings, VideoSettings> change, bool modeChanged = false)
+    /// <summary>
+    /// At Start: hands the floating preview to the recording (it stays on screen while the recorder opens the camera),
+    /// or null if Camera is off. After this the panel no longer closes it.
+    /// </summary>
+    internal CameraPreviewWindow? TakePreview()
+    {
+        CameraPreviewWindow? preview = _preview;
+        _preview = null;
+        preview?.SetSource(null);
+        preview?.SetState(CameraPreviewWindow.Placement(RecordingController.Effective(Settings)), inRecording: true, placeholder: "Starting the recording…");
+        return preview;
+    }
+
+    private void Save(Func<VideoSettings, VideoSettings> change)
     {
         _services.UpdateSettings(s => s with { Video = change(s.Video).Normalized() });
-        if (modeChanged)
+        UpdateCameraInfo();
+    }
+
+    // ---------------------------------------------------------------- switches
+
+    private void SetCamera(bool on)
+    {
+        RecordingController.SessionCamera = on;
+        if (on)
         {
-            UpdateMode(userChoseCamera: true);
+            StartPreview(); // turning Camera on is the explicit action that opens the camera
         }
         else
         {
-            UpdatePreviewLayout();
+            if (_cameraOnly.IsChecked == true)
+            {
+                _cameraOnly.IsChecked = false;
+                Save(s => s with { StudioMode = StudioMode.ScreenAndCamera });
+            }
+
+            StopPreview(null);
+            _preview?.Close();
+            _preview = null;
+            HideCameraError();
         }
+
+        UpdateMode();
     }
 
-    // ---------------------------------------------------------------- mode, preview
-
-    private void UpdateMode(bool userChoseCamera = false)
+    private void SetMicrophone(bool on)
     {
-        StudioMode mode = Settings.StudioMode;
-        bool camera = mode != StudioMode.Screen;
-        _cameraSection.Visibility = camera ? Visibility.Visible : Visibility.Collapsed;
-        _targetSection.Visibility = mode == StudioMode.Camera ? Visibility.Collapsed : Visibility.Visible;
-        _cursorRow.Visibility = mode == StudioMode.Camera ? Visibility.Collapsed : Visibility.Visible;
-        if (!camera)
+        RecordingController.SessionMicrophone = on;
+        if (on)
         {
-            StopPreview(null); // Screen only: the camera is never open
+            StartMeter();
         }
-        else if (userChoseCamera && _camera is null)
+        else
         {
-            StartPreview(); // choosing a camera mode is the explicit action that turns the camera on
-        }
-        else if (_camera is null)
-        {
-            ShowPreviewOff("Camera preview is off.");
+            StopMeter();
         }
 
-        UpdatePreviewLayout();
+        UpdateSwitch(_micToggle);
+    }
+
+    private void UpdateMode()
+    {
+        bool cameraOnly = RecordingController.SessionCamera && Settings.StudioMode == StudioMode.Camera;
+        _targetRow.Visibility = cameraOnly ? Visibility.Collapsed : Visibility.Visible;
+        _targetHeader.Text = cameraOnly ? "RECORDING THE CAMERA ONLY" : "WHAT TO RECORD";
+        _cursorRow.Visibility = cameraOnly ? Visibility.Collapsed : Visibility.Visible;
+        UpdateSwitch(_cameraToggle);
+        UpdateSwitch(_micToggle);
+        UpdateCameraInfo();
         UpdateStart();
+    }
+
+    private static void UpdateSwitch(ToggleButton toggle)
+    {
+        bool on = toggle.IsChecked == true;
+        if (toggle.Tag is TextBlock state)
+        {
+            state.Text = on ? "On" : "Off";
+        }
+
+        AutomationProperties.SetItemStatus(toggle, on ? "On" : "Off");
+    }
+
+    private void UpdateCameraInfo()
+    {
+        bool on = RecordingController.SessionCamera;
+        _cameraInfo.Visibility = on ? Visibility.Visible : Visibility.Collapsed;
+        if (!on)
+        {
+            return;
+        }
+
+        VideoSettings v = RecordingController.Effective(Settings);
+        string where = v.StudioMode == StudioMode.Camera
+            ? "The recording will be the camera picture."
+            : $"You will appear in the recording at the {CameraPreviewWindow.Corner(v.CameraCorner)} (change it in More options).";
+        _cameraStatus.Text = (_camera is { IsRunning: true } ? "Camera is on. " : string.Empty) + where;
+        _previewToggle.Content = _preview is { IsVisible: true } ? "Hide preview" : "Show preview";
+        _previewToggle.Visibility = _preview is null ? Visibility.Collapsed : Visibility.Visible;
+        if (_preview is { } p)
+        {
+            p.SetShape(v.CameraShape, v.CameraMirror);
+            if (_camera is { IsRunning: true })
+            {
+                p.SetState(CameraPreviewWindow.Placement(v) + " (not recording yet)", inRecording: false);
+            }
+        }
     }
 
     private void UpdateStart()
     {
-        bool needsCamera = Settings.StudioMode != StudioMode.Screen;
+        bool needsCamera = RecordingController.SessionCamera && Settings.StudioMode == StudioMode.Camera;
         _start.IsEnabled = !needsCamera || _cameras.Count > 0;
-        _start.ToolTip = _start.IsEnabled ? null : "No camera is connected. Connect one, or choose Screen.";
+        _start.ToolTip = _start.IsEnabled ? null : "No camera is connected. Connect one, or turn off \"Record the camera only\".";
     }
+
+    // ---------------------------------------------------------------- camera
 
     private void LoadCameras()
     {
@@ -334,10 +467,6 @@ internal sealed class StudioWindow : Window
         _cameraText.Text = chosen?.Name ?? (_cameras.Count == 0 ? "No camera found" : "Camera");
         _cameraButton.IsEnabled = _cameras.Count > 0;
         AutomationProperties.SetName(_cameraButton, "Camera device: " + _cameraText.Text);
-        if (_cameras.Count == 0)
-        {
-            ShowCameraError("No camera was found. Connect a camera, or choose Screen.", privacy: false);
-        }
     }
 
     private Mf.VideoDevice? CurrentCamera()
@@ -363,8 +492,11 @@ internal sealed class StudioWindow : Window
                 Save(s => s with { CameraDeviceId = device.SymbolicLink });
                 _cameraText.Text = device.Name;
                 AutomationProperties.SetName(_cameraButton, "Camera device: " + device.Name);
-                StopPreview(null);
-                StartPreview(); // choosing a device is an explicit action
+                if (RecordingController.SessionCamera)
+                {
+                    StopPreview(null);
+                    StartPreview(); // choosing a device while Camera is on switches the preview to it
+                }
             };
             menu.Items.Add(item);
         }
@@ -373,24 +505,75 @@ internal sealed class StudioWindow : Window
         menu.IsOpen = true;
     }
 
+    private CameraPreviewWindow EnsurePreviewWindow()
+    {
+        if (_preview is { } existing)
+        {
+            return existing;
+        }
+
+        var preview = new CameraPreviewWindow(ExcludeFromCapture);
+        preview.HideRequested += (_, _) =>
+        {
+            preview.Hide();
+            RecordingController.PreviewHidden = true;
+            UpdateCameraInfo();
+        };
+        _preview = preview;
+        VideoSettings v = RecordingController.Effective(Settings);
+        preview.SetShape(v.CameraShape, v.CameraMirror);
+        if (!RecordingController.PreviewHidden)
+        {
+            preview.Show();
+        }
+
+        return preview;
+    }
+
+    private void TogglePreviewVisible()
+    {
+        if (_preview is not { } p)
+        {
+            return;
+        }
+
+        if (p.IsVisible)
+        {
+            p.Hide();
+            RecordingController.PreviewHidden = true;
+        }
+        else
+        {
+            RecordingController.PreviewHidden = false;
+            p.Show();
+            p.KeepOnScreen();
+        }
+
+        UpdateCameraInfo();
+    }
+
     private void StartPreview()
     {
-        if (Settings.StudioMode == StudioMode.Screen || _camera is not null)
+        if (!RecordingController.SessionCamera || _camera is not null)
         {
             return;
         }
 
         LoadCameras();
+        UpdateStart();
         if (CurrentCamera() is not { } device)
         {
-            UpdateStart();
+            ShowCameraError("No camera was found. Connect a camera, then turn Camera off and on again — or record without it.", privacy: false);
+            UpdateCameraInfo();
             return;
         }
 
+        CameraPreviewWindow preview = EnsurePreviewWindow();
         if (PrivacySettings.CameraBlocked())
         {
             ShowCameraError(PrivacySettings.CameraBlockedMessage, privacy: true);
-            ShowPreviewOff("Camera access is blocked by Windows.");
+            preview.SetState("Camera blocked by Windows", inRecording: false, placeholder: "Windows is blocking camera access. Use the link in the Record panel to allow it.");
+            UpdateCameraInfo();
             return;
         }
 
@@ -398,20 +581,21 @@ internal sealed class StudioWindow : Window
         ICameraSource camera = _cameraFactory(device.SymbolicLink, device.Name);
         _camera = camera;
         int generation = ++_generation;
-        ShowPreviewOff("Starting the camera…", button: false);
+        preview.SetState("Camera preview", inRecording: false, placeholder: "Starting the camera…");
         Task previousRelease = _cameraReleased;
         _ = Task.Run(async () =>
         {
             await previousRelease.ConfigureAwait(false); // the device may still be closing from a previous preview
             camera.Start();
         }).ContinueWith(t => Dispatcher.BeginInvoke(() => OnPreviewStarted(camera, generation, t.Exception?.GetBaseException())), TaskScheduler.Default);
+        UpdateCameraInfo();
     }
 
     private void OnPreviewStarted(ICameraSource camera, int generation, Exception? error)
     {
         if (generation != _generation || !ReferenceEquals(camera, _camera))
         {
-            return; // superseded (mode changed, window closed): StopPreview releases it
+            return; // superseded (Camera turned off, panel closed): StopPreview releases it
         }
 
         if (error is not null)
@@ -420,7 +604,11 @@ internal sealed class StudioWindow : Window
             _cameraReleased = Task.Run(camera.Dispose);
             CameraException ce = error as CameraException ?? new CameraException(CameraFailure.Failed, "The camera could not be started: " + error.Message);
             ShowCameraError(ce.Message, privacy: ce.Kind == CameraFailure.AccessDenied);
-            ShowPreviewOff(ce.Kind == CameraFailure.Busy ? "The camera is in use by another app." : "The camera is not available.", button: true, buttonText: "_Try again");
+            _preview?.SetState(
+                ce.Kind == CameraFailure.Busy ? "Camera in use by another app" : "Camera not available",
+                inRecording: false,
+                placeholder: ce.Kind == CameraFailure.Busy ? "Close the other app that uses the camera, then turn Camera off and on again." : ce.Message);
+            UpdateCameraInfo();
             return;
         }
 
@@ -430,96 +618,30 @@ internal sealed class StudioWindow : Window
             {
                 StopPreview(null);
                 ShowCameraError(reason, privacy: false);
+                _preview?.SetState("Camera disconnected", inRecording: false, placeholder: reason);
             }
         });
-        _previewStatus.Visibility = Visibility.Collapsed;
-        _previewButton.Visibility = Visibility.Collapsed;
-        _shownSequence = -1;
-        _frameTimer.Start();
+        _preview?.SetSource(camera);
+        UpdateCameraInfo();
     }
 
     /// <summary>Releases the preview camera (on a worker thread: the camera light goes off within a moment).</summary>
     private void StopPreview(string? message)
     {
         _generation++;
-        _frameTimer.Stop();
         if (_camera is { } camera)
         {
             _camera = null;
             _cameraReleased = Task.Run(camera.Dispose);
         }
 
-        _cameraImage.Source = null;
-        _bitmap = null;
-        if (Settings.StudioMode != StudioMode.Screen)
+        _preview?.SetSource(null);
+        if (message is not null)
         {
-            ShowPreviewOff(message ?? "Camera preview is off.");
-        }
-    }
-
-    private void ShowPreviewOff(string text, bool button = true, string buttonText = "Show camera _preview")
-    {
-        _cameraImage.Source = null;
-        _previewStatus.Text = text;
-        _previewStatus.Visibility = Visibility.Visible;
-        _previewButton.Content = buttonText;
-        _previewButton.Visibility = button && _cameras.Count > 0 ? Visibility.Visible : Visibility.Collapsed;
-        Canvas.SetLeft(_previewStatus, 20);
-        Canvas.SetTop(_previewStatus, (PreviewHeight / 2) - 34);
-        _previewButton.Measure(new Size(double.PositiveInfinity, double.PositiveInfinity));
-        Canvas.SetLeft(_previewButton, (PreviewWidth - _previewButton.DesiredSize.Width) / 2);
-        Canvas.SetTop(_previewButton, (PreviewHeight / 2) + 4);
-    }
-
-    private unsafe void ShowFrame()
-    {
-        if (_camera is not { IsRunning: true } camera || camera.FrameSequence == _shownSequence)
-        {
-            return;
+            _preview?.SetState("Camera off", inRecording: false, placeholder: message);
         }
 
-        _shownSequence = camera.FrameSequence;
-        camera.WithFrame(long.MaxValue, (bgra, w, h, _) =>
-        {
-            if (_bitmap is null || _bitmap.PixelWidth != w || _bitmap.PixelHeight != h)
-            {
-                _bitmap = new WriteableBitmap(w, h, 96, 96, PixelFormats.Bgr32, null);
-                _cameraImage.Source = _bitmap;
-                UpdatePreviewLayout();
-            }
-
-            fixed (byte* p = bgra)
-            {
-                _bitmap.WritePixels(new Int32Rect(0, 0, w, h), (nint)p, w * h * 4, w * 4);
-            }
-        });
-    }
-
-    /// <summary>Lays the preview out like the recording: camera only fills the box; Screen + camera shows the overlay in its corner.</summary>
-    private void UpdatePreviewLayout()
-    {
-        VideoSettings v = Settings;
-        _cameraImage.RenderTransform = new ScaleTransform(v.CameraMirror ? -1 : 1, 1);
-        if (v.StudioMode == StudioMode.Camera)
-        {
-            _cameraImage.Width = PreviewWidth;
-            _cameraImage.Height = PreviewHeight;
-            _cameraImage.Stretch = Stretch.Uniform;
-            _cameraImage.Clip = null;
-            Canvas.SetLeft(_cameraImage, 0);
-            Canvas.SetTop(_cameraImage, 0);
-            return;
-        }
-
-        OverlayLayout layout = OverlayLayout.For((int)PreviewWidth, (int)PreviewHeight, v.CameraShape, v.CameraSize, v.CameraCorner, v.CameraMirror);
-        _cameraImage.Stretch = Stretch.UniformToFill;
-        _cameraImage.Width = layout.Width;
-        _cameraImage.Height = layout.Height;
-        _cameraImage.Clip = v.CameraShape == CameraOverlayShape.Circle
-            ? new EllipseGeometry(new Rect(0, 0, layout.Width, layout.Height))
-            : new RectangleGeometry(new Rect(0, 0, layout.Width, layout.Height), layout.CornerRadius, layout.CornerRadius);
-        Canvas.SetLeft(_cameraImage, layout.X);
-        Canvas.SetTop(_cameraImage, layout.Y);
+        UpdateCameraInfo();
     }
 
     private void ShowCameraError(string text, bool privacy)
@@ -539,7 +661,11 @@ internal sealed class StudioWindow : Window
     {
         if (e.Reason is SessionSwitchReason.SessionLock or SessionSwitchReason.ConsoleDisconnect or SessionSwitchReason.RemoteDisconnect)
         {
-            Dispatcher.BeginInvoke(() => StopPreview("The camera preview was turned off because the PC was locked."));
+            Dispatcher.BeginInvoke(() =>
+            {
+                StopPreview("The camera was turned off because the PC was locked. Turn Camera off and on again to restart it.");
+                StopMeter();
+            });
         }
     }
 
@@ -547,11 +673,63 @@ internal sealed class StudioWindow : Window
     {
         if (e.Mode == PowerModes.Suspend)
         {
-            Dispatcher.Invoke(() => StopPreview("The camera preview was turned off because the PC went to sleep."));
+            Dispatcher.Invoke(() =>
+            {
+                StopPreview("The camera was turned off because the PC went to sleep.");
+                StopMeter();
+            });
         }
     }
 
     // ---------------------------------------------------------------- microphone
+
+    private void StartMeter()
+    {
+        _micInfo.Visibility = Visibility.Visible;
+        bool blocked = PrivacySettings.MicrophoneBlocked();
+        _micError.Visibility = blocked ? Visibility.Visible : Visibility.Collapsed;
+        _micPrivacy.Visibility = blocked ? Visibility.Visible : Visibility.Collapsed;
+        if (blocked || _meter is not null)
+        {
+            return;
+        }
+
+        _meter = new MicrophoneMeter(Settings.MicrophoneDeviceId);
+        _meterTimer.Start();
+    }
+
+    private void StopMeter()
+    {
+        _meterTimer.Stop();
+        MicrophoneMeter? meter = _meter;
+        _meter = null;
+        if (meter is not null)
+        {
+            _ = Task.Run(meter.Dispose); // microphone released (indicator off)
+        }
+
+        _micLevel.Value = 0;
+        _micInfo.Visibility = RecordingController.SessionMicrophone ? Visibility.Visible : Visibility.Collapsed;
+    }
+
+    private void UpdateMeter()
+    {
+        if (_meter is not { } m)
+        {
+            return;
+        }
+
+        _micLevel.Value = Math.Sqrt(m.Level) * 100;
+        if (m.AccessDenied)
+        {
+            _micError.Visibility = Visibility.Visible;
+            _micPrivacy.Visibility = Visibility.Visible;
+        }
+
+        _micStatus.Text = m.DeviceName is { } name
+            ? $"{name} — say something; the bar moves when the microphone hears you."
+            : "Looking for a microphone… (connect one, or check the device under More options)";
+    }
 
     private void SetUpMicrophoneMenu(TextBlock micText)
     {
@@ -580,6 +758,11 @@ internal sealed class StudioWindow : Window
                     Save(s => s with { MicrophoneDeviceId = id });
                     micText.Text = name;
                     AutomationProperties.SetName(_micButton, "Microphone device: " + name);
+                    if (_meter is not null)
+                    {
+                        StopMeter();
+                        StartMeter(); // listen to the newly chosen microphone
+                    }
                 };
                 menu.Items.Add(item);
             }
@@ -589,25 +772,19 @@ internal sealed class StudioWindow : Window
         };
     }
 
-    private void UpdateMicrophone(bool on)
-    {
-        _micButton.IsEnabled = on;
-        bool blocked = on && PrivacySettings.MicrophoneBlocked();
-        _micError.Visibility = blocked ? Visibility.Visible : Visibility.Collapsed;
-        _micPrivacy.Visibility = blocked ? Visibility.Visible : Visibility.Collapsed;
-    }
-
     // ---------------------------------------------------------------- start
 
     private void RequestStart()
     {
-        if (Settings.StudioMode != StudioMode.Screen && PrivacySettings.CameraBlocked())
+        if (RecordingController.SessionCamera && PrivacySettings.CameraBlocked())
         {
             ShowCameraError(PrivacySettings.CameraBlockedMessage, privacy: true);
             return;
         }
 
-        StopPreview(null); // the recorder opens the camera itself once the area is chosen
+        _starting = true;
+        StopMeter(); // the recorder opens the microphone itself
+        StopPreview(null); // and the camera, once the area is chosen
         StartRequested?.Invoke(this, EventArgs.Empty);
     }
 
@@ -620,10 +797,30 @@ internal sealed class StudioWindow : Window
         return t;
     }
 
+    private static TextBlock SubHeader(string text) =>
+        new() { Text = text, FontWeight = FontWeights.SemiBold, FontSize = 12, Margin = new Thickness(0, 10, 0, 2) };
+
+    private static ToggleButton Switch(string label, Geometry icon, bool on, string name)
+    {
+        var path = new Path { Data = icon, Width = 22, Height = 22, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
+        path.SetBinding(Shape.FillProperty, new System.Windows.Data.Binding(nameof(Foreground)) { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(ToggleButton), 1) });
+        var text = new TextBlock { Text = label, FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
+        var state = new TextBlock { Text = on ? "On" : "Off", FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, Opacity = 0.8 };
+        var stack = new StackPanel();
+        stack.Children.Add(path);
+        stack.Children.Add(text);
+        stack.Children.Add(state);
+        var toggle = new ToggleButton { Content = stack, IsChecked = on, Tag = state, Margin = new Thickness(0, 0, 6, 0), Padding = new Thickness(6, 8, 6, 6), MinHeight = 74, HorizontalContentAlignment = HorizontalAlignment.Center };
+        toggle.SetResourceReference(StyleProperty, "ToolbarToggle");
+        AutomationProperties.SetName(toggle, name);
+        AutomationProperties.SetItemStatus(toggle, on ? "On" : "Off");
+        return toggle;
+    }
+
     private static Grid Labeled(string label, UIElement control)
     {
         var g = new Grid { Margin = new Thickness(0, 2, 0, 2) };
-        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(84) });
+        g.ColumnDefinitions.Add(new ColumnDefinition { Width = new GridLength(78) });
         g.ColumnDefinitions.Add(new ColumnDefinition { Width = GridLength.Auto });
         var text = new TextBlock { Text = label, VerticalAlignment = VerticalAlignment.Center, FontSize = 12 };
         text.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
@@ -634,21 +831,34 @@ internal sealed class StudioWindow : Window
     }
 
     /// <summary>A row of segment buttons (one radio group); arrow keys move between them, Space/Enter chooses.</summary>
-    private static Border Segments<T>(string groupName, string group, (string Text, string Name, T Value)[] items, T current, Action<T> chosen)
+    private static Border Segments<T>(string groupName, string group, (string Text, string Name, T Value)[] items, T current, Action<T> chosen, bool stretch = false)
     {
-        var row = new StackPanel { Orientation = Orientation.Horizontal };
+        Panel row = stretch ? new UniformGrid { Rows = 1 } : new StackPanel { Orientation = Orientation.Horizontal };
         KeyboardNavigation.SetDirectionalNavigation(row, KeyboardNavigationMode.Cycle);
         string groupId = group + "-" + Guid.NewGuid().ToString("N");
         foreach ((string text, string name, T value) in items)
         {
             var b = new RadioButton { Content = text, GroupName = groupId, IsChecked = EqualityComparer<T>.Default.Equals(value, current), MinWidth = 44 };
             b.SetResourceReference(StyleProperty, "SegmentButton");
+            if (stretch)
+            {
+                b.HorizontalContentAlignment = HorizontalAlignment.Center;
+                b.Padding = new Thickness(8, 6, 8, 6);
+            }
+
             AutomationProperties.SetName(b, $"{groupName}: {name}");
             b.Checked += (_, _) => chosen(value);
             row.Children.Add(b);
         }
 
-        var border = new Border { BorderThickness = new Thickness(1), CornerRadius = new CornerRadius(7), Padding = new Thickness(2), HorizontalAlignment = HorizontalAlignment.Left, Child = row };
+        var border = new Border
+        {
+            BorderThickness = new Thickness(1),
+            CornerRadius = new CornerRadius(7),
+            Padding = new Thickness(2),
+            HorizontalAlignment = stretch ? HorizontalAlignment.Stretch : HorizontalAlignment.Left,
+            Child = row,
+        };
         border.SetResourceReference(Border.BorderBrushProperty, "BorderBrush");
         border.SetResourceReference(Border.BackgroundProperty, "BackgroundBrush");
         AutomationProperties.SetName(border, groupName);
@@ -657,7 +867,7 @@ internal sealed class StudioWindow : Window
 
     private static Button Dropdown(TextBlock text, string name)
     {
-        var b = new Button { MinWidth = 300, HorizontalAlignment = HorizontalAlignment.Left, Margin = new Thickness(0, 4, 0, 2), HorizontalContentAlignment = HorizontalAlignment.Stretch };
+        var b = new Button { HorizontalAlignment = HorizontalAlignment.Stretch, Margin = new Thickness(0, 4, 0, 2), HorizontalContentAlignment = HorizontalAlignment.Stretch };
         b.SetResourceReference(StyleProperty, "DropdownButton");
         var panel = new DockPanel();
         var chevron = new Path { Width = 14, Height = 14, Stretch = Stretch.Uniform };
