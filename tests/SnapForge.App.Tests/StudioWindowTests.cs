@@ -10,34 +10,45 @@ using SnapForge.Core.Settings;
 namespace SnapForge.App.Tests;
 
 /// <summary>
-/// SnapForge Studio window (SF-006) with a SYNTHETIC camera (CI has none): the camera is never opened in Screen mode
-/// or merely by opening Studio, a camera choice starts the preview, Screen / Start release it, choices persist, and
-/// every control has an accessible name.
+/// RC3 Record panel (SF-006, owner feedback on rc.2) with a SYNTHETIC camera (CI has none): opening the panel never
+/// opens the camera; Camera and Mic start off every session; turning Camera on starts the floating live preview and
+/// turning it off releases the camera; Start releases the camera and hands the preview to the recording; a camera
+/// failure is explained and not retried; choices persist; every control has an accessible name.
 /// </summary>
 [Collection(DesktopTestGroup.Name)]
 public class StudioWindowTests
 {
+    private const string CameraSwitch = "Camera: show yourself in the recording";
     private static readonly Mf.VideoDevice[] OneCamera = [new("Test camera (SYNTHETIC)", "synthetic-camera-1")];
 
     [Fact]
     public void Opening_studio_does_not_open_the_camera_and_every_control_is_named() => UiThread.Run(async () =>
     {
+        ResetSession();
         AppServices services = TestServices.Create();
         using var camera = new SyntheticCameraSource(320, 180, 30);
         var studio = new StudioWindow(services, (_, _) => camera, () => OneCamera);
         studio.Show();
         await Task.Delay(300);
-        Assert.Equal(StudioMode.Screen, services.Settings.Video.StudioMode);
-        Assert.False(services.Settings.Video.RecordMicrophone);
+        Assert.False(RecordingController.SessionCamera); // Camera and Mic start off in every session
+        Assert.False(RecordingController.SessionMicrophone);
+        Assert.Equal(StudioMode.Screen, RecordingController.Effective(services.Settings.Video).StudioMode);
+        Assert.False(RecordingController.Effective(services.Settings.Video).RecordMicrophone);
         Assert.Equal(0, camera.StartCount);
         Assert.Null(studio.PreviewCamera);
+        Assert.Null(studio.Preview);
         foreach (ButtonBase b in All<ButtonBase>(studio))
         {
             string name = AutomationProperties.GetName(b);
             Assert.True(!string.IsNullOrWhiteSpace(name) || b.Content is string { Length: > 0 }, $"unnamed {b.GetType().Name}");
         }
 
-        Assert.NotNull(Find<RadioButton>(studio, "Record: Screen and camera"));
+        Assert.Equal(false, Find<ToggleButton>(studio, CameraSwitch)!.IsChecked);
+        Assert.Equal(false, Find<ToggleButton>(studio, "Microphone: record your voice")!.IsChecked);
+        Assert.NotNull(Find<ToggleButton>(studio, "Computer audio: record what you hear"));
+        Assert.NotNull(Find<RadioButton>(studio, "What to record: A whole screen"));
+        Assert.NotNull(Find<RadioButton>(studio, "What to record: One window"));
+        Assert.NotNull(Find<RadioButton>(studio, "What to record: An area you draw"));
         Assert.NotNull(Find<Button>(studio, "Start recording"));
         studio.Close();
         Assert.Equal(0, camera.StartCount);
@@ -46,72 +57,129 @@ public class StudioWindowTests
     [Fact]
     public void Camera_choice_starts_the_preview_and_screen_only_releases_it() => UiThread.Run(async () =>
     {
+        ResetSession();
         AppServices services = TestServices.Create();
         using var camera = new SyntheticCameraSource(320, 180, 30);
         var studio = new StudioWindow(services, (_, _) => camera, () => OneCamera);
-        studio.Show();
-        await Task.Delay(200);
+        try
+        {
+            studio.Show();
+            await Task.Delay(200);
 
-        Find<RadioButton>(studio, "Record: Screen and camera")!.IsChecked = true;
-        Assert.Equal(StudioMode.ScreenAndCamera, services.Settings.Video.StudioMode);
-        await WaitUntil(() => camera.IsRunning);
-        Image preview = Find<Image>(studio, "Camera preview")!;
-        await WaitUntil(() => preview.Source is not null);
+            Find<RadioButton>(studio, "What to record: One window")!.IsChecked = true;
+            Assert.Equal(RecordingSource.Window, services.Settings.Video.Source); // the target type is remembered
+            Click(Find<ToggleButton>(studio, CameraSwitch)!, on: true);
+            Assert.True(RecordingController.SessionCamera);
+            Assert.Equal(StudioMode.ScreenAndCamera, RecordingController.Effective(services.Settings.Video).StudioMode);
+            await WaitUntil(() => camera.IsRunning);
+            CameraPreviewWindow preview = studio.Preview!;
+            Assert.True(preview.IsVisible); // see yourself before recording
+            await WaitUntil(() => preview.FramesShown > 2); // live frames
+            Assert.Contains("bottom right", preview.Describe(), StringComparison.Ordinal); // where it will appear
 
-        Find<RadioButton>(studio, "Camera position: Top left")!.IsChecked = true;
-        Find<RadioButton>(studio, "Camera shape: Rounded rectangle")!.IsChecked = true;
-        Find<RadioButton>(studio, "Camera size: Large")!.IsChecked = true;
-        Assert.Equal(CameraCorner.TopLeft, services.Settings.Video.CameraCorner);
-        Assert.Equal(CameraOverlayShape.RoundedRectangle, services.Settings.Video.CameraShape);
-        Assert.Equal(CameraOverlaySize.Large, services.Settings.Video.CameraSize);
+            Find<RadioButton>(studio, "Camera position in the recording: Top left")!.IsChecked = true;
+            Find<RadioButton>(studio, "Camera shape: Rounded rectangle")!.IsChecked = true;
+            Find<RadioButton>(studio, "Camera size: Large")!.IsChecked = true;
+            Assert.Equal(CameraCorner.TopLeft, services.Settings.Video.CameraCorner);
+            Assert.Equal(CameraOverlayShape.RoundedRectangle, services.Settings.Video.CameraShape);
+            Assert.Equal(CameraOverlaySize.Large, services.Settings.Video.CameraSize);
+            Assert.Contains("top left", preview.Describe(), StringComparison.Ordinal);
 
-        Find<RadioButton>(studio, "Record: Screen only")!.IsChecked = true;
-        await studio.CameraReleased;
-        Assert.False(camera.IsRunning);
-        Assert.Null(studio.PreviewCamera);
-        studio.Close();
+            Click(Find<ToggleButton>(studio, CameraSwitch)!, on: false); // back to screen only
+            await studio.CameraReleased;
+            Assert.False(camera.IsRunning);
+            Assert.Null(studio.PreviewCamera);
+            Assert.Null(studio.Preview);
+            Assert.False(preview.IsVisible);
+            Assert.Equal(StudioMode.Screen, RecordingController.Effective(services.Settings.Video).StudioMode);
+        }
+        finally
+        {
+            studio.Close();
+            ResetSession();
+        }
     });
 
     [Fact]
     public void A_remembered_camera_mode_waits_for_an_explicit_preview_and_start_releases_the_camera() => UiThread.Run(async () =>
     {
+        ResetSession();
         AppServices services = TestServices.Create(s => s with { Video = s.Video with { StudioMode = StudioMode.Camera } });
         using var camera = new SyntheticCameraSource(320, 180, 30);
         var studio = new StudioWindow(services, (_, _) => camera, () => OneCamera);
         bool started = false;
-        studio.StartRequested += (_, _) => started = true;
-        studio.Show();
-        await Task.Delay(300);
-        Assert.Equal(0, camera.StartCount); // opening Studio alone never turns the camera on
+        CameraPreviewWindow? handedOver = null;
+        studio.StartRequested += (_, _) =>
+        {
+            started = true;
+            handedOver = studio.TakePreview();
+        };
+        try
+        {
+            studio.Show();
+            await Task.Delay(300);
+            Assert.Equal(0, camera.StartCount); // a remembered "camera only" never turns the camera on by itself
+            Assert.Equal(StudioMode.Screen, RecordingController.Effective(services.Settings.Video).StudioMode);
 
-        Button show = Find<Button>(studio, "Turn on the camera preview")!;
-        Assert.Equal(Visibility.Visible, show.Visibility);
-        show.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        await WaitUntil(() => camera.IsRunning);
+            Click(Find<ToggleButton>(studio, CameraSwitch)!, on: true);
+            await WaitUntil(() => camera.IsRunning);
+            Assert.Equal(StudioMode.Camera, RecordingController.Effective(services.Settings.Video).StudioMode);
 
-        Find<Button>(studio, "Start recording")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
-        Assert.True(started);
-        await studio.CameraReleased;
-        Assert.False(camera.IsRunning);
-        studio.Close();
+            Find<Button>(studio, "Start recording")!.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+            Assert.True(started);
+            await studio.CameraReleased;
+            Assert.False(camera.IsRunning);
+            Assert.NotNull(handedOver); // the preview stays on screen for the recording
+            studio.Close();
+            Assert.True(handedOver!.IsVisible);
+        }
+        finally
+        {
+            handedOver?.Close();
+            studio.Close();
+            ResetSession();
+        }
     });
 
     [Fact]
     public void Camera_failure_is_explained_and_not_retried() => UiThread.Run(async () =>
     {
+        ResetSession();
         AppServices services = TestServices.Create();
         using var camera = new SyntheticCameraSource(320, 180, 30) { FailNextStart = CameraFailure.AccessDenied };
         var studio = new StudioWindow(services, (_, _) => camera, () => OneCamera);
-        studio.Show();
-        await Task.Delay(200);
-        Find<RadioButton>(studio, "Record: Camera only")!.IsChecked = true;
-        Button privacy = Find<Button>(studio, "Open camera privacy settings")!;
-        await WaitUntil(() => privacy.Visibility == Visibility.Visible);
-        await Task.Delay(500);
-        Assert.Equal(0, camera.StartCount); // the failed attempt is not repeated behind the user's back
-        Assert.False(camera.IsRunning);
-        studio.Close();
+        try
+        {
+            studio.Show();
+            await Task.Delay(200);
+            Click(Find<ToggleButton>(studio, CameraSwitch)!, on: true);
+            Button privacy = Find<Button>(studio, "Open camera privacy settings")!;
+            await WaitUntil(() => privacy.Visibility == Visibility.Visible);
+            await Task.Delay(500);
+            Assert.Equal(0, camera.StartCount); // the failed attempt is not repeated behind the user's back
+            Assert.False(camera.IsRunning);
+            Assert.Contains("not available", studio.Preview!.Describe(), StringComparison.OrdinalIgnoreCase);
+        }
+        finally
+        {
+            studio.Close();
+            ResetSession();
+        }
     });
+
+    private static void ResetSession()
+    {
+        RecordingController.SessionCamera = false;
+        RecordingController.SessionMicrophone = false;
+        RecordingController.PreviewHidden = false;
+    }
+
+    /// <summary>Like a user click on a switch: changes its state, then raises Click.</summary>
+    private static void Click(ToggleButton toggle, bool on)
+    {
+        toggle.IsChecked = on;
+        toggle.RaiseEvent(new RoutedEventArgs(ButtonBase.ClickEvent));
+    }
 
     private static async Task WaitUntil(Func<bool> condition, int timeoutMs = 5000)
     {

@@ -231,13 +231,18 @@ internal static partial class VideoSelfTest
         try
         {
             double excluded = ToolbarAbsence(dir, exclude: true);
-            (string? coveredExcluded, double paintedExcluded) = (LastToolbarCovered, LastToolbarPaintedMs);
+            (string? coveredExcluded, double paintedExcluded, string? stateOfExcluded) = (LastToolbarCovered, LastToolbarPaintedMs, LastToolbarWindowState);
             double control = ToolbarAbsence(dir, exclude: false);
             (string? coveredControl, double paintedControl) = (LastToolbarCovered, LastToolbarPaintedMs);
             report["toolbarExclusion"] = new { greenWhereToolbarIsWithExclusion = excluded, greenWhereToolbarIsWithoutExclusion = control, coveredExcluded, coveredControl };
             string precondition = coveredExcluded is not null || coveredControl is not null ? $" — PRECONDITION NOT MET: test area covered by {coveredExcluded ?? coveredControl}"
                 : paintedExcluded < 0 || paintedControl < 0 ? " — PRECONDITION NOT MET: the test window was not painted within 5 s" : string.Empty;
             precondition += $" (test window painted after {paintedExcluded:0} / {paintedControl:0} ms)";
+            string? stateExcluded = paintedExcluded < 0 ? stateOfExcluded : null, stateControl = paintedControl < 0 ? LastToolbarWindowState : null;
+            if (stateExcluded is not null || stateControl is not null)
+            {
+                precondition += $" — unpainted test window state (DEF-RC2-07 diagnostics): {stateExcluded ?? stateControl}";
+            }
             Check("toolbar-not-recorded", excluded >= 0.98 && control < 0.6, $"toolbar area is {excluded:P1} background in the recording (control without exclusion: {control:P1}){precondition}");
         }
 #pragma warning disable CA1031
@@ -288,6 +293,37 @@ internal static partial class VideoSelfTest
     /// </summary>
     /// <summary>Milliseconds until the test window of the last <see cref="ToolbarAbsence"/> run was painted (−1 = not within 5 s).</summary>
     private static double LastToolbarPaintedMs { get; set; }
+
+    /// <summary>DEF-RC2-07: what Windows reports about a test window that was never painted (null when it was painted).</summary>
+    private static string? LastToolbarWindowState { get; set; }
+
+    [LibraryImport("dwmapi.dll")]
+    private static partial int DwmGetWindowAttribute(nint hwnd, int attribute, out int value, int size);
+
+    [LibraryImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static partial bool IsWindowVisible(nint hwnd);
+
+    [LibraryImport("user32.dll")]
+    [return: System.Runtime.InteropServices.MarshalAs(System.Runtime.InteropServices.UnmanagedType.Bool)]
+    private static partial bool IsIconic(nint hwnd);
+
+    [LibraryImport("user32.dll")]
+    private static partial nint GetForegroundWindow();
+
+    /// <summary>
+    /// DEF-RC2-07 diagnostics for a test window that Windows reports on top but that never reached the screen: DWM
+    /// cloaking (a cloaked window is laid out and hit-tested but not composed), visibility, minimised state, its
+    /// physical bounds versus the test area, and the colours a direct screen capture shows there.
+    /// </summary>
+    internal static string DescribeWindowState(nint hwnd, PixelRect area)
+    {
+        int cloaked = DwmGetWindowAttribute(hwnd, 14 /* DWMWA_CLOAKED */, out int c, sizeof(int)) == 0 ? c : -1;
+        Core.Imaging.PixelBuffer shot = SnapForge.App.Capture.ScreenCaptureService.CaptureRegion(new PixelRect(area.X + 4, area.Y + 4, 8, 8));
+        string colour = shot.Pixels.Length >= 4 ? $"{shot.Pixels[2]},{shot.Pixels[1]},{shot.Pixels[0]}" : "-";
+        return $"cloaked={cloaked} (1 app, 2 shell, 4 inherited), visible={IsWindowVisible(hwnd)}, minimised={IsIconic(hwnd)}, " +
+            $"foreground is test window={GetForegroundWindow() == hwnd}, screen colour at the corner (R,G,B)={colour}, test area {area}";
+    }
 
     /// <summary>Waits up to 5 s until the top-left corner of <paramref name="area"/> shows the lime test colour on the screen (direct GDI capture).</summary>
     private static double WaitForLimeCorner(PixelRect area)
@@ -386,6 +422,7 @@ internal static partial class VideoSelfTest
         // showed 0 % of the test colour; run 141 here: 0 % even in the control run). Wait up to 5 s for the test
         // window to be painted (a corner outside the outline and the toolbar), and record how long it took.
         LastToolbarPaintedMs = WaitForLimeCorner(area);
+        LastToolbarWindowState = LastToolbarPaintedMs < 0 && ours.Count > 0 ? DescribeWindowState(ours[0], area) : null;
         string path = Path.Combine(dir, exclude ? "toolbar-excluded.mp4" : "toolbar-control.mp4");
         try
         {
