@@ -88,3 +88,18 @@ records DWM cloaking, visibility, minimised and foreground state and the colour 
 | DEF-RC4-04 | Low | Tests (installer CI) | Active-recording check stopped after Setup correctly refused and the recording kept growing (run 171): clicking SnapForge's "Yes" failed with UI Automation "Unsupported Pattern" | Test harness: the UI Automation lookup matched an element without the Invoke pattern | The test answers the standard Windows message box like a user: dialog `#32770` "SnapForge Setup", checks its question text, clicks IDYES with BM_CLICK | run 175: question shown, answered, recording saved, setup completed |
 | DEF-RC4-05 | Low | Tests (installer CI) | Reinstall/recording/other-session/interrupted step reported failure although every check in it passed (run 175) | Test harness: a second `schtasks /Delete` of the already deleted test task returned 1, and the CI wrapper returns the last native exit code | Delete only if the task exists; the step ends with `exit 0` after its checks (each check throws on failure) | run 177 green |
 
+
+## rc.5 — full-scope QA audit (installed app, display scaling 100–175 %)
+
+Found by the CI UI audit (run 183 on rc.4 code; runs 185 and 187 after the fixes). Details, screenshots and the
+coverage checklist: [QA-COVERAGE-rc.5.md](QA-COVERAGE-rc.5.md).
+
+| ID | Severity | Area | Symptom | Cause | Fix | Evidence |
+|---|---|---|---|---|---|---|
+| DEF-RC5-01 | Medium | All windows | Text at 9–11.5 DIP (tool labels, badges, headings, Library, Settings, QuickDock, recording windows, loupe) | Font sizes chosen for 100 % on large monitors | Minimum 12 DIP everywhere | `9270ce6`; run 185: 0 small-text findings at 100/125/150/175 % |
+| DEF-RC5-02 | High | Record panel | With More options open the panel extended below the work area at 100–150 %; at 125–150 % Cancel and Start recording were off the screen | Fixed `MaxHeight` from the primary monitor at start-up; the work-area guard only fitted windows when shown, not when they grew | Height limited to the panel's monitor work area (per DPI); options scroll; buttons pinned; the guard re-fits any window that grows | `9270ce6`; run 185: no FAIL, screenshot shows the buttons at 150 % |
+| DEF-RC5-03 | Low | QuickDock | Collapsed pill clipped (30-DIP button in a 22-DIP window) | Implicit button style's `MinHeight=30` applied to the pill | `MinHeight/MinWidth=0` on the pill | `9270ce6`; run 185 |
+| DEF-RC5-04 | Low | Accessibility | Video editor quality list unnamed; truncated titles unreadable | Missing `AutomationProperties.Name` / tooltip | Name and tooltips added | `9270ce6`; run 185: 0 WARN at 100–150 % |
+| DEF-RC5-05 | Medium | Capture panel | Tab focus disappeared onto the hidden "Undo" link of the reset notice; Capture, Library, Editor and the options below were not reachable with Tab | Hyperlink inside a collapsed TextBlock stays a tab stop | Link focusable only while the notice is shown | `462f448`; run 187 |
+| DEF-RC5-06 | Low | Editor toolbar | At 175 % (two-row toolbar) Blur, Pixelate and Crop not reachable with the arrow keys | WPF spatial arrow navigation stops at the end of a wrapped row | Arrow keys step through the tools in order | `462f448`; run 187 |
+| DEF-RC5-07 | Low | Website | Download page scrolled sideways 17–53 px on phone/tablet widths (all three engines) | 40-character commit ID in a flex item could not wrap | `min-width: 0` and `overflow-wrap: anywhere` for facts | `9270ce6`; Website run 72 green |
