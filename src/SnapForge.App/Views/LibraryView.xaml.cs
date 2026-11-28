@@ -592,6 +592,9 @@ public partial class LibraryView : UserControl
                     case "open":
                         item.Header = video ? "_Play" : "_Open in Editor";
                         break;
+                    case "copy-file":
+                        item.IsEnabled = SelectedRecords().Any(r => !r.IsDeleted && r.Damage is null);
+                        break;
                     case "export":
                         item.Header = video ? "_Export MP4 video…" : "_Export image (PNG, JPEG, BMP, TIFF)…";
                         break;
@@ -918,6 +921,33 @@ public partial class LibraryView : UserControl
                 _services!.Library.SetFolder(r.Id, folder);
             }
         }, folder.Trim().Length == 0 ? "Removed from folder." : $"Moved to \"{folder.Trim()}\".").ConfigureAwait(true);
+    }
+
+    private void OnCopyFiles(object sender, RoutedEventArgs e)
+    {
+        if (_host is null || _services is null)
+        {
+            return;
+        }
+
+        DragCapture[] items = [.. SelectedRecords()
+            .Where(r => !r.IsDeleted && r.Damage is null)
+            .Select(r => _host.DragItemFor(r.Id))
+            .OfType<DragCapture>()];
+        if (items.Length == 0)
+        {
+            return;
+        }
+
+        try
+        {
+            CaptureDragDrop.CopyFiles(items, _services.Settings.DragDrop);
+            _host.SetStatus(items.Length == 1 ? "Capture file copied." : $"Copied {items.Length} capture files.");
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or System.Runtime.InteropServices.ExternalException)
+        {
+            _host.SetStatus($"Could not copy capture files: {ex.Message}");
+        }
     }
 
     private async void OnExport(object sender, RoutedEventArgs e)

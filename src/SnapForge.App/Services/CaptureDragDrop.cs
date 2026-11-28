@@ -85,6 +85,23 @@ internal static class CaptureDragDrop
         return effect;
     }
 
+    public static void CopyFiles(IReadOnlyList<DragCapture> items, DragDropSettings settings)
+    {
+        var files = new LazyCaptureFiles(items, settings, Store);
+        bool copied = false;
+        try
+        {
+            var data = new DataObject();
+            data.SetFileDropList(files.FileDropList());
+            Clipboard.SetDataObject(data, copy: true);
+            copied = true;
+        }
+        finally
+        {
+            files.EndDrag(copied);
+        }
+    }
+
     /// <summary>True if the data came from a SnapForge drag (so a drop onto SnapForge is a reorder, not an import).</summary>
     public static bool IsOwnDrag(IDataObject data) => data?.GetDataPresent(KeysFormat) == true;
 

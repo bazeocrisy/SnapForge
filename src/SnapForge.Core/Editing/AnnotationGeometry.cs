@@ -86,6 +86,7 @@ internal static class AnnotationGeometry
                 {
                     Position = P(t.Position),
                     FontSize = t.FontSize * u,
+                    WrapWidth = t.WrapWidth * u,
                     MeasuredSize = new PointD(t.MeasuredSize.X * u, t.MeasuredSize.Y * u),
                     StrokeWidth = t.StrokeWidth * u,
                 };

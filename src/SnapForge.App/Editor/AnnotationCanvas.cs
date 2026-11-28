@@ -34,6 +34,7 @@ internal sealed class AnnotationCanvas : Canvas
     private PointD _moveStart;
 
     private TextBox? _textEditor;
+    private RectD? _textBoxPreview;
     private PointD _textPosition;
     private TextAnnotation? _textOriginal;
     private ArgbColor _textEditColor;
@@ -257,6 +258,7 @@ internal sealed class AnnotationCanvas : Canvas
 
         string text = _textEditor.Text.TrimEnd();
         TextAnnotation? original = _textOriginal;
+        double wrapWidth = double.IsNaN(_textEditor.Width) ? 0 : _textEditor.Width;
         RemoveTextEditor();
 
         if (original is null)
@@ -265,6 +267,7 @@ internal sealed class AnnotationCanvas : Canvas
             {
                 var annotation = WithMeasuredSize(new TextAnnotation(_textPosition, text, _textEditFontSize)
                 {
+                    WrapWidth = wrapWidth,
                     Color = _textEditColor,
                     StrokeWidth = _textEditStroke,
                 });
@@ -325,6 +328,12 @@ internal sealed class AnnotationCanvas : Canvas
         }
 
         double px = 1 / Math.Max(Zoom, 0.01);
+        if (_textBoxPreview is { } textBox)
+        {
+            var pen = new Pen(SelectionBrush, px) { DashStyle = DashStyles.Dash };
+            dc.DrawRectangle(null, pen, new Rect(textBox.X, textBox.Y, textBox.Width, textBox.Height));
+        }
+
         if (_redactPreview is { } redact)
         {
             var pen = new Pen(Brushes.White, px) { DashStyle = new DashStyle([4, 4], 0) };
@@ -394,8 +403,8 @@ internal sealed class AnnotationCanvas : Canvas
                 }
                 else
                 {
-                    double fontSize = FontSizeForStroke(StrokeWidth);
-                    BeginTextEdit(new PointD(p.X, p.Y - fontSize * 0.65), null);
+                    _dragStart = p;
+                    CaptureMouse();
                 }
 
                 break;
@@ -457,7 +466,11 @@ internal sealed class AnnotationCanvas : Canvas
             return;
         }
 
-        if (Tool == AnnotationTool.Freehand)
+        if (Tool == AnnotationTool.Text)
+        {
+            _textBoxPreview = RectD.FromPoints(start, p);
+        }
+        else if (Tool == AnnotationTool.Freehand)
         {
             PointD last = _freehand[^1];
             if (Math.Abs(p.X - last.X) + Math.Abs(p.Y - last.Y) >= 1.5 && _freehand.Count < FreehandAnnotation.MaxPoints)
@@ -513,7 +526,20 @@ internal sealed class AnnotationCanvas : Canvas
         ResetInteraction();
         ReleaseMouseCapture();
 
-        if (Tool == AnnotationTool.Redact)
+        if (Tool == AnnotationTool.Text)
+        {
+            RectD box = RectD.FromPoints(start, p);
+            double minimum = 4 / Math.Max(Zoom, 0.01);
+            if (box.Width >= minimum && box.Height >= minimum)
+            {
+                BeginTextEdit(new PointD(box.X, box.Y), null, box.Width, box.Height);
+            }
+            else
+            {
+                BeginTextEdit(new PointD(start.X, start.Y - FontSizeForStroke(StrokeWidth) * 0.65), null);
+            }
+        }
+        else if (Tool == AnnotationTool.Redact)
         {
             PixelRect region = RectD.FromPoints(start, p).ToCoveringPixelRect().Intersect(_document.Image.Bounds);
             if (region.Width >= 2 && region.Height >= 2)
@@ -636,7 +662,7 @@ internal sealed class AnnotationCanvas : Canvas
         return new PointD(start.X + length * Math.Cos(angle), start.Y + length * Math.Sin(angle));
     }
 
-    private void BeginTextEdit(PointD position, TextAnnotation? existing)
+    private void BeginTextEdit(PointD position, TextAnnotation? existing, double width = 0, double height = 0)
     {
         _textOriginal = existing;
         _textPosition = position;
@@ -647,6 +673,7 @@ internal sealed class AnnotationCanvas : Canvas
         _textEditFontSize = fontSize;
         _textEditStroke = existing?.StrokeWidth ?? StrokeWidth;
 
+        width = existing?.WrapWidth ?? width;
         _textEditor = new TextBox
         {
             Text = existing?.Text ?? string.Empty,
@@ -660,8 +687,10 @@ internal sealed class AnnotationCanvas : Canvas
             BorderThickness = new Thickness(1 / Math.Max(Zoom, 0.01)),
             Padding = new Thickness(0),
             AcceptsReturn = true,
-            MinWidth = fontSize * 2,
-            TextWrapping = TextWrapping.NoWrap,
+            Width = width > 0 ? width : double.NaN,
+            MinWidth = width > 0 ? 0 : fontSize * 2,
+            MinHeight = height,
+            TextWrapping = width > 0 ? TextWrapping.Wrap : TextWrapping.NoWrap,
             Style = null,
         };
         _textEditor.PreviewKeyDown += OnTextEditorKeyDown;
@@ -736,7 +765,7 @@ internal sealed class AnnotationCanvas : Canvas
     }
 
     private static TextAnnotation WithMeasuredSize(TextAnnotation t) =>
-        t with { MeasuredSize = AnnotationRenderer.MeasureText(t.Text, t.FontSize) };
+        t with { MeasuredSize = AnnotationRenderer.MeasureText(t.Text, t.FontSize, t.WrapWidth) };
 
     private Annotation? SelectedAnnotation() =>
         _selectedId is { } id && _document is not null ? _document.FindById(id) : null;
@@ -751,6 +780,7 @@ internal sealed class AnnotationCanvas : Canvas
     {
         _dragStart = null;
         _preview = null;
+        _textBoxPreview = null;
         _redactPreview = null;
         _moveOriginal = null;
         _moveCurrent = null;
