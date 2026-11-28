@@ -3,8 +3,9 @@
 This is the full-scope QA audit of the **installed** Windows app. Windows CI ran every check below against the real installer on a GitHub `windows-latest` runner (Windows Server, one virtual 1920×1080 display, no camera, microphone or GPU). Nothing is marked passed unless a CI run executed it.
 
 * **Before (rc.4 code):** CI run 183, commit `803b4e0`: https://github.com/bazeocrisy/SnapForge/actions/runs/46174581430
-* **After (rc.5 candidate):** CI run RUNNUM, commit `COMMIT`: RUNURL
-* **Screenshots:** the `ui-audit-<commit>` artifact of each run holds every PNG and `ui-audit.json`. Before/after pairs are listed in §4.
+* **After (rc.5 candidate):** CI run 187, commit `462f448`: https://github.com/bazeocrisy/SnapForge/actions/runs/46178250395
+* **Installer:** `SnapForge-1.0.0-rc.5-win-x64-setup.exe`, build 187, SHA-256 `2f2a90fd7e965ed1c42bddd40b6563e1c2743acad13e90411d44bd1f97058ea8`, **not code-signed**. Package: https://github.com/bazeocrisy/SnapForge/actions/runs/46178250395/artifacts/15276573295
+* **Screenshots:** the `ui-audit-<commit>` artifact of each run holds every PNG and `ui-audit.json` (run 187: https://github.com/bazeocrisy/SnapForge/actions/runs/46178250395/artifacts/15276519560). Before/after pairs are listed in §4.
 
 **Legend:** ✅ passed in CI · ⚠️ passed with a note · ⛔ blocked (needs hardware or an environment CI does not have, see §6) · ⏸ unverified (CI could not apply the condition)
 
@@ -12,12 +13,12 @@ This is the full-scope QA audit of the **installed** Windows app. Windows CI ran
 
 For each level, CI changes the runner's display scaling live (the same setting as Settings → System → Display → Scale), reads it back from Windows, and checks the DPI that SnapForge itself measures. A level is **verified** only when all three agree.
 
-| Scaling | Effective DPI | Before (run 183) | After (run RUNNUM) | Status |
+| Scaling | Effective DPI | Before (run 183) | After (run 187) | Status |
 |---|---|---|---|---|
-| 100 % | 96 | 4 FAIL, 664 WARN | AFTER100 | ✅ verified |
-| 125 % | 120 | 8 FAIL, 664 WARN | AFTER125 | ✅ verified |
-| 150 % | 144 | 23 FAIL, 665 WARN | AFTER150 | ✅ verified |
-| 175 % | 168 | not run | AFTER175 | ✅ verified (the runner's maximum) |
+| 100 % | 96 | 4 FAIL, 664 WARN | 0 FAIL, 0 WARN | ✅ verified |
+| 125 % | 120 | 8 FAIL, 664 WARN | 0 FAIL, 0 WARN | ✅ verified |
+| 150 % | 144 | 23 FAIL, 665 WARN | 0 FAIL, 0 WARN | ✅ verified |
+| 175 % | 168 | not run | 0 FAIL, 0 WARN | ✅ verified (the runner's maximum) |
 | 200 % | 192 | unverified | unverified | ⏸ **unverified.** At 1920×1080, Windows only allows up to 175 %, and the runner offers no larger display mode. CI attempted it and Windows stayed at 175 %. The run reports this as UNVERIFIED, never as passed. |
 | Mixed DPI (two monitors at different scaling) | — | — | — | ⛔ blocked: the runner has one display |
 
@@ -53,7 +54,7 @@ For each level, CI changes the runner's display scaling live (the same setting a
 | **Recording** | Recording control strip, Recording saved, Recording could not be finished, Camera preview | `recording-controls`, `recording-saved`, `recording-failed`, `camera-preview` | ✅ |
 | **Setup** | Setup wizard, first page, at each scaling level (photographed, not installed) | `setup-wizard` | ✅ (screenshot only; Inno Setup draws its own wizard) |
 
-### 2.2 Workflows driven through the installed or packaged app in CI (full regression, run RUNNUM)
+### 2.2 Workflows driven through the installed or packaged app in CI (full regression, run 187)
 
 | Workflow | CI job / step | After |
 |---|---|---|
@@ -88,8 +89,8 @@ For each level, CI changes the runner's display scaling live (the same setting a
 | DEF-RC5-02 | High | Record panel | With **More options** open, the panel ran off the bottom of the screen at 100 %, 125 % and 150 %. At 125–150 % **Cancel and Start recording were below the screen**, as were the countdown and after-recording options | The panel is never taller than its monitor's work area. Its options scroll, and **Cancel / Start recording are pinned at the bottom**. Every SnapForge window that grows after opening is moved back into the work area | No FAIL; screenshot `record-panel-more-options` at 150 % shows both buttons |
 | DEF-RC5-03 | Low | QuickDock (collapsed) | The collapsed pill was 30 DIP tall inside its 22-DIP window, so its lower edge and rounded corners were cut off | The pill no longer inherits the default 30-DIP minimum button height | No FAIL |
 | DEF-RC5-04 | Low | Video editor, Editor, Library | The video editor's quality list had no accessible name. Capture titles cut off with "…" (for example "Demo recording (test pa…") had no way to read the full title | Accessible name "Export quality"; truncated titles and Library details show the full text as a tooltip | No WARN |
-| DEF-RC5-05 | Medium | Capture panel (Image and Video) | **Keyboard focus disappeared:** Tab stopped on the "Undo" link of the hidden "Options reset." notice, so Tab could no longer reach Library, Editor, Capture or the options below | The link only takes focus while the notice is shown | Fixed in `462f448`; run RUNNUM |
-| DEF-RC5-06 | Low | Editor toolbar at 175 % | The toolbar wraps onto two rows, and the arrow keys stopped at the end of the first row, so **Blur, Pixelate and Crop** could not be reached from the keyboard (their shortcut keys still worked) | The arrow keys step through all 15 tools in order and wrap around | Fixed in `462f448`; run RUNNUM |
+| DEF-RC5-05 | Medium | Capture panel (Image and Video) | **Keyboard focus disappeared:** Tab stopped on the "Undo" link of the hidden "Options reset." notice, so Tab could no longer reach Library, Editor, Capture or the options below | The link only takes focus while the notice is shown | Fixed in `462f448`; run 187 |
+| DEF-RC5-06 | Low | Editor toolbar at 175 % | The toolbar wraps onto two rows, and the arrow keys stopped at the end of the first row, so **Blur, Pixelate and Crop** could not be reached from the keyboard (their shortcut keys still worked) | The arrow keys step through all 15 tools in order and wrap around | Fixed in `462f448`; run 187 |
 | DEF-RC5-07 | Low | Website download page | On phones and tablets the page scrolled sideways by **17–53 px** (Chromium, Firefox and WebKit), because the 40-character commit ID could not wrap | Long IDs, checksums and file names wrap | 0 px at 360, 768 and 1280 px (local Playwright check and Website CI) |
 
 **Audit corrections, so the numbers are honest:**
@@ -101,17 +102,19 @@ For each level, CI changes the runner's display scaling live (the same setting a
 
 ## 4. Before/after screenshots
 
-The PNGs are in the `ui-audit-<commit>` artifacts of runs 183 and RUNNUM; the after set is also attached to PR #3. Recommended pairs:
+These are real screen captures from the CI runner, taken in the installed app; the files are in [qa-rc5-screenshots/](qa-rc5-screenshots/). The complete sets (all 45 screens per scaling level) are in the `ui-audit-<commit>` artifacts of runs 183 and 187.
 
-| Screen | Before (run 183) | After (run RUNNUM) |
+| Screen | Before (rc.4, run 183) | After (rc.5, run 187) |
 |---|---|---|
-| Record panel, More options, 150 % | `150/record-panel-more-options.png` (panel missing: excluded from capture) | panel fits; Cancel and Start recording visible |
-| Editor, 150 % | tool labels 10 DIP | tool labels 12 DIP |
-| Editor, 175 % | not run | two-row toolbar, all tools visible |
-| Capture panel, 150 % | 10–11 DIP section labels | 12 DIP |
-| QuickDock expanded, 150 % | 10 DIP labels | 12 DIP |
-| Settings, 175 % | not run | window fits the screen; content scrolls |
-| Setup wizard, 100–175 % | photographed | photographed (Inno Setup's own UI, unchanged) |
+| Editor, 150 % | [before-150-editor](qa-rc5-screenshots/before-150-editor.jpg): tool labels 10 DIP | [after-150-editor](qa-rc5-screenshots/after-150-editor.jpg): 12 DIP |
+| Capture panel, 150 % | [before-150-capture-panel](qa-rc5-screenshots/before-150-capture-panel.jpg) | [after-150-capture-panel](qa-rc5-screenshots/after-150-capture-panel.jpg) |
+| QuickDock, 150 % | [before-150-quickdock](qa-rc5-screenshots/before-150-quickdock.jpg): 10 DIP labels | [after-150-quickdock](qa-rc5-screenshots/after-150-quickdock.jpg) |
+| Record panel + More options, 150 % | [before-150-record-panel-more-options](qa-rc5-screenshots/before-150-record-panel-more-options.jpg): the panel is missing because it is excluded from capture; its measured bounds ran past the screen | [after-150-record-panel-more-options](qa-rc5-screenshots/after-150-record-panel-more-options.jpg): fits; Cancel and Start recording pinned |
+| Editor, 175 % | not run | [after-175-editor](qa-rc5-screenshots/after-175-editor.jpg): two-row toolbar |
+| Settings, 175 % | not run | [after-175-settings](qa-rc5-screenshots/after-175-settings.jpg) |
+| Library, 175 % | not run | [after-175-library](qa-rc5-screenshots/after-175-library.jpg) |
+| Setup wizard, 175 % | not run | [after-175-setup-wizard](qa-rc5-screenshots/after-175-setup-wizard.jpg) |
+| Recording controls, 100 % | — | [after-100-recording-controls](qa-rc5-screenshots/after-100-recording-controls.jpg) |
 
 ## 5. Upgrades preserve captures and settings
 
@@ -122,7 +125,7 @@ The installer job checks each of these with a real older build, against a SHA-25
 * rc.3 → rc.5 and **rc.4 (build 177) → rc.5** with Capture and Editor both open;
 * repair, reinstall, uninstall (data kept).
 
-All ✅ in run RUNNUM.
+All ✅ in run 187.
 
 ## 6. Blocked: needs real hardware or your PC (grouped)
 

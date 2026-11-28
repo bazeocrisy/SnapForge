@@ -10,7 +10,7 @@ Windows CI already ran the full regression and the display-scaling audit on the 
 Get-FileHash .\SnapForge-1.0.0-rc.5-win-x64-setup.exe
 ```
 
-It must show `SHA256VALUE`. Do not run a file whose checksum differs. Windows will then show SmartScreen's blue "Windows protected your PC" window. That is expected for this unsigned test build (REL-SIGN-01).
+It must show `2f2a90fd7e965ed1c42bddd40b6563e1c2743acad13e90411d44bd1f97058ea8`. Do not run a file whose checksum differs. Windows will then show SmartScreen's blue "Windows protected your PC" window. That is expected for this unsigned test build (REL-SIGN-01).
 
 ## 1. Upgrade from rc.4 with both apps open
 
