@@ -178,6 +178,7 @@ public partial class App : Application
         }
 
         AppServices.Current = services;
+        services.WatchOtherPrograms = true;
         bool startedHidden = args.Contains(StartupRegistration.BackgroundArgument);
         ReportSettingsLoad(services, startedHidden);
         services.SettingsSaveFailed += (_, message) => Current.Dispatcher.BeginInvoke(() => ReportSettingsSaveFailure(message));

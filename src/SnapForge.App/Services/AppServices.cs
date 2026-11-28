@@ -195,6 +195,14 @@ internal sealed class AppServices : IDisposable
         return true;
     }
 
+    private LibraryWatcher? _libraryWatcher;
+
+    /// <summary>
+    /// True in the two SnapForge programs (not in tests): after indexing, a <see cref="LibraryWatcher"/> keeps this
+    /// process's index in step with what the other program saves (docs/LIBRARY-COORDINATION.md).
+    /// </summary>
+    public bool WatchOtherPrograms { get; set; }
+
     private FileSystemWatcher? _settingsWatcher;
     private Timer? _settingsDebounce;
 
@@ -299,6 +307,7 @@ internal sealed class AppServices : IDisposable
     {
         _settingsWatcher?.Dispose();
         _settingsDebounce?.Dispose();
+        _libraryWatcher?.Dispose();
         Writer.Dispose();
     }
 
@@ -328,6 +337,12 @@ internal sealed class AppServices : IDisposable
             if (ReferenceEquals(library, Library))
             {
                 Tray.Prune(id => Library.Find(id) is { IsDeleted: false });
+                if (WatchOtherPrograms)
+                {
+                    // RC3: pick up items the other SnapForge program creates, edits or deletes.
+                    _libraryWatcher?.Dispose();
+                    _libraryWatcher = new LibraryWatcher(library);
+                }
             }
         }
     }

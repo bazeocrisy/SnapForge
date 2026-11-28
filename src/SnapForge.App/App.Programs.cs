@@ -119,6 +119,34 @@ public partial class App
         }
     }
 
+    /// <summary>
+    /// Backup, restore and moving the Library change or read the whole Library for a long time; while one runs the
+    /// other SnapForge program could not save (its save would wait for the Library and might time out), and after a
+    /// move it would still use the old location. These run only while the other program is closed. Returns true when
+    /// it is closed (or the user closed it); otherwise explains what to do.
+    /// </summary>
+    internal static bool OtherProgramClosedFor(Window? owner, string what)
+    {
+        AppRole other = Role == AppRole.Editor ? AppRole.Capture : AppRole.Editor;
+        while (Handoff.IsRunning(other))
+        {
+            string name = other == AppRole.Editor ? "SnapForge Editor" : "SnapForge Capture";
+            string how = other == AppRole.Editor
+                ? "Close SnapForge Editor (save your edits first; they are saved automatically)."
+                : "Stop any recording, then exit SnapForge Capture: right-click the SnapForge icon in the notification area → Exit SnapForge Capture.";
+            string text = $"To {what}, {name} must be closed first, so nothing is saved to the Library while this runs.\n\n{how}\n\nClick Retry when it is closed.";
+            MessageBoxResult answer = owner is null
+                ? MessageBox.Show(text, ProgramName, MessageBoxButton.OKCancel, MessageBoxImage.Information)
+                : MessageBox.Show(owner, text, ProgramName, MessageBoxButton.OKCancel, MessageBoxImage.Information);
+            if (answer != MessageBoxResult.OK)
+            {
+                return false;
+            }
+        }
+
+        return true;
+    }
+
     // ------------------------------------------------------------------ requests
 
     /// <summary>
@@ -273,11 +301,7 @@ public partial class App
             return known;
         }
 
-        return await services.Writer.RunAsync(() =>
-        {
-            services.Library.Reindex(); // replaced by a per-item refresh once Library coordination is merged
-            return services.Library.Find(id);
-        }).ConfigureAwait(true);
+        return await services.Writer.RunAsync(() => services.Library.RefreshFromDisk(id)).ConfigureAwait(true);
     }
 
     private static void OpenHandedOverImage(MainWindow main, AppServices services, string path, DateTime capturedUtc)

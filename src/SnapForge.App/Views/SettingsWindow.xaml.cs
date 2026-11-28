@@ -275,6 +275,11 @@ public partial class SettingsWindow : Window
         }
 
         string target = dialog.FolderName;
+        if (!App.OtherProgramClosedFor(this, "move the Capture Library"))
+        {
+            return;
+        }
+
         if (Video.RecordingController.IsActive)
         {
             MessageBox.Show(this, "Stop the recording first. The Library cannot be moved while recording.", "Move Capture Library", MessageBoxButton.OK, MessageBoxImage.Information);
@@ -373,6 +378,11 @@ public partial class SettingsWindow : Window
 
     private async void OnBackup(object sender, RoutedEventArgs e)
     {
+        if (!App.OtherProgramClosedFor(this, "back up the Capture Library"))
+        {
+            return;
+        }
+
         var dialog = new SaveFileDialog { Title = "Back up Capture Library", Filter = "ZIP archive (*.zip)|*.zip", FileName = $"SnapForge Library {DateTime.Now:yyyy-MM-dd}.zip" };
         if (dialog.ShowDialog(this) != true)
         {
@@ -411,6 +421,11 @@ public partial class SettingsWindow : Window
 
     private async void OnRestore(object sender, RoutedEventArgs e)
     {
+        if (!App.OtherProgramClosedFor(this, "restore a backup into the Capture Library"))
+        {
+            return;
+        }
+
         var dialog = new OpenFileDialog { Title = "Restore from backup", Filter = "ZIP archive (*.zip)|*.zip" };
         if (dialog.ShowDialog(this) != true)
         {

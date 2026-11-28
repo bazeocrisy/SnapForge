@@ -1062,6 +1062,11 @@ public partial class LibraryView : UserControl
 
     private async void OnRestore(object sender, RoutedEventArgs e)
     {
+        if (!App.OtherProgramClosedFor(Window.GetWindow(this), "restore a backup into the Capture Library"))
+        {
+            return;
+        }
+
         Guid[] ids = [.. SelectedRecords().Where(r => r.IsDeleted).Select(r => r.Id)];
         if (ids.Length > 0)
         {
