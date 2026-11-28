@@ -29,7 +29,7 @@
 
                 <CheckBox x:Name="StartupBox" Content="Launch SnapForge when I sign in to Windows (starts in the notification area)" Click="OnStartupChanged"
                           AutomationProperties.Name="Launch with Windows" />
-                <TextBlock x:Name="StartupStatus" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="26,0,0,4" />
+                <TextBlock x:Name="StartupStatus" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="26,0,0,4" />
 
                 <TextBlock Text="QUICKDOCK" Style="{StaticResource SectionHeader}" />
                 <CheckBox x:Name="WidgetEnabledBox" Content="Show the QuickDock at the screen edge" Click="OnWidgetChanged" AutomationProperties.Name="Show the QuickDock" />
@@ -45,7 +45,7 @@
                 <WrapPanel Margin="0,6,0,0">
                     <Button Content="Move QuickDock to top centre" Click="OnWidgetReset" Margin="0,0,6,6" />
                 </WrapPanel>
-                <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}"
+                <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}"
                            Text="Drag the QuickDock by its grip to dock it at the top, left or right edge of any display; it remembers the place. It never takes keyboard focus and is hidden while a capture is taken." />
 
                 <TextBlock Text="DRAG AND DROP" Style="{StaticResource SectionHeader}" />
@@ -60,7 +60,7 @@
                     <TextBox x:Name="JpegQualityBox" DockPanel.Dock="Right" Width="70" LostFocus="OnDragFormatChanged" AutomationProperties.Name="JPEG quality" />
                     <TextBlock Text="JPEG quality (1–100)" VerticalAlignment="Center" />
                 </DockPanel>
-                <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,4,0,0"
+                <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,4,0,0"
                            Text="Dragging a capture to Explorer, the desktop, Office, mail, chat or a browser copies a flattened image (annotations applied, redactions burned in, no metadata) named after the capture and its time. Editable captures and original pixels are never included. Temporary copies are deleted automatically." />
 
                 <TextBlock Text="HOTKEYS" Style="{StaticResource SectionHeader}" />
@@ -77,7 +77,7 @@
                              ToolTip="Optional. Click here and press the key combination (e.g. Ctrl+Shift+Space)" />
                 </DockPanel>
                 <TextBlock x:Name="HotkeyStatus" FontSize="12" TextWrapping="Wrap" Margin="0,8,0,0" Foreground="{DynamicResource MutedTextBrush}" />
-                <TextBlock FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,6,0,0"
+                <TextBlock FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="0,6,0,0"
                            Text="If Print Screen is reported as in use, Windows is probably using it to open the Snipping Tool: Settings → Accessibility → Keyboard → turn off “Use the Print screen key to open screen capture”, then reopen this window. Preset hotkeys are set in the capture panel: Presets → (preset) → Set hotkey…." />
 
                 <TextBlock Text="CAPTURE LIBRARY" Style="{StaticResource SectionHeader}" />

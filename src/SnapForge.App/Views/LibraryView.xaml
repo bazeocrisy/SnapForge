@@ -50,7 +50,7 @@
                                         <Ellipse Width="40" Height="40" Fill="#B0000000" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         <Path Data="M0,0 L14,8 L0,16 Z" Fill="White" Width="14" Height="16" Margin="4,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                         <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="4" CornerRadius="3" Padding="5,1" Background="#C8000000">
-                                            <TextBlock Text="{Binding DurationText}" FontSize="11" Foreground="White" />
+                                            <TextBlock Text="{Binding DurationText}" FontSize="12" Foreground="White" />
                                         </Border>
                                     </Grid>
                                     <Path Data="{StaticResource IconStar}" Fill="{DynamicResource AccentBrush}" Width="24" Height="24" Stretch="None"
@@ -58,11 +58,11 @@
                                     <Border HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="4" CornerRadius="3" Padding="4,1"
                                             Background="{DynamicResource SurfaceBrush}" BorderBrush="{DynamicResource WarningBrush}" BorderThickness="1"
                                             Visibility="{Binding HasWarning, Converter={StaticResource BoolToVis}}">
-                                        <TextBlock Text="{Binding WarningText}" FontSize="10" Foreground="{DynamicResource WarningBrush}" />
+                                        <TextBlock Text="{Binding WarningText}" FontSize="12" Foreground="{DynamicResource WarningBrush}" />
                                     </Border>
                                 </Grid>
-                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" Margin="2,6,2,0" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource TextBrush}" />
-                                <TextBlock Text="{Binding Subtitle}" FontSize="11" Margin="2,1,2,0" TextTrimming="CharacterEllipsis" Foreground="{DynamicResource MutedTextBrush}" />
+                                <TextBlock Text="{Binding Title}" FontSize="12" FontWeight="SemiBold" Margin="2,6,2,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}" Foreground="{DynamicResource TextBrush}" />
+                                <TextBlock Text="{Binding Subtitle}" FontSize="12" Margin="2,1,2,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Subtitle}" Foreground="{DynamicResource MutedTextBrush}" />
                             </StackPanel>
                         </Border>
                         <DataTemplate.Triggers>
@@ -112,17 +112,17 @@
 
                     <TextBlock Text="TAGS" Style="{StaticResource SectionHeader}" Margin="10,18,0,6" />
                     <StackPanel x:Name="TagsPanel" />
-                    <TextBlock x:Name="NoTagsText" Text="No tags yet. Right-click a capture → Tags…" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" />
+                    <TextBlock x:Name="NoTagsText" Text="No tags yet. Right-click a capture → Tags…" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" />
 
                     <TextBlock Text="FOLDERS" Style="{StaticResource SectionHeader}" Margin="10,18,0,6" />
                     <StackPanel x:Name="FoldersPanel" />
-                    <TextBlock x:Name="NoFoldersText" Text="No folders yet. Right-click a capture → Move to folder…" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" />
+                    <TextBlock x:Name="NoFoldersText" Text="No folders yet. Right-click a capture → Move to folder…" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" />
 
                     <TextBlock Text="STORAGE" Style="{StaticResource SectionHeader}" Margin="10,18,0,6" />
-                    <TextBlock x:Name="StorageText" FontSize="11" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" />
-                    <TextBlock Text="Stored locally in:" FontSize="11" Foreground="{DynamicResource MutedTextBrush}" Margin="10,2,10,0" />
+                    <TextBlock x:Name="StorageText" FontSize="12" TextWrapping="Wrap" Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" />
+                    <TextBlock Text="Stored locally in:" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Margin="10,2,10,0" />
                     <!-- Long paths are shortened in the middle-free way (trailing ellipsis); the full path is in the tooltip. -->
-                    <TextBlock x:Name="StoragePathText" FontSize="11" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
+                    <TextBlock x:Name="StoragePathText" FontSize="12" TextTrimming="CharacterEllipsis" TextWrapping="NoWrap"
                                Foreground="{DynamicResource MutedTextBrush}" Margin="10,0" AutomationProperties.Name="Library location" />
                     <Button Style="{StaticResource LinkButton}" Content="Storage &amp; privacy settings…" HorizontalAlignment="Left" Margin="4,4,0,0" Click="OnStorageSettings" />
                 </StackPanel>

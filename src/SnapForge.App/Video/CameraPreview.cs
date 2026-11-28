@@ -67,7 +67,7 @@ internal sealed class CameraPreviewWindow : Window
         _picture.Children.Add(_placeholder);
 
         _dot = new System.Windows.Shapes.Ellipse { Width = 8, Height = 8, Margin = new Thickness(2, 0, 6, 0), VerticalAlignment = VerticalAlignment.Center };
-        _caption = new TextBlock { FontSize = 11.5, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 210 };
+        _caption = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, VerticalAlignment = VerticalAlignment.Center, MaxWidth = 210 };
         AutomationProperties.SetName(_caption, "Camera status");
         var hide = new Button { Content = "Hide", Padding = new Thickness(8, 1, 8, 1), Focusable = false, ToolTip = "Hide this preview. What is recorded does not change; show it again from the recording controls or the notification-area icon." };
         hide.SetResourceReference(StyleProperty, "ToolbarButton");

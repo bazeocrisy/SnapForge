@@ -110,6 +110,7 @@ internal sealed class VideoEditorWindow : Window
 
         _quality = new ComboBox { ItemsSource = new[] { "Standard quality", "High quality" }, SelectedIndex = 0, Margin = new Thickness(0, 0, 8, 0), MinWidth = 140 };
         AutomationProperties.SetName(_quality, "Export quality");
+        AutomationProperties.SetName(_quality, "Export quality");
         var exportBar = new WrapPanel { Margin = new Thickness(12, 4, 12, 4) };
         exportBar.Children.Add(Action(ToolbarButton("Save frame to Library", "Saves the frame at the current position as an image capture", () => _ = SaveFrameAsync())));
         exportBar.Children.Add(_quality);

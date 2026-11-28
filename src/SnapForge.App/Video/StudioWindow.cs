@@ -79,7 +79,6 @@ internal sealed class StudioWindow : Window
         Title = "SnapForge — Record";
         Width = 392;
         SizeToContent = SizeToContent.Height;
-        MaxHeight = SystemParameters.WorkArea.Height - 24;
         ResizeMode = ResizeMode.CanMinimize;
         WindowStartupLocation = WindowStartupLocation.CenterScreen;
         SetResourceReference(BackgroundProperty, "SurfaceBrush");
@@ -147,7 +146,7 @@ internal sealed class StudioWindow : Window
         AutomationProperties.SetName(_micLevel, "Microphone level");
         micLine.Children.Add(_micLevel);
         _micInfo.Children.Add(micLine);
-        _micStatus = new TextBlock { FontSize = 11.5, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0), Text = "Say something — the bar moves when the microphone hears you." };
+        _micStatus = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, Margin = new Thickness(0, 3, 0, 0), Text = "Say something — the bar moves when the microphone hears you." };
         _micStatus.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
         _micInfo.Children.Add(_micStatus);
         _micError = new TextBlock { Text = PrivacySettings.MicrophoneBlockedMessage, TextWrapping = TextWrapping.Wrap, FontSize = 12, Visibility = Visibility.Collapsed };
@@ -228,7 +227,7 @@ internal sealed class StudioWindow : Window
 
         // ---- Footer
         string hint = string.Join("  ·  ", new[] { v.RecordHotkey is { } r ? $"{r} pause" : null, v.StopHotkey is { } st ? $"{st} stop" : null }.OfType<string>());
-        var hintText = new TextBlock { Text = hint, FontSize = 11, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
+        var hintText = new TextBlock { Text = hint, FontSize = 12, VerticalAlignment = VerticalAlignment.Center, TextWrapping = TextWrapping.Wrap };
         hintText.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
         var cancel = new Button { Content = "Cancel", IsCancel = true, MinWidth = 76, Padding = new Thickness(12, 6, 12, 6), Margin = new Thickness(0, 0, 8, 0) };
         cancel.Click += (_, _) => Close();
@@ -242,13 +241,23 @@ internal sealed class StudioWindow : Window
         var buttons = new StackPanel { Orientation = Orientation.Horizontal, HorizontalAlignment = HorizontalAlignment.Right };
         buttons.Children.Add(cancel);
         buttons.Children.Add(_start);
-        var footer = new DockPanel { Margin = new Thickness(0, 16, 0, 0), LastChildFill = true };
+        var footer = new DockPanel { Margin = new Thickness(18, 10, 18, 14), LastChildFill = true };
         DockPanel.SetDock(buttons, Dock.Right);
         footer.Children.Add(buttons);
         footer.Children.Add(hintText);
-        root.Children.Add(footer);
 
-        Content = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Focusable = false };
+        // The options scroll when the screen is too small for them (high display scaling, More options open); Cancel and
+        // Start recording stay pinned below them so they are always visible (QA-RC5-02).
+        root.Margin = new Thickness(18, 12, 18, 4);
+        // A grid (not a DockPanel) keeps the Tab order top to bottom: options first, then Cancel and Start recording.
+        var shell = new Grid();
+        shell.RowDefinitions.Add(new RowDefinition { Height = new GridLength(1, GridUnitType.Star) });
+        shell.RowDefinitions.Add(new RowDefinition { Height = GridLength.Auto });
+        var scroll = new ScrollViewer { Content = root, VerticalScrollBarVisibility = ScrollBarVisibility.Auto, Focusable = false };
+        shell.Children.Add(scroll);
+        Grid.SetRow(footer, 1);
+        shell.Children.Add(footer);
+        Content = shell;
 
         _meterTimer = new DispatcherTimer(TimeSpan.FromMilliseconds(50), DispatcherPriority.Render, (_, _) => UpdateMeter(), Dispatcher);
         SourceInitialized += (_, _) =>
@@ -256,8 +265,10 @@ internal sealed class StudioWindow : Window
             WindowChrome.UseDarkTitleBar(this, ThemeManager.IsDark);
             Excluded = ExcludeFromCapture && CaptureExclusion.Apply(this); // never part of a recording
         };
+        DpiChanged += (_, _) => LimitHeightToScreen();
         Loaded += (_, _) =>
         {
+            LimitHeightToScreen();
             long start = System.Diagnostics.Stopwatch.GetTimestamp();
             LoadCameras();
             UpdateMode();
@@ -306,6 +317,29 @@ internal sealed class StudioWindow : Window
 
     /// <summary>False only for the documentation screenshot tour (so the window can be photographed).</summary>
     internal bool ExcludeFromCapture { get; init; } = true;
+
+    /// <summary>
+    /// QA-RC5-02: the panel sizes itself to its content but never grows taller than the work area of its monitor at the
+    /// current display scaling; the options then scroll while Cancel and Start recording stay visible.
+    /// </summary>
+    private void LimitHeightToScreen()
+    {
+        if (PhysicalPlacement.GetBounds(this) is not { } bounds)
+        {
+            return;
+        }
+
+        try
+        {
+            SnapForge.Core.Capture.MonitorInfo monitor = PhysicalPlacement.MonitorFor(PhysicalPlacement.Layout(), bounds);
+            double scale = VisualTreeHelper.GetDpi(this).DpiScaleY;
+            MaxHeight = Math.Max(240, monitor.WorkArea.Height / (scale > 0 ? scale : 1.0));
+        }
+        catch (InvalidOperationException)
+        {
+            // No monitor reported during a display change; the work-area guard fits the window afterwards.
+        }
+    }
 
     /// <summary>Diagnostics (DEF-RC2-07): how long the Loaded work blocked the UI thread, and the camera listing part of it (ms; −1 = not run yet).</summary>
     internal double LoadedWorkMs { get; private set; } = -1;
@@ -805,7 +839,7 @@ internal sealed class StudioWindow : Window
         var path = new Path { Data = icon, Width = 22, Height = 22, Stretch = Stretch.Uniform, HorizontalAlignment = HorizontalAlignment.Center };
         path.SetBinding(Shape.FillProperty, new System.Windows.Data.Binding(nameof(Foreground)) { RelativeSource = new System.Windows.Data.RelativeSource(System.Windows.Data.RelativeSourceMode.FindAncestor, typeof(ToggleButton), 1) });
         var text = new TextBlock { Text = label, FontSize = 12, FontWeight = FontWeights.SemiBold, HorizontalAlignment = HorizontalAlignment.Center, Margin = new Thickness(0, 4, 0, 0), TextTrimming = TextTrimming.CharacterEllipsis };
-        var state = new TextBlock { Text = on ? "On" : "Off", FontSize = 11, HorizontalAlignment = HorizontalAlignment.Center, Opacity = 0.8 };
+        var state = new TextBlock { Text = on ? "On" : "Off", FontSize = 12, HorizontalAlignment = HorizontalAlignment.Center, Opacity = 0.8 };
         var stack = new StackPanel();
         stack.Children.Add(path);
         stack.Children.Add(text);

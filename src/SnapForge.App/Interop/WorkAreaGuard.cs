@@ -7,7 +7,7 @@ namespace SnapForge.App.Interop;
 
 /// <summary>
 /// FA-003 / SF-007: every SnapForge window with a normal title bar is kept inside the usable area (work area) of its
-/// monitor — when it is first shown, when it is restored from minimized/maximized, and whenever the display layout,
+/// monitor — when it is first shown, when it grows, when it is restored from minimized/maximized, and whenever the display layout,
 /// resolution, scaling or taskbar changes (including a monitor being unplugged). Works in physical pixels so mixed
 /// DPI and Windows scaling are exact. Borderless overlays, toolbars and the QuickDock manage their own placement and
 /// are not touched.
@@ -65,6 +65,16 @@ internal static class WorkAreaGuard
 
         Attached.Add(w, new object());
         w.StateChanged += OnStateChanged;
+
+        // QA-RC5-02: a window that grows after it was placed (the Record panel's "More options", a dialog whose content
+        // gets longer) is fitted again, so its lower part and buttons never end up under the taskbar or off the screen.
+        w.SizeChanged += (_, e) =>
+        {
+            if (e.HeightChanged && e.NewSize.Height > e.PreviousSize.Height || e.WidthChanged && e.NewSize.Width > e.PreviousSize.Width)
+            {
+                w.Dispatcher.BeginInvoke(() => Fit(w), System.Windows.Threading.DispatcherPriority.Background);
+            }
+        };
         FitSoon(w);
     }
 

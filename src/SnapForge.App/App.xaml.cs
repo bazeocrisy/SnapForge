@@ -143,6 +143,7 @@ public partial class App : Application
             // QA (RC5): every window, dialog, menu, tool and settings section at the CURRENT display scaling.
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             string label = args.Length >= 3 && !args[2].StartsWith("--", StringComparison.Ordinal) ? args[2] : "current";
+            Interop.WorkAreaGuard.Install(); // audit windows exactly as the app places them for users
             Shutdown(UiAudit.Run(args[1], label, strict: args.Contains("--strict")));
             return;
         }

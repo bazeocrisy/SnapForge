@@ -106,7 +106,7 @@ internal sealed class SelectionOverlayWindow : Window
         var zoomed = new Grid { ClipToBounds = true };
         zoomed.Children.Add(_loupeImage);
         zoomed.Children.Add(marker);
-        _loupeText = new TextBlock { Foreground = Brushes.White, FontSize = 11, FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(4, 2, 4, 2) };
+        _loupeText = new TextBlock { Foreground = Brushes.White, FontSize = 12, FontFamily = new FontFamily("Segoe UI"), Margin = new Thickness(4, 2, 4, 2) };
         var loupeStack = new StackPanel();
         loupeStack.Children.Add(zoomed);
         loupeStack.Children.Add(_loupeText);

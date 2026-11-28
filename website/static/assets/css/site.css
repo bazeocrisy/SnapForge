@@ -226,6 +226,9 @@ figure.shot a:focus-visible { outline: 3px solid var(--orange-500); outline-offs
 .facts dt { font-size: 0.82rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--slate-600); font-weight: 700; }
 .facts dd { margin: 0.2rem 0 0; display: flex; flex-wrap: wrap; align-items: center; gap: 0.6rem; }
 .hash { word-break: break-all; }
+/* Long commit IDs, checksums and file names must wrap on phones instead of widening the page (QA-RC5-07). */
+.facts div, .facts dd > * { min-width: 0; max-width: 100%; }
+.facts code { overflow-wrap: anywhere; }
 
 /* tables */
 .table-wrap { overflow-x: auto; margin-bottom: 1.5rem; border: 1px solid var(--slate-200); border-radius: var(--radius-sm); }

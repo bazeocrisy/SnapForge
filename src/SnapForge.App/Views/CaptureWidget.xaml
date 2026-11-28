@@ -25,7 +25,7 @@
             <Setter Property="Background" Value="Transparent" />
             <Setter Property="Focusable" Value="False" />
             <Setter Property="Cursor" Value="Hand" />
-            <Setter Property="FontSize" Value="11" />
+            <Setter Property="FontSize" Value="12" />
             <Setter Property="Margin" Value="1" />
             <Setter Property="MinWidth" Value="52" />
             <Setter Property="FocusVisualStyle" Value="{x:Null}" />
@@ -101,7 +101,7 @@
 
     <Grid>
         <!-- Collapsed pill: aperture mark + chevron pointing away from the edge it is docked to. -->
-        <Button x:Name="TabButton" Click="OnTabClick" Cursor="Hand" Focusable="False"
+        <Button x:Name="TabButton" Click="OnTabClick" Cursor="Hand" Focusable="False" MinWidth="0" MinHeight="0" Padding="0"
                 AutomationProperties.Name="Open QuickDock" AutomationProperties.HelpText="Opens SnapForge QuickDock: Capture, Record, Text, Library, Editor, Settings and Presets"
                 ToolTip="SnapForge QuickDock">
             <Button.Template>

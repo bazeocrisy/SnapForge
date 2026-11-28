@@ -45,6 +45,8 @@ internal static class UiAudit
 
     private sealed record Finding(string Severity, string State, string Element, string Problem);
 
+    private static readonly Dictionary<string, int> TabStops = [];
+
     private sealed record StateRecord(string State, string Screenshot, double WindowDpiScale, double MonitorDpiScale, string Bounds, int Texts, int Controls, int Fails, int Warns);
 
     public static int Run(string outputFolder, string label, bool strict)
@@ -78,6 +80,7 @@ internal static class UiAudit
             monitors = layout.Monitors.Select(m => new { m.DeviceName, bounds = m.Bounds.ToString(), workArea = m.WorkArea.ToString(), dpiScale = m.DpiScale, effectiveDpi = (int)Math.Round(96 * m.DpiScale) }),
             minFontDip = MinFontDip,
             states = States,
+            tabStops = TabStops,
             findings = Findings,
             fails,
             warns,
@@ -272,7 +275,7 @@ internal static class UiAudit
         settings.Close();
 
         // Record panel (Camera and Mic off, and with More options open), recording controls, saved message, preview.
-        var studio = new Video.StudioWindow(services, listCameras: () => []);
+        var studio = new Video.StudioWindow(services, listCameras: () => []) { ExcludeFromCapture = false };
         studio.Show();
         ScreenshotTour.Pump(600);
         Audit(studio, "record-panel");
@@ -434,13 +437,20 @@ internal static class UiAudit
             if (ft.Width > tb.ActualWidth + 1.5)
             {
                 bool trimmed = tb.TextTrimming != TextTrimming.None;
+                if (trimmed && HasToolTip(tb, root))
+                {
+                    return; // shortened on purpose; the full text is in the tooltip
+                }
+
                 Findings.Add(new Finding(trimmed ? "WARN" : "FAIL", state, $"text \"{label}\"",
                     trimmed ? $"truncated with an ellipsis ({ft.Width:0} DIP of text in {tb.ActualWidth:0} DIP)" : $"clipped: {ft.Width:0} DIP of text in {tb.ActualWidth:0} DIP"));
             }
         }
         else
         {
-            ft.MaxTextWidth = Math.Max(1, tb.ActualWidth);
+            // WPF lays text out with rounded (and, in Display mode, pixel-snapped) widths, so a line that exactly fits can measure a
+            // fraction wider here and appear to wrap. Allow 1 DIP of rounding; real clipping is far larger (a whole extra line).
+            ft.MaxTextWidth = Math.Max(1, tb.ActualWidth - tb.Padding.Left - tb.Padding.Right + 1);
             if (ft.Height > tb.ActualHeight + 1.5 && (tb.MaxHeight >= double.MaxValue || tb.TextTrimming == TextTrimming.None))
             {
                 Findings.Add(new Finding("FAIL", state, $"text \"{label}\"", $"clipped vertically: needs {ft.Height:0} DIP, has {tb.ActualHeight:0} DIP"));
@@ -452,6 +462,13 @@ internal static class UiAudit
 
     private static void CheckControl(Control c, FrameworkElement root, Rect rootRect, string state)
     {
+        // Parts of another control's template (a ComboBox's drop-down button, a ScrollBar's arrows) are announced as part of
+        // that control, which is checked itself.
+        if (c.TemplatedParent is Control)
+        {
+            return;
+        }
+
         string name = AutomationProperties.GetName(c);
         string label = !string.IsNullOrWhiteSpace(name) ? name : c is ContentControl { Content: string s } ? s.Replace("_", string.Empty, StringComparison.Ordinal) : c is HeaderedContentControl { Header: string h } ? h : string.Empty;
         if (string.IsNullOrWhiteSpace(label) && c is not TextBoxBase && c is not ScrollBar && !HasVisibleText(c) && c.GetType().Name is not ("RepeatButton" or "Thumb"))
@@ -489,6 +506,8 @@ internal static class UiAudit
 
     private static void CheckTabReachability(Window window, List<Control> interactive, string state)
     {
+        // Press Tab (MoveFocus Next is what the Tab key does) until focus comes back to an element already visited.
+        // Focus can land on a ContentElement such as a Hyperlink, so both kinds are followed.
         var seen = new HashSet<DependencyObject>();
         window.Activate();
         ScreenshotTour.Pump(100);
@@ -496,27 +515,74 @@ internal static class UiAudit
         window.MoveFocus(new TraversalRequest(FocusNavigationDirection.First));
         for (int i = 0; i < 600; i++)
         {
-            if (Keyboard.FocusedElement is DependencyObject d && !seen.Add(d))
+            if (Keyboard.FocusedElement is not DependencyObject d || !seen.Add(d))
             {
                 break;
             }
 
-            if (Keyboard.FocusedElement is UIElement u)
+            if (d is UIElement { IsVisible: false } || (d is FrameworkContentElement ce && ce.Parent is UIElement { IsVisible: false }))
             {
-                u.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next));
+                Findings.Add(new Finding("FAIL", state, d.GetType().Name, "the Tab key stops on an element that is not visible (focus disappears)"));
             }
-            else
+
+            bool moved = d switch
+            {
+                UIElement u => u.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)),
+                ContentElement c => c.MoveFocus(new TraversalRequest(FocusNavigationDirection.Next)),
+                _ => false,
+            };
+            if (!moved)
             {
                 break;
             }
         }
 
-        foreach (Control c in interactive.Where(c => !seen.Contains(c) && !seen.Any(s => s is Visual v && c.IsAncestorOf(v))))
+        // Windows convention: Tab reaches one option of a group (the selected one); the arrow keys move between the options.
+        // An option counts as reachable when the arrow keys get to it from an option the Tab key reached.
+        var arrowed = new HashSet<DependencyObject>();
+        foreach (RadioButton start in seen.OfType<RadioButton>().ToList())
+        {
+            foreach (FocusNavigationDirection dir in new[] { FocusNavigationDirection.Down, FocusNavigationDirection.Right, FocusNavigationDirection.Up, FocusNavigationDirection.Left })
+            {
+                Keyboard.Focus(start);
+                for (int i = 0; i < 40; i++)
+                {
+                    if (Keyboard.FocusedElement is not UIElement u || !u.MoveFocus(new TraversalRequest(dir)) || Keyboard.FocusedElement is not RadioButton r || !arrowed.Add(r))
+                    {
+                        break;
+                    }
+                }
+            }
+        }
+
+        TabStops[state] = seen.Count;
+        foreach (Control c in interactive.Where(c => !seen.Contains(c) && !arrowed.Contains(c) && !seen.Any(s => s is Visual v && c.IsAncestorOf(v))))
         {
             string label = AutomationProperties.GetName(c) is { Length: > 0 } n ? n : c is ContentControl { Content: string s } ? s : c.GetType().Name;
-            Findings.Add(new Finding("WARN", state, $"{c.GetType().Name} \"{Short(label)}\"", "not reachable with the Tab key"));
+            Findings.Add(new Finding("WARN", state, $"{c.GetType().Name} \"{Short(label)}\"", $"not reachable with the Tab or arrow keys (Tab visited {seen.Count} element(s), last: {Describe(seen.LastOrDefault())})"));
         }
     }
+
+    private static bool HasToolTip(FrameworkElement e, FrameworkElement root)
+    {
+        for (DependencyObject? d = e; d is not null && d != root; d = VisualTreeHelper.GetParent(d))
+        {
+            if (d is FrameworkElement { ToolTip: not null })
+            {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    private static string Describe(DependencyObject? d) => d switch
+    {
+        null => "none",
+        FrameworkElement f when AutomationProperties.GetName(f) is { Length: > 0 } n => $"{f.GetType().Name} \"{Short(n)}\"",
+        ContentControl { Content: string s } c => $"{c.GetType().Name} \"{Short(s)}\"",
+        _ => d.GetType().Name,
+    };
 
     // ------------------------------------------------------------------ helpers
 

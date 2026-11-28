@@ -133,7 +133,7 @@ internal sealed class RecordingToolbar : Window
         _time = new TextBlock { Text = "0:00:00", FontSize = 15, FontWeight = FontWeights.SemiBold, VerticalAlignment = VerticalAlignment.Center, MinWidth = 62, FontFamily = new FontFamily("Consolas, Segoe UI"), ToolTip = format };
         AutomationProperties_SetName(_time, "Elapsed recording time");
 
-        _micLabel = new TextBlock { Text = "Mic", FontSize = 11.5, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 4, 0) };
+        _micLabel = new TextBlock { Text = "Mic", FontSize = 12, VerticalAlignment = VerticalAlignment.Center, Margin = new Thickness(10, 0, 4, 0) };
         _micLevel = new ProgressBar { Width = 46, Height = 6, Minimum = 0, Maximum = 100, Margin = new Thickness(0, 1, 8, 0), VerticalAlignment = VerticalAlignment.Center, IsHitTestVisible = false };
         _micLevel.SetResourceReference(StyleProperty, "LevelMeter");
         AutomationProperties_SetName(_micLevel, "Microphone level");
@@ -153,7 +153,7 @@ internal sealed class RecordingToolbar : Window
         row.Children.Add(_more);
         UpdateMicLabel();
 
-        _status = new TextBlock { FontSize = 11.5, TextWrapping = TextWrapping.Wrap, MaxWidth = 420, Margin = new Thickness(12, 0, 12, 6), Visibility = Visibility.Collapsed };
+        _status = new TextBlock { FontSize = 12, TextWrapping = TextWrapping.Wrap, MaxWidth = 420, Margin = new Thickness(12, 0, 12, 6), Visibility = Visibility.Collapsed };
         _status.SetResourceReference(TextBlock.ForegroundProperty, "MutedTextBrush");
         var stack = new StackPanel();
         stack.Children.Add(row);

@@ -33,14 +33,14 @@
                             </Border>
                             <Border Grid.Row="0" HorizontalAlignment="Left" VerticalAlignment="Top" Margin="5" CornerRadius="3" Padding="3,1"
                                     Background="{DynamicResource AccentBrush}" Visibility="{Binding Pinned, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="Pinned" FontSize="9" FontWeight="SemiBold" Foreground="{DynamicResource AccentForegroundBrush}" />
+                                <TextBlock Text="Pinned" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource AccentForegroundBrush}" />
                             </Border>
                             <!-- Video: play badge and duration -->
                             <Grid Grid.Row="0" IsHitTestVisible="False" Visibility="{Binding IsVideo, Converter={StaticResource BoolToVis}}">
                                 <Ellipse Width="28" Height="28" Fill="#B0000000" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 <Path Data="M0,0 L10,6 L0,12 Z" Fill="White" Width="10" Height="12" Margin="3,0,0,0" HorizontalAlignment="Center" VerticalAlignment="Center" />
                                 <Border HorizontalAlignment="Right" VerticalAlignment="Bottom" Margin="5" CornerRadius="3" Padding="4,0" Background="#C8000000">
-                                    <TextBlock Text="{Binding DurationText}" FontSize="10" Foreground="White" />
+                                    <TextBlock Text="{Binding DurationText}" FontSize="12" Foreground="White" />
                                 </Border>
                             </Grid>
                             <Border x:Name="SelectedMark" Grid.Row="0" Visibility="Collapsed" CornerRadius="6" Background="{DynamicResource AccentSubtleBrush}" IsHitTestVisible="False" />
@@ -49,9 +49,9 @@
                                      Visibility="{Binding IsUnsaved, Converter={StaticResource BoolToVis}}" />
                             <Border Grid.Row="0" HorizontalAlignment="Left" VerticalAlignment="Bottom" Margin="5" CornerRadius="3" Padding="3,1"
                                     Background="{DynamicResource WarningBackgroundBrush}" Visibility="{Binding NotInLibrary, Converter={StaticResource BoolToVis}}">
-                                <TextBlock Text="Not in Library" FontSize="9" Foreground="{DynamicResource WarningBrush}" />
+                                <TextBlock Text="Not in Library" FontSize="12" Foreground="{DynamicResource WarningBrush}" />
                             </Border>
-                            <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="11" Margin="2,3,2,0" TextTrimming="CharacterEllipsis"
+                            <TextBlock Grid.Row="1" Text="{Binding Title}" FontSize="12" Margin="2,3,2,0" TextTrimming="CharacterEllipsis" ToolTip="{Binding Title}"
                                        Foreground="{DynamicResource MutedTextBrush}" />
                         </Grid>
                         <ControlTemplate.Triggers>
@@ -286,56 +286,56 @@
                         </Grid.ColumnDefinitions>
                         <WrapPanel x:Name="ToolButtonsPanel" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle">
                             <RadioButton x:Name="SelectTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Select" Checked="OnToolChecked" ToolTip="Select and move (V)" AutomationProperties.Name="Select tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconSelect}" /><TextBlock Text="Select" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconSelect}" /><TextBlock Text="Select" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="ArrowTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Arrow" Checked="OnToolChecked" ToolTip="Arrow (A) — Shift for 45°" IsChecked="True" AutomationProperties.Name="Arrow tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconArrow}" /><TextBlock Text="Arrow" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconArrow}" /><TextBlock Text="Arrow" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="LineTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Line" Checked="OnToolChecked" ToolTip="Line (L)" AutomationProperties.Name="Line tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconLine}" /><TextBlock Text="Line" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconLine}" /><TextBlock Text="Line" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="RectangleTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Rectangle" Checked="OnToolChecked" ToolTip="Rectangle (R) — Shift for a square" AutomationProperties.Name="Rectangle tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconRect}" /><TextBlock Text="Shape" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconRect}" /><TextBlock Text="Shape" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="EllipseTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Ellipse" Checked="OnToolChecked" ToolTip="Ellipse (E) — Shift for a circle" AutomationProperties.Name="Ellipse tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconEllipse}" /><TextBlock Text="Ellipse" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconEllipse}" /><TextBlock Text="Ellipse" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="HighlightTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Highlight" Checked="OnToolChecked" ToolTip="Highlight (H)" AutomationProperties.Name="Highlight tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconHighlight}" /><TextBlock Text="Highlight" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconHighlight}" /><TextBlock Text="Highlight" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="TextTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Text" Checked="OnToolChecked" ToolTip="Text (T) — Enter to finish, Shift+Enter for a new line" AutomationProperties.Name="Text tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconText}" /><TextBlock Text="Text" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconText}" /><TextBlock Text="Text" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="StepTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="StepMarker" Checked="OnToolChecked" ToolTip="Numbered step (N)" AutomationProperties.Name="Step tool">
                                 <StackPanel>
                                     <Grid Width="24" Height="24">
                                         <Ellipse Width="19" Height="19" Stroke="{Binding Foreground, RelativeSource={RelativeSource AncestorType=RadioButton}}" StrokeThickness="1.8" />
-                                        <TextBlock Text="1" FontSize="11" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1" />
+                                        <TextBlock Text="1" FontSize="12" FontWeight="Bold" HorizontalAlignment="Center" VerticalAlignment="Center" Margin="0,0,0,1" />
                                     </Grid>
-                                    <TextBlock Text="Step" FontSize="10" HorizontalAlignment="Center" />
+                                    <TextBlock Text="Step" FontSize="12" HorizontalAlignment="Center" />
                                 </StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="FreehandTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Freehand" Checked="OnToolChecked" ToolTip="Pen (D) — draw freehand" AutomationProperties.Name="Pen tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconPen}" /><TextBlock Text="Pen" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconPen}" /><TextBlock Text="Pen" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="CalloutTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Callout" Checked="OnToolChecked" ToolTip="Callout (K) — drag from what you point at to where the bubble goes" AutomationProperties.Name="Callout tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconCallout}" /><TextBlock Text="Callout" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconCallout}" /><TextBlock Text="Callout" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="StampTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Stamp" Checked="OnToolChecked" Click="OnStampToolClick" ToolTip="Stamp (S) — click to place; click the button again to choose the stamp" AutomationProperties.Name="Stamp tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconStamp}" /><TextBlock Text="Stamp" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconStamp}" /><TextBlock Text="Stamp" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <Rectangle Style="{StaticResource Separator}" Height="32" />
                             <RadioButton x:Name="RedactTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Redact" Checked="OnToolChecked" ToolTip="Redact (X) — blacks out pixels in every export" AutomationProperties.Name="Redact tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconRedact}" /><TextBlock Text="Redact" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconRedact}" /><TextBlock Text="Redact" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="BlurTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Blur" Checked="OnToolChecked" ToolTip="Blur (B) — softens an area. Not redaction: use Redact for sensitive data" AutomationProperties.Name="Blur tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconBlur}" /><TextBlock Text="Blur" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconBlur}" /><TextBlock Text="Blur" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="PixelateTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Pixelate" Checked="OnToolChecked" ToolTip="Pixelate (P) — coarse blocks. Not redaction: use Redact for sensitive data" AutomationProperties.Name="Pixelate tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconPixelate}" /><TextBlock Text="Pixelate" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconPixelate}" /><TextBlock Text="Pixelate" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                             <RadioButton x:Name="CropTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Crop" Checked="OnToolChecked" ToolTip="Crop (C) — drag the area to keep" AutomationProperties.Name="Crop tool">
-                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconCrop}" /><TextBlock Text="Crop" FontSize="10" HorizontalAlignment="Center" /></StackPanel>
+                                <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconCrop}" /><TextBlock Text="Crop" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
                         </WrapPanel>
 
@@ -483,14 +483,14 @@
                                 <DockPanel Margin="0,14,0,6">
                                     <Button DockPanel.Dock="Right" x:Name="SaveStyleButton" Style="{StaticResource LinkButton}" Content="+ Save current" Click="OnSaveQuickStyle"
                                             ToolTip="Save the current color and thickness as a Quick Style" />
-                                    <TextBlock Text="QUICK STYLES" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                                    <TextBlock Text="QUICK STYLES" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
                                 </DockPanel>
                                 <ItemsControl x:Name="QuickStylesList" ItemTemplate="{StaticResource QuickStyleTemplate}" Focusable="False">
                                     <ItemsControl.ItemsPanel>
                                         <ItemsPanelTemplate><WrapPanel /></ItemsPanelTemplate>
                                     </ItemsControl.ItemsPanel>
                                 </ItemsControl>
-                                <TextBlock Text="Right-click a style to mark it as a favorite (favorites are listed first)." FontSize="11" TextWrapping="Wrap"
+                                <TextBlock Text="Right-click a style to mark it as a favorite (favorites are listed first)." FontSize="12" TextWrapping="Wrap"
                                            Foreground="{DynamicResource MutedTextBrush}" Margin="0,4,0,0" />
 
                                 <TextBlock Text="TOOL PROPERTIES" Style="{StaticResource SectionHeader}" Margin="0,20,0,6" />
@@ -539,7 +539,7 @@
                                 <Button Style="{StaticResource LinkButton}" Content="Open Library" Click="OnShowLibrary" />
                                 <Button Style="{StaticResource LinkButton}" Content="Hide" Click="OnToggleTray" ToolTip="Hide the Recent Captures tray (View menu shows it again)" />
                             </StackPanel>
-                            <TextBlock x:Name="TrayHeader" Text="RECENT CAPTURES" FontSize="11" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
+                            <TextBlock x:Name="TrayHeader" Text="RECENT CAPTURES" FontSize="12" FontWeight="SemiBold" Foreground="{DynamicResource MutedTextBrush}" VerticalAlignment="Center" />
                         </DockPanel>
                         <ScrollViewer x:Name="TrayScroller" HorizontalScrollBarVisibility="Auto" VerticalScrollBarVisibility="Disabled" PreviewMouseWheel="OnTrayMouseWheel" Focusable="False" Padding="8,6,8,8"
                                       AllowDrop="True" DragOver="OnTrayDragOver" Drop="OnTrayDrop">
@@ -576,7 +576,7 @@
                         <Path Style="{StaticResource IconPath}" Data="{StaticResource IconFit}" />
                     </Button>
                     <Button Style="{StaticResource ToolbarButton}" Click="OnZoomActual" ToolTip="Actual pixels (Ctrl+Alt+0)" MinHeight="24" Padding="6,1" AutomationProperties.Name="Actual pixels">
-                        <TextBlock Text="1:1" FontSize="11" FontWeight="SemiBold" />
+                        <TextBlock Text="1:1" FontSize="12" FontWeight="SemiBold" />
                     </Button>
                 </StackPanel>
                 <TextBlock x:Name="StatusText" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Text="Ready" TextTrimming="CharacterEllipsis" VerticalAlignment="Center" />
