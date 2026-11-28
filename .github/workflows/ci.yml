@@ -923,15 +923,27 @@ jobs:
           $size3 = (Get-Item $mp4.FullName).Length
           if ($size3 -le $size2) { throw "the recording stopped growing ($size2 → $size3 bytes)" }
           Write-Output "PASS setup refused (exit $($p.ExitCode)) and explained why; SnapForge kept recording ($size2 → $size3 bytes)"
-          Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
-          $root = [System.Windows.Automation.AutomationElement]::RootElement
-          $byName = { param($n) New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, $n) }
-          $dlg = $null
-          for ($i = 0; $i -lt 40 -and -not $dlg; $i++) { $dlg = $root.FindFirst([System.Windows.Automation.TreeScope]::Children, (& $byName 'SnapForge Setup')); if (-not $dlg) { Start-Sleep -Milliseconds 250 } }
-          if (-not $dlg) { throw "SnapForge did not ask the user about the recording" }
-          Write-Output "PASS SnapForge asked the user: '$($dlg.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Text))).Current.Name)'"
-          $yes = $dlg.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (& $byName 'Yes'))
-          $yes.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+          # Answer SnapForge's own question like the user would: the standard Windows message box "SnapForge Setup"
+          # (dialog class #32770) → its Yes button (IDYES = 6), clicked with BM_CLICK.
+          Add-Type -TypeDefinition @"
+          using System; using System.Text; using System.Runtime.InteropServices;
+          public static class SfDialog {
+            [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern IntPtr FindWindow(string cls, string title);
+            [DllImport("user32.dll")] public static extern IntPtr GetDlgItem(IntPtr dialog, int id);
+            [DllImport("user32.dll", CharSet = CharSet.Unicode)] public static extern int GetWindowText(IntPtr h, StringBuilder text, int max);
+            [DllImport("user32.dll")] public static extern bool PostMessage(IntPtr h, int msg, IntPtr w, IntPtr l);
+            public static string Text(IntPtr h) { var b = new StringBuilder(1024); GetWindowText(h, b, b.Capacity); return b.ToString(); }
+          }
+          "@
+          $dlg = [IntPtr]::Zero
+          for ($i = 0; $i -lt 40 -and $dlg -eq [IntPtr]::Zero; $i++) { $dlg = [SfDialog]::FindWindow('#32770', 'SnapForge Setup'); if ($dlg -eq [IntPtr]::Zero) { Start-Sleep -Milliseconds 250 } }
+          if ($dlg -eq [IntPtr]::Zero) { throw "SnapForge did not ask the user about the recording" }
+          $question = [SfDialog]::Text([SfDialog]::GetDlgItem($dlg, 0xFFFF))
+          if ($question -notmatch 'recording is in progress') { throw "unexpected question: '$question'" }
+          Write-Output "PASS SnapForge asked the user: '$($question -replace '\s+', ' ')'"
+          $yes = [SfDialog]::GetDlgItem($dlg, 6)
+          if ($yes -eq [IntPtr]::Zero) { throw "the question has no Yes button" }
+          [void][SfDialog]::PostMessage($yes, 0x00F5, [IntPtr]::Zero, [IntPtr]::Zero)   # BM_CLICK
           if (-not $rec.WaitForExit(60000)) { throw "SnapForge did not close after the user agreed" }
           if ($rec.ExitCode -ne 0) { throw "SnapForge did not exit normally after saving the recording (exit $($rec.ExitCode))" }
           $report = Join-Path $env:RUNNER_TEMP 'ci-rec-library-check.txt'
