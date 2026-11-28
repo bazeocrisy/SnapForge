@@ -121,7 +121,8 @@ function GetCurrentProcessId(): DWORD; external 'GetCurrentProcessId@kernel32.dl
 function ProcessIdToSessionId(dwProcessId: DWORD; var pSessionId: DWORD): BOOL; external 'ProcessIdToSessionId@kernel32.dll stdcall';
 
 var
-  ClosingPage: TOutputMarqueeProgressPage;
+  ClosingPage: TOutputProgressPage;
+  ClosingTick: Integer;
 
 function MySession(): Integer;
 var
@@ -218,7 +219,11 @@ begin
   T := 0;
   while T < Ms do
   begin
-    if (ClosingPage <> nil) and not IsUninstaller() then ClosingPage.Animate();
+    if (ClosingPage <> nil) and not IsUninstaller() then
+    begin
+      ClosingTick := (ClosingTick + 1) mod 100;
+      ClosingPage.SetProgress(ClosingTick, 100);
+    end;
     Sleep(100);
     T := T + 100;
   end;
@@ -299,7 +304,7 @@ end;
 
 procedure InitializeWizard();
 begin
-  ClosingPage := CreateOutputMarqueeProgressPage('Closing SnapForge', 'Setup is closing SnapForge so it can update the program files.');
+  ClosingPage := CreateOutputProgressPage('Closing SnapForge', 'Setup is closing SnapForge so it can update the program files.');
 end;
 
 function PrepareToInstall(var NeedsRestart: Boolean): String;
