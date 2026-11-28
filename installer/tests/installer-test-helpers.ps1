@@ -42,6 +42,7 @@ function AssertClosedGracefully($proc, [string]$what, [string]$log) {
 # Both programs at the expected version and build, as Windows and both About boxes show them.
 function AssertInstalledRc4 {
   $build = $env:GITHUB_RUN_NUMBER
+  if ((Split-Path $new -Leaf) -ne "SnapForge-$expectedVersion-win-x64-setup.exe") { throw "installer file name $(Split-Path $new -Leaf) does not carry $expectedVersion" }
   foreach ($exe in 'SnapForge.exe', 'SnapForgeEditor.exe') {
     $v = (Get-Item "$machine\$exe").VersionInfo
     if ($v.ProductVersion -notlike "$expectedVersion*") { throw "$exe product version $($v.ProductVersion), expected $expectedVersion" }
@@ -64,5 +65,5 @@ function AssertInstalledRc4 {
   if ($entries.Count -ne 1) { throw "Installed apps entries: $($entries.Count)" }
   $display = (Get-ItemProperty $entries[0]).DisplayVersion
   if ($display -ne $expectedVersion) { throw "Installed apps shows $display, expected $expectedVersion" }
-  Write-Output "PASS installed: SnapForge Capture and SnapForge Editor $expectedVersion (build $build) in About, file version 1.0.0.$build, Installed apps $display, two working Start menu shortcuts"
+  Write-Output "PASS installed from $(Split-Path $new -Leaf): SnapForge Capture and SnapForge Editor $expectedVersion (build $build) in About, file version 1.0.0.$build, Installed apps $display, two working Start menu shortcuts"
 }

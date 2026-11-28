@@ -180,6 +180,16 @@ begin
   end;
 end;
 
+// Sets a named event once and closes Setup's handle. True if the event exists (that program is listening).
+function SignalOnce(Name: String): Boolean;
+var
+  H: THandle;
+begin
+  H := SignalEvent(Name);
+  Result := H <> 0;
+  if Result then CloseHandle(H);
+end;
+
 // Older builds and other administrator accounts: ask as the signed-in user (their events are always reachable).
 procedure SignalAsOriginalUser();
 var
@@ -223,7 +233,7 @@ var
   Here, Away, Waited, Limit: Integer;
   Lines: String;
   Broadcast: THandle;
-  Retry: Boolean;
+  Retry, CaptureAsked, EditorAsked: Boolean;
 begin
   Result := False;
   Reason := '';
@@ -241,8 +251,12 @@ begin
       ListSnapForge(Dir, Here, Away, Lines);
       if Here > 0 then
       begin
-        if (SignalEvent('Local\SnapForge-SingleInstance-7c1d-exit') = 0) and (SignalEvent('Local\SnapForge-Editor-SingleInstance-7c1d-exit') = 0) then
-          SignalAsOriginalUser();                                       // rc.1–rc.3, or a different administrator account
+        // rc.1–rc.3 programs: ask EACH of them (run 169: a combined "a and b" test stopped after the first request
+        // because Pascal evaluates it short-circuit, so the rc.3 Editor was never asked and Setup waited for it).
+        CaptureAsked := SignalOnce('Local\SnapForge-SingleInstance-7c1d-exit');
+        EditorAsked := SignalOnce('Local\SnapForge-Editor-SingleInstance-7c1d-exit');
+        if not (CaptureAsked or EditorAsked) then
+          SignalAsOriginalUser();                                       // a different administrator account
       end;
       Waited := 0;
       while (Here > 0) and (Waited < Limit) do
