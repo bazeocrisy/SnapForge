@@ -340,7 +340,8 @@ public class VideoSettingsTests
     [InlineData(3840, 2160, 60, SnapForge.Core.Settings.VideoQuality.High, 79_600_000)]
     [InlineData(320, 240, 30, SnapForge.Core.Settings.VideoQuality.Standard, 1_000_000)]
     public void Bit_rate_scales_with_pixels_frame_rate_and_quality(int w, int h, int fps, SnapForge.Core.Settings.VideoQuality q, int expected) =>
-        Assert.Equal(expected, SnapForge.Core.Settings.VideoSettings.BitRate(w, h, fps, q));
+        // Release candidate 2's model, kept for the quality comparison; the current model is covered by RC3_VQ_ tests.
+        Assert.Equal(expected, SnapForge.Core.Settings.VideoSettings.Rc2BitRate(w, h, fps, q));
 
     [Fact]
     public void Recording_hotkeys_take_part_in_conflict_detection()

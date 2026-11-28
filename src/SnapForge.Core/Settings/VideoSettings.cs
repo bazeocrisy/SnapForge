@@ -3,10 +3,13 @@ namespace SnapForge.Core.Settings;
 /// <summary>Recording quality presets (owner decision: Standard and High).</summary>
 public enum VideoQuality
 {
-    /// <summary>Good quality, moderate file size: ~0.08 bits per pixel per frame.</summary>
+    /// <summary>
+    /// Good quality, moderate file size: 0.18 bits per pixel per frame at 30 FPS (1080p30 ≈ 11.2 Mbit/s), legible
+    /// desktop text. Release candidate 2 used 0.08 (≈ 5 Mbit/s), which smeared small text (docs/VIDEO-QUALITY.md).
+    /// </summary>
     Standard,
 
-    /// <summary>Higher quality, larger files: ~0.16 bits per pixel per frame.</summary>
+    /// <summary>Higher quality, larger files: 0.28 bits per pixel per frame at 30 FPS (1080p30 ≈ 17.4 Mbit/s).</summary>
     High,
 }
 
@@ -141,14 +144,37 @@ public sealed record VideoSettings
         };
     }
 
+    /// <summary>Bits per pixel per frame at the 30 FPS reference rate (release candidate 3 and later).</summary>
+    public static double BitsPerPixel(VideoQuality quality) => quality == VideoQuality.High ? 0.28 : 0.18;
+
     /// <summary>
-    /// Video bit rate for a size, frame rate and quality: bits-per-pixel model, rounded to 100 kbit/s and kept
-    /// between 1 and 80 Mbit/s. Standard 1080p30 ≈ 5 Mbit/s, High 1080p30 ≈ 10 Mbit/s.
+    /// Video bit rate (the encoder's mean target) for a size, frame rate and quality: bits per pixel at 30 FPS, scaled
+    /// by (fps ÷ 30)^0.75 — at a higher frame rate consecutive frames differ less, so 60 FPS needs ~1.7×, not 2×, the
+    /// bits of 30 FPS. Rounded to 100 kbit/s and kept between 1 and 80 Mbit/s.
+    /// Standard: 1080p30 ≈ 11.2 Mbit/s, 1080p60 ≈ 18.8 Mbit/s; High: 1080p30 ≈ 17.4 Mbit/s.
+    /// Desktop text needs roughly twice the bits of camera video at the same size (sharp edges on flat colour), which
+    /// is why release candidate 2's 0.08 bits per pixel looked grainy (<see cref="Rc2BitRate"/>; docs/VIDEO-QUALITY.md).
     /// </summary>
     public static int BitRate(int width, int height, int fps, VideoQuality quality)
     {
+        double rate = Math.Max(1, fps);
+        double bits = width * (double)height * 30 * BitsPerPixel(quality) * Math.Pow(rate / 30.0, 0.75);
+        return RoundAndClamp(bits);
+    }
+
+    /// <summary>
+    /// The release candidate 2 bit rate model, kept only to reproduce old recordings in the quality comparison
+    /// (<c>--video-quality</c>): 0.08 (Standard) / 0.16 (High) bits per pixel per frame, linear in frame rate.
+    /// Standard 1080p30 ≈ 5 Mbit/s, High 1080p30 ≈ 10 Mbit/s.
+    /// </summary>
+    public static int Rc2BitRate(int width, int height, int fps, VideoQuality quality)
+    {
         double bpp = quality == VideoQuality.High ? 0.16 : 0.08;
-        double bits = width * (double)height * fps * bpp;
+        return RoundAndClamp(width * (double)height * fps * bpp);
+    }
+
+    private static int RoundAndClamp(double bits)
+    {
         int rounded = (int)(Math.Round(bits / 100_000) * 100_000);
         return Math.Clamp(rounded, 1_000_000, 80_000_000);
     }

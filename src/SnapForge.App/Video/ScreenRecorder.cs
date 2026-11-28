@@ -50,10 +50,16 @@ internal sealed class RecorderHooks
 }
 
 /// <summary>Options for one recording.</summary>
-internal sealed record RecorderOptions(int FramesPerSecond, VideoQuality Quality, bool RecordSystemAudio, bool RecordMicrophone, string? MicrophoneDeviceId, long MinimumFreeBytes, int LowSpaceWarningMinutes)
+internal sealed record RecorderOptions(int FramesPerSecond, VideoQuality Quality, bool RecordSystemAudio, bool RecordMicrophone, string? MicrophoneDeviceId, long MinimumFreeBytes, int LowSpaceWarningMinutes, VideoEncoderTuning? Tuning = null)
 {
     /// <summary>True if the file gets an audio track (system sound or microphone requested at the start).</summary>
     public bool AudioTrack => RecordSystemAudio || RecordMicrophone;
+
+    /// <summary>Encoder settings (null = <see cref="VideoEncoderTuning.Default"/>; the quality comparison passes <see cref="VideoEncoderTuning.Rc2"/>).</summary>
+    public VideoEncoderTuning EncoderTuning => Tuning ?? VideoEncoderTuning.Default;
+
+    /// <summary>Mean video bit rate for a frame size.</summary>
+    public int VideoBitRate(int width, int height) => EncoderTuning.BitRate(width, height, FramesPerSecond, Quality);
 }
 
 /// <summary>What a recording produced, with the measurements the benchmark report needs.</summary>
@@ -83,7 +89,8 @@ internal sealed record RecordingResult(
     bool Finalized,
     PixelBuffer? FirstFrame,
     bool Cancelled = false,
-    bool Stalled = false);
+    bool Stalled = false,
+    string? EncoderSettings = null);
 
 /// <summary>
 /// One screen recording (Milestone V1). Threads:
@@ -265,17 +272,17 @@ internal sealed unsafe class ScreenRecorder : IDisposable
 
     private void OpenWriter()
     {
-        var format = new VideoStreamFormat(_video.Width, _video.Height, _options.FramesPerSecond, VideoSettings.BitRate(_video.Width, _video.Height, _options.FramesPerSecond, _options.Quality));
+        var format = new VideoStreamFormat(_video.Width, _video.Height, _options.FramesPerSecond, _options.VideoBitRate(_video.Width, _video.Height));
         try
         {
-            _writer = new Mp4Writer(_path, format, _options.AudioTrack, fragmented: true, EncoderInput.SystemMemory, 0, allowHardware: true);
+            _writer = new Mp4Writer(_path, format, _options.AudioTrack, fragmented: true, EncoderInput.SystemMemory, 0, allowHardware: true, _options.EncoderTuning);
         }
         catch (NativeCallException ex)
         {
             AddNotice($"The hardware video encoder could not start ({ex.Message}); using the Windows software encoder.");
             TryDelete(_path);
             _softwareFallback = true;
-            _writer = new Mp4Writer(_path, format, _options.AudioTrack, fragmented: true, EncoderInput.SystemMemory, 0, allowHardware: false);
+            _writer = new Mp4Writer(_path, format, _options.AudioTrack, fragmented: true, EncoderInput.SystemMemory, 0, allowHardware: false, _options.EncoderTuning);
         }
     }
 
@@ -915,6 +922,7 @@ internal sealed unsafe class ScreenRecorder : IDisposable
         }
 
         EncoderNameAtEnd = _writer.Encoder?.Name;
+        EncoderSettingsAtEnd = _writer.SettingsSummary;
         HardwareAtEnd = _writer.Encoder?.Hardware ?? false;
         _writer.Dispose();
         _writer = null;
@@ -938,8 +946,8 @@ internal sealed unsafe class ScreenRecorder : IDisposable
             _writer!.Dispose();
             TryDelete(_path);
             _softwareFallback = true;
-            var format = new VideoStreamFormat(_video.Width, _video.Height, _options.FramesPerSecond, VideoSettings.BitRate(_video.Width, _video.Height, _options.FramesPerSecond, _options.Quality));
-            _writer = new Mp4Writer(_path, format, _options.AudioTrack, fragmented: true, EncoderInput.SystemMemory, 0, allowHardware: false);
+            var format = new VideoStreamFormat(_video.Width, _video.Height, _options.FramesPerSecond, _options.VideoBitRate(_video.Width, _video.Height));
+            _writer = new Mp4Writer(_path, format, _options.AudioTrack, fragmented: true, EncoderInput.SystemMemory, 0, allowHardware: false, _options.EncoderTuning);
             _writer.WriteFrame(p, _video.Width * 4, item.Time, item.Duration);
             _hooks?.EncoderRestarted?.Invoke(item.Time);
             _hooks?.AfterVideoWrite?.Invoke(item.Time, item.Repeat);
@@ -984,7 +992,7 @@ internal sealed unsafe class ScreenRecorder : IDisposable
             return; // network paths
         }
 
-        double bytesPerSecond = VideoSettings.BytesPerSecond(VideoSettings.BitRate(_video.Width, _video.Height, _options.FramesPerSecond, _options.Quality), _options.AudioTrack);
+        double bytesPerSecond = VideoSettings.BytesPerSecond(_options.VideoBitRate(_video.Width, _video.Height), _options.AudioTrack);
         double minutesLeft = (free - _options.MinimumFreeBytes) / bytesPerSecond / 60;
         if (free < _options.MinimumFreeBytes)
         {
@@ -1078,10 +1086,13 @@ internal sealed unsafe class ScreenRecorder : IDisposable
             _latencyMax,
             File.Exists(_path) ? new FileInfo(_path).Length : 0,
             finalized,
-            _firstFrame);
+            _firstFrame,
+            EncoderSettings: EncoderSettingsAtEnd);
     }
 
     private string? EncoderNameAtEnd { get; set; }
+
+    private string? EncoderSettingsAtEnd { get; set; }
 
     private bool HardwareAtEnd { get; set; }
 

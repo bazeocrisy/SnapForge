@@ -79,7 +79,7 @@ public partial class App : Application
             return;
         }
 
-        if (args.Length >= 2 && args[0] is "--video-selftest" or "--video-record-until-killed" or "--video-recover" or "--video-benchmark")
+        if (args.Length >= 2 && args[0] is "--video-selftest" or "--video-record-until-killed" or "--video-recover" or "--video-benchmark" or "--video-quality")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
             Shutdown(Video.VideoSelfTest.Run(args));

@@ -90,6 +90,7 @@ internal static partial class VideoSelfTest
             "--video-selftest" => SelfTest(args[1]),
             "--video-record-until-killed" => RecordUntilKilled(args[1], args[2]),
             "--video-recover" => Recover(args[1], args[2]),
+            "--video-quality" => Quality(args[1]),
             "--video-benchmark" => Benchmark(args[1], int.Parse(args[2], System.Globalization.CultureInfo.InvariantCulture), int.Parse(args[3], System.Globalization.CultureInfo.InvariantCulture), int.Parse(args[4], System.Globalization.CultureInfo.InvariantCulture), int.Parse(args[5], System.Globalization.CultureInfo.InvariantCulture), args[6]),
             _ => 2,
         };
@@ -759,6 +760,7 @@ internal static partial class VideoSelfTest
         r.FramesRepeated,
         r.FramesDropped,
         r.Encoder,
+        r.EncoderSettings,
         r.HardwareEncoder,
         r.SoftwareFallback,
         r.CpuPercent,
