@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <rect x="8" y="8" width="240" height="240" rx="56" fill="#0b1220"/>
+  <g transform="translate(28 28)" fill="none" stroke="#f97316" stroke-width="8" stroke-linecap="round">
+    <path d="M12 32V20Q12 12 20 12H32 M68 12H80Q88 12 88 20V32 M32 88H20Q12 88 12 80V68" transform="scale(2)"/>
+  </g>
+  <!-- Editor badge: a pencil across the lower-right corner of the capture frame -->
+  <g transform="rotate(-45 150 150)">
+    <rect x="92" y="132" width="104" height="36" rx="6" fill="#f8fafc"/>
+    <rect x="92" y="132" width="24" height="36" rx="6" fill="#f97316"/>
+    <path d="M196 132 L232 150 L196 168 Z" fill="#fcd9b6"/>
+    <path d="M220 144 L232 150 L220 156 Z" fill="#0b1220"/>
+  </g>
+</svg>

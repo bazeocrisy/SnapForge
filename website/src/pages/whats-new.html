@@ -1,0 +1,84 @@
+<!--meta {"title": "What's New", "description": "Development progress of SnapForge. There is no public release yet; this page lists what has been built and is under review."} -->
+<section class="page-hero">
+  <div class="container">
+    <p class="eyebrow">What's New</p>
+    <h1>Development notes</h1>
+    <p class="lead">SnapForge has no public release yet. Release notes will appear here when one is published;
+    until then, this page summarises what has been built and where it stands. Release candidate 2 is in
+    testing.</p>
+  </div>
+</section>
+
+<div class="container narrow section">
+  <ol class="timeline">
+    <li class="is-review">
+      <h2 id="rc2">SnapForge 1.0 release candidate 2 (1.0.0-rc.2) <span class="badge badge-exp">Release candidate 2 (in testing)</span></h2>
+      <p class="muted small">November 2026 · in testing with invited testers · not a public release</p>
+      <ul>
+        <li><strong>SnapForge Studio</strong> (provisional name) for recording, with three modes: screen only,
+        screen + camera, and camera only. Camera and microphone are off by default; the camera picture stays on
+        your PC and Windows shows its camera indicator while it is on.</li>
+        <li><strong>QuickDock</strong> (provisional name): the desktop widget has a new, original design — a compact
+        rounded bar with the orange aperture mark and a horizontal row of actions.</li>
+        <li>A new capture panel design without the large capture button.</li>
+        <li>When SnapForge starts with Windows it opens only the notification-area icon and QuickDock.</li>
+        <li>The installer now installs <strong>for all users into Program Files</strong> and asks for
+        administrator approval (UAC) once for install and uninstall; the app itself still runs without
+        administrator rights. The portable ZIP is unchanged and needs no administrator rights. Uninstalling keeps
+        your captures.</li>
+        <li>Library backups now include videos, the Trash and all metadata.</li>
+        <li>Packages are still not code-signed. Test builds are available to invited testers from the CI run
+        page — see <a href="download.html#test-builds">Test builds</a>.</li>
+      </ul>
+      <p class="small">Screenshots on this site still show the release-candidate 1 design where marked.</p>
+    </li>
+    <li class="is-review">
+      <h2 id="rc1">SnapForge 1.0 release candidate 1 (1.0.0-rc.1) <span class="badge badge-dev">Release candidate</span></h2>
+      <p class="muted small">November 2026 · superseded by release candidate 2 · not a public release</p>
+      <ul>
+        <li>Scrolling capture, active-window capture, repeat last capture, new from clipboard, a selection magnifier.</li>
+        <li>Extract text from captures with the offline text recognition built into Windows.</li>
+        <li>New annotation tools: pen, callouts, stamps, blur and pixelate; rotate, flip, resize, canvas size,
+        borders, drop shadows and watermarks; copy and paste annotations; print; BMP and TIFF export.</li>
+        <li>Video editing: trim, remove sections, save frames, export MP4 and animated GIF; import MP4 files.</li>
+        <li>Combine images, a first-start welcome, reset preferences, a new app icon and version details in About.</li>
+        <li>A per-user installer (no administrator rights; replaced by an all-users installer in release
+        candidate 2) alongside the portable ZIP, with checksums and a software bill of materials. Packages are not
+        yet code-signed.</li>
+      </ul>
+    </li>
+    <li class="is-review">
+      <h2 id="v1-recording">Screen recording <span class="badge badge-dev">Included in the release candidate</span></h2>
+      <p class="muted small">November 2026</p>
+      <ul>
+        <li>Video mode in the capture panel and a Record button on the widget.</li>
+        <li>Region, window or display to MP4 (H.264 + AAC) with system sound and microphone.</li>
+        <li>Floating toolbar, excluded from the recording; pause, resume, stop, cancel; hotkeys.</li>
+        <li>Crash recovery for interrupted recordings; videos in the Library with a player.</li>
+        <li>Automated tests on a cloud Windows machine: sound/picture sync, pause and resume, crash recovery
+        and long recordings (up to two hours at 1080p). Tests on real PCs with sound devices and graphics cards
+        are still to be done.</li>
+      </ul>
+    </li>
+    <li class="is-review">
+      <h2 id="m3">Capture workflow, widget and drag-and-drop <span class="badge badge-dev">Development build</span></h2>
+      <p class="muted small">November 2026 · awaiting independent review</p>
+      <ul>
+        <li>New compact capture panel with presets and their own hotkeys.</li>
+        <li>Desktop widget that docks to the top, left or right edge of any monitor.</li>
+        <li>Native drag-and-drop of flattened images from the Editor, the recent captures tray and the Library;
+        import by dropping image files onto SnapForge.</li>
+        <li>Optional launch with Windows, background Library loading, high-contrast theme support.</li>
+      </ul>
+    </li>
+    <li class="is-review">
+      <h2 id="mvp">Editor and Library <span class="badge badge-dev">Development build</span></h2>
+      <p class="muted small">November 2026</p>
+      <ul>
+        <li>Capture of regions, windows, displays and the full screen across monitors.</li>
+        <li>Annotations, Quick Styles, crop, undo/redo, black-box redaction.</li>
+        <li>An editable local Library with tags, folders, favourites, search, Trash and backup.</li>
+      </ul>
+    </li>
+  </ol>
+</div>

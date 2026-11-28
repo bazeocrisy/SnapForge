@@ -1,0 +1,72 @@
+{
+  "_comment": "Central website configuration. Edit, then run `python3 website/build.py`. See README.md and LAUNCH-CHECKLIST.md. Leave values null/false until the owner has approved and verified them; unconfigured items are hidden or shown as 'not available yet'. release.ownerApproved: true is refused unless release-verification.json (written by tools/verify-release.py) matches the release AND every asset (asset id, size, SHA-256, signing claim) exactly, and private vulnerability reporting is verified.",
+  "siteUrl": "https://bazeocrisy.github.io/SnapForge/",
+  "repositoryUrl": "https://github.com/bazeocrisy/SnapForge",
+  "_sourceUrl": "Where 'Source code' links point: the candidate branch until the owner approves merging it into main. After the merge set sourceUrl to https://github.com/bazeocrisy/SnapForge and sourceIsCandidate to false.",
+  "sourceUrl": "https://github.com/bazeocrisy/SnapForge/tree/release/v1.0-candidate",
+  "sourceIsCandidate": true,
+  "security": {
+    "privateReporting": {
+      "url": null,
+      "verified": false
+    }
+  },
+  "_testBuild": "Release-candidate test packages for invited testers: only LINKS to GitHub Actions, never a file on this site. runUrl: https://github.com/bazeocrisy/SnapForge/actions/runs/<run id>; commit: the full 40-character commit SHA the run built. RC4: artifactUrl (the 'Download Windows test build' button) is the run's own package https://github.com/bazeocrisy/SnapForge/actions/runs/<run id>/artifacts/<artifact id>, with build (the CI run number), fileName, sha256 (the installer's, from the run's SHA256SUMS.txt), signed (always false) and expires (the artifact's expiry date). Each verified candidate REPLACES the previous values (website/HANDOFF.md, 'Test build link'). Leave null until that run passed every Windows job.",
+  "testBuild": {
+    "version": "1.0.0-rc.5",
+    "build": 187,
+    "runUrl": "https://github.com/bazeocrisy/SnapForge/actions/runs/46178250395",
+    "artifactUrl": "https://github.com/bazeocrisy/SnapForge/actions/runs/46178250395/artifacts/15276573295",
+    "commit": "462f44833256248da581102a3d8538d7218ac88f",
+    "fileName": "SnapForge-1.0.0-rc.5-win-x64-setup.exe",
+    "sha256": "2f2a90fd7e965ed1c42bddd40b6563e1c2743acad13e90411d44bd1f97058ea8",
+    "signed": false,
+    "expires": "2026-12-28"
+  },
+  "_release": "A future public release: one GitHub Release (tag) with one or two assets of the SAME version, each verified separately by tools/verify-release.py. publisher.subject is the signing certificate's full Subject string, publisher.thumbprints the allowed SHA-1 thumbprints (40 upper-case hex); both are required for any signed asset.",
+  "release": {
+    "ownerApproved": false,
+    "version": null,
+    "tag": null,
+    "date": null,
+    "releaseNotesUrl": null,
+    "publisher": {
+      "subject": null,
+      "thumbprints": []
+    },
+    "assets": [
+      {
+        "kind": "installer",
+        "fileName": null,
+        "downloadUrl": null,
+        "assetId": null,
+        "sizeBytes": null,
+        "sha256": null,
+        "signed": false
+      },
+      {
+        "kind": "portable",
+        "fileName": null,
+        "downloadUrl": null,
+        "assetId": null,
+        "sizeBytes": null,
+        "sha256": null,
+        "signed": false
+      }
+    ]
+  },
+  "donations": {
+    "githubSponsors": {
+      "url": null,
+      "verified": false
+    },
+    "buyMeACoffee": {
+      "url": null,
+      "verified": false
+    },
+    "paypal": {
+      "url": null,
+      "verified": false
+    }
+  }
+}

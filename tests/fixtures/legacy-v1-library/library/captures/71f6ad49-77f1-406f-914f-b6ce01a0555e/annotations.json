@@ -1,0 +1,48 @@
+{
+  "format": "snapforge.capture.annotations",
+  "version": 1,
+  "annotations": [
+    {
+      "id": "abe77738-ec24-49ef-898c-296703f69546",
+      "color": "#FFE53935",
+      "strokeWidth": 4,
+      "type": "text",
+      "position": [
+        10,
+        10
+      ],
+      "text": "hunter2-secret",
+      "fontSize": 10,
+      "measuredSize": [
+        28,
+        10
+      ]
+    },
+    {
+      "id": "c8831171-e721-4994-86ce-62ae54b0ca2a",
+      "color": "#FF000000",
+      "strokeWidth": 0,
+      "type": "redaction",
+      "region": [
+        6,
+        6,
+        38,
+        20
+      ]
+    },
+    {
+      "id": "007e6fb7-92d0-4078-8216-5c19a312f586",
+      "color": "#FFE53935",
+      "strokeWidth": 4,
+      "type": "arrow",
+      "start": [
+        45,
+        30
+      ],
+      "end": [
+        60,
+        44
+      ]
+    }
+  ]
+}

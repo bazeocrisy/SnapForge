@@ -1,0 +1,170 @@
+<Window x:Class="SnapForge.App.Views.CaptureWidget"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        Title="SnapForge QuickDock"
+        WindowStyle="None" AllowsTransparency="True" Background="Transparent"
+        ResizeMode="NoResize" ShowInTaskbar="False" ShowActivated="False" Topmost="True"
+        WindowStartupLocation="Manual" Width="40" Height="22"
+        FontFamily="{StaticResource UiFont}" Foreground="{DynamicResource DockTextBrush}"
+        UseLayoutRounding="True"
+        AutomationProperties.Name="SnapForge QuickDock"
+        AutomationProperties.HelpText="Capture, record and open SnapForge from the screen edge">
+    <!--
+        QuickDock (SF-005 redesign of the milestone 3 desktop widget). Collapsed: a small charcoal-navy pill docked to
+        a screen edge (top centre by default) showing the SnapForge aperture mark and a chevron. Expanded on hover or
+        click: Capture, Record, Text, Library, Editor, Settings and Presets, each with an icon and a label.
+        Non-activating for the mouse (it never takes focus from the app being captured); a keyboard mode (FA-004)
+        makes it activatable with focusable buttons. Dock colours are window resources set by code-behind: SnapForge
+        navy in the light and dark themes, the Windows high-contrast colours in high contrast.
+    -->
+    <Window.Resources>
+        <!-- Dock button: icon (Tag) above a label (Content). Keyboard focus draws a visible ring (the template does it,
+             so it shows however focus arrived). -->
+        <Style x:Key="DockButton" TargetType="Button">
+            <Setter Property="Foreground" Value="{DynamicResource DockTextBrush}" />
+            <Setter Property="Background" Value="Transparent" />
+            <Setter Property="Focusable" Value="False" />
+            <Setter Property="Cursor" Value="Hand" />
+            <Setter Property="FontSize" Value="12" />
+            <Setter Property="Margin" Value="1" />
+            <Setter Property="MinWidth" Value="52" />
+            <Setter Property="FocusVisualStyle" Value="{x:Null}" />
+            <Setter Property="ToolTipService.ShowOnDisabled" Value="True" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8" Padding="6,4,6,3">
+                                <StackPanel>
+                                    <Path x:Name="Icon" Data="{TemplateBinding Tag}" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.8"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center" />
+                                    <ContentPresenter x:Name="Label" RecognizesAccessKey="True" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="FocusRing" BorderBrush="{DynamicResource DockFocusBrush}" BorderThickness="2" CornerRadius="9" Margin="-1" Visibility="Collapsed" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource DockHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.8" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                            <Trigger Property="IsEnabled" Value="False">
+                                <Setter Property="Opacity" Value="0.4" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+
+        <!-- The main action: filled with the theme accent. -->
+        <Style x:Key="DockPrimaryButton" TargetType="Button" BasedOn="{StaticResource DockButton}">
+            <Setter Property="Background" Value="{DynamicResource AccentBrush}" />
+            <Setter Property="Foreground" Value="{DynamicResource AccentForegroundBrush}" />
+            <Setter Property="FontWeight" Value="SemiBold" />
+            <Setter Property="Template">
+                <Setter.Value>
+                    <ControlTemplate TargetType="Button">
+                        <Grid>
+                            <Border x:Name="Bd" Background="{TemplateBinding Background}" CornerRadius="8" Padding="6,4,6,3">
+                                <StackPanel>
+                                    <Path Data="{TemplateBinding Tag}" Stroke="{TemplateBinding Foreground}" StrokeThickness="1.8"
+                                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round"
+                                          Width="18" Height="18" Stretch="Uniform" HorizontalAlignment="Center" />
+                                    <ContentPresenter RecognizesAccessKey="True" HorizontalAlignment="Center" Margin="0,2,0,0" />
+                                </StackPanel>
+                            </Border>
+                            <Border x:Name="FocusRing" BorderBrush="{DynamicResource DockFocusBrush}" BorderThickness="2" CornerRadius="9" Margin="-1" Visibility="Collapsed" />
+                        </Grid>
+                        <ControlTemplate.Triggers>
+                            <Trigger Property="IsMouseOver" Value="True">
+                                <Setter TargetName="Bd" Property="Background" Value="{DynamicResource AccentHoverBrush}" />
+                            </Trigger>
+                            <Trigger Property="IsPressed" Value="True">
+                                <Setter TargetName="Bd" Property="Opacity" Value="0.85" />
+                            </Trigger>
+                            <Trigger Property="IsKeyboardFocused" Value="True">
+                                <Setter TargetName="FocusRing" Property="Visibility" Value="Visible" />
+                            </Trigger>
+                        </ControlTemplate.Triggers>
+                    </ControlTemplate>
+                </Setter.Value>
+            </Setter>
+        </Style>
+    </Window.Resources>
+
+    <Grid>
+        <!-- Collapsed pill: aperture mark + chevron pointing away from the edge it is docked to. -->
+        <Button x:Name="TabButton" Click="OnTabClick" Cursor="Hand" Focusable="False" MinWidth="0" MinHeight="0" Padding="0"
+                AutomationProperties.Name="Open QuickDock" AutomationProperties.HelpText="Opens SnapForge QuickDock: Capture, Record, Text, Library, Editor, Settings and Presets"
+                ToolTip="SnapForge QuickDock">
+            <Button.Template>
+                <ControlTemplate TargetType="Button">
+                    <Border x:Name="TabBorder" Background="{DynamicResource DockSurfaceBrush}" BorderBrush="{DynamicResource DockBorderBrush}"
+                            BorderThickness="{Binding TabBorderThickness, RelativeSource={RelativeSource AncestorType=Window}}"
+                            CornerRadius="{Binding TabCorner, RelativeSource={RelativeSource AncestorType=Window}}">
+                        <!-- Mark and chevron; hidden in auto-hide (thin strip) mode, where an accent line marks the dock instead. -->
+                        <Grid>
+                            <StackPanel x:Name="TabContent" Orientation="{Binding TabOrientation, RelativeSource={RelativeSource AncestorType=Window}}"
+                                        HorizontalAlignment="Center" VerticalAlignment="Center"
+                                        Visibility="{Binding TabIconVisibility, RelativeSource={RelativeSource AncestorType=Window}}">
+                                <Path Data="{StaticResource BrandApertureMark}" Stroke="{DynamicResource DockMarkBrush}" StrokeThickness="1.7"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="14" Height="14" Stretch="Uniform" />
+                                <Path x:Name="TabChevron" Data="{Binding ChevronGeometry, RelativeSource={RelativeSource AncestorType=Window}}" Stroke="{DynamicResource DockMutedBrush}" StrokeThickness="1.8"
+                                      StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="8" Height="8" Stretch="Uniform" Margin="3" />
+                            </StackPanel>
+                        </Grid>
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="TabBorder" Property="Background" Value="{DynamicResource DockHoverBrush}" />
+                            <Setter TargetName="TabChevron" Property="Stroke" Value="{DynamicResource DockTextBrush}" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Button.Template>
+        </Button>
+
+        <!-- Expanded dock -->
+        <Border x:Name="Panel" Visibility="Collapsed" Background="{DynamicResource DockSurfaceBrush}" BorderBrush="{DynamicResource DockBorderBrush}" BorderThickness="1"
+                CornerRadius="{Binding PanelCorner, RelativeSource={RelativeSource AncestorType=Window}}" Padding="5">
+            <StackPanel x:Name="PanelStack" Orientation="Horizontal"
+                        KeyboardNavigation.TabNavigation="Cycle" KeyboardNavigation.DirectionalNavigation="Cycle">
+                <Border x:Name="GripHandle" Width="16" Height="36" Background="Transparent" Cursor="SizeAll" Margin="0,0,1,0" VerticalAlignment="Center"
+                        MouseLeftButtonDown="OnGripDown" MouseMove="OnGripMove" MouseLeftButtonUp="OnGripUp"
+                        ToolTip="Drag to dock QuickDock at the top, left or right edge of any display"
+                        AutomationProperties.Name="Move QuickDock" AutomationProperties.HelpText="Drag to dock QuickDock at the top, left or right edge of any display">
+                    <Path Data="{StaticResource IconGrip}" Stroke="{DynamicResource DockMutedBrush}" StrokeThickness="2" StrokeStartLineCap="Round" StrokeEndLineCap="Round"
+                          Width="16" Height="22" Stretch="Uniform" />
+                </Border>
+                <Border x:Name="DockMark" Width="26" Height="26" Margin="1,0,4,0" VerticalAlignment="Center" HorizontalAlignment="Center"
+                        AutomationProperties.Name="SnapForge logo" ToolTip="SnapForge QuickDock">
+                    <Path Data="{StaticResource BrandApertureMark}" Stroke="{DynamicResource DockMarkBrush}" StrokeThickness="2"
+                          StrokeStartLineCap="Round" StrokeEndLineCap="Round" StrokeLineJoin="Round" Width="22" Height="22" Stretch="Uniform" />
+                </Border>
+                <Button x:Name="CaptureButton" Style="{StaticResource DockPrimaryButton}" Click="OnCapture" Content="Capture" Tag="{StaticResource IconCapture}"
+                        AutomationProperties.Name="Capture" AutomationProperties.HelpText="Capture with the current capture settings" ToolTip="Capture with the current settings" />
+                <Button x:Name="RecordButton" Style="{StaticResource DockButton}" Click="OnRecord" Content="Record" Tag="{StaticResource IconRecordDot}"
+                        AutomationProperties.Name="Record" AutomationProperties.HelpText="Open the recording studio to record the screen (MP4)" ToolTip="Record the screen (MP4)" />
+                <Button x:Name="TextButton" Style="{StaticResource DockButton}" Click="OnText" Content="Text" Tag="{StaticResource IconExtractText}"
+                        AutomationProperties.Name="Extract text" AutomationProperties.HelpText="Select a screen region and extract its text (offline; nothing is saved)"
+                        ToolTip="Extract text from a screen region (offline text recognition; nothing is saved)" />
+                <Button x:Name="LibraryButton" Style="{StaticResource DockButton}" Click="OnLibrary" Content="Library" Tag="{StaticResource IconLibrary}"
+                        AutomationProperties.Name="Library" AutomationProperties.HelpText="Open the Capture Library" ToolTip="Open the Library" />
+                <Button x:Name="EditorButton" Style="{StaticResource DockButton}" Click="OnEditor" Content="Editor" Tag="{StaticResource IconEditor}"
+                        AutomationProperties.Name="Editor" AutomationProperties.HelpText="Open the SnapForge Editor" ToolTip="Open the Editor" />
+                <Button x:Name="SettingsButton" Style="{StaticResource DockButton}" Click="OnSettings" Content="Settings" Tag="{StaticResource IconSettings}"
+                        AutomationProperties.Name="Settings" AutomationProperties.HelpText="Open SnapForge Settings (including QuickDock options)" ToolTip="Settings" />
+                <Button x:Name="PresetsButton" Style="{StaticResource DockButton}" Click="OnPresets" Content="Presets" Tag="{StaticResource IconPresets}"
+                        AutomationProperties.Name="Presets" AutomationProperties.HelpText="Capture with a preset, open the capture panel or hide QuickDock"
+                        ToolTip="Presets, capture panel and QuickDock options" />
+            </StackPanel>
+        </Border>
+    </Grid>
+</Window>

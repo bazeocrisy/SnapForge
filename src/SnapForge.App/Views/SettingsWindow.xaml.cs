@@ -1,0 +1,548 @@
+using System.Diagnostics;
+using System.Globalization;
+using System.IO;
+using System.Windows;
+using System.Windows.Input;
+using Microsoft.Win32;
+using SnapForge.App.Interop;
+using SnapForge.App.Services;
+using SnapForge.App.Themes;
+using SnapForge.Core.Library;
+using SnapForge.Core.Settings;
+
+namespace SnapForge.App.Views;
+
+public partial class SettingsWindow : Window
+{
+    private readonly AppServices _services;
+    private bool _loading;
+
+    internal SettingsWindow(AppServices services)
+    {
+        _services = services;
+        InitializeComponent();
+        SourceInitialized += (_, _) => WindowChrome.UseDarkTitleBar(this, ThemeManager.IsDark);
+        Load();
+    }
+
+    private void Load()
+    {
+        _loading = true;
+        AppSettings s = _services.Settings;
+        ThemeSystem.IsChecked = s.Theme == ThemePreference.System;
+        ThemeLight.IsChecked = s.Theme == ThemePreference.Light;
+        ThemeDark.IsChecked = s.Theme == ThemePreference.Dark;
+        CloseToTrayBox.IsChecked = s.CloseToNotificationArea;
+        ShowCaptureWindowBox.IsChecked = s.ShowCaptureWindowOnStart;
+        PanelTopmostBox.IsChecked = s.CapturePanelTopmost;
+        PanelHotkeyBox.Text = s.ShowPanelHotkey?.ToString() ?? "(none)";
+        CaptureHotkeyBox.Text = s.CaptureHotkey?.ToString() ?? "(none)";
+        TrashDaysCheck.IsChecked = s.Retention.EmptyTrashAfterDays is not null;
+        TrashDaysBox.Text = (s.Retention.EmptyTrashAfterDays ?? 30).ToString(CultureInfo.CurrentCulture);
+        KeepDaysCheck.IsChecked = s.Retention.MoveToTrashAfterDays is not null;
+        KeepDaysBox.Text = (s.Retention.MoveToTrashAfterDays ?? 365).ToString(CultureInfo.CurrentCulture);
+        LocationBox.Text = _services.Library.Root;
+        StorageUsage u = _services.Library.GetUsage();
+        UsageText.Text = $"{u.CaptureCount} captures ({MainWindow.FormatBytes(u.TotalBytes - u.TrashBytes)}) · Trash: {u.TrashCount} ({MainWindow.FormatBytes(u.TrashBytes)})";
+        int unsanitized = _services.Library.Records.Count(r => r.HasReversibleRedactions);
+        PrivacyText.Text = (unsanitized == 0
+            ? "No library capture keeps original pixels under redactions."
+            : $"{unsanitized} library capture(s) still keep original pixels under their redactions (so the redactions can be undone). Exports are unaffected.")
+            + "\nSnapForge has no network features: captures are never uploaded or synchronized by SnapForge.";
+        UpdateHotkeyStatus();
+        LoadGateBSettings(s);
+        BuildRecordingSection();
+        _loading = false;
+    }
+
+    private void LoadGateBSettings(AppSettings s)
+    {
+        WidgetEnabledBox.IsChecked = s.Widget.Enabled;
+        WidgetTopmostBox.IsChecked = s.Widget.Topmost;
+        WidgetAutoHideBox.IsChecked = s.Widget.AutoHide;
+        WidgetHover.IsChecked = s.Widget.ExpandMode == WidgetExpandMode.Hover;
+        WidgetClick.IsChecked = s.Widget.ExpandMode == WidgetExpandMode.Click;
+        DragPng.IsChecked = s.DragDrop.Format == Core.Export.ImageFileFormat.Png;
+        DragJpeg.IsChecked = s.DragDrop.Format == Core.Export.ImageFileFormat.Jpeg;
+        JpegQualityBox.Text = s.DragDrop.JpegQuality.ToString(CultureInfo.CurrentCulture);
+        JpegQualityBox.IsEnabled = s.DragDrop.Format == Core.Export.ImageFileFormat.Jpeg;
+        bool registered = SafeStartupEnabled();
+        StartupBox.IsChecked = registered;
+        StartupStatus.Text = registered && !StartupPointsHere()
+            ? "The startup entry points to a different copy of SnapForge.exe. Turn this off and on again to use this copy."
+            : "Per-user setting (no administrator rights). Turn it off here or in Windows Settings → Apps → Startup.";
+        if (Core.ProductInfo.Profile is not null)
+        {
+            StartupBox.IsEnabled = false;
+            StartupStatus.Text = "Not available in an isolated test profile (it would start a test copy with Windows).";
+        }
+    }
+
+    private static bool SafeStartupEnabled()
+    {
+        try
+        {
+            return StartupRegistration.IsEnabled();
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException)
+        {
+            return false;
+        }
+    }
+
+    private static bool StartupPointsHere()
+    {
+        try
+        {
+            return StartupRegistration.PointsAt(StartupRegistration.CurrentExecutable());
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException or InvalidOperationException)
+        {
+            return false;
+        }
+    }
+
+    private void OnStartupChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        bool enabled = StartupBox.IsChecked == true;
+        try
+        {
+            StartupRegistration.Set(enabled, StartupRegistration.CurrentExecutable());
+            _services.UpdateSettings(s => s with { LaunchAtStartup = enabled });
+        }
+        catch (Exception ex) when (ex is System.Security.SecurityException or UnauthorizedAccessException or IOException or InvalidOperationException)
+        {
+            MessageBox.Show(this, $"The startup setting could not be changed:\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+
+        _loading = true;
+        LoadGateBSettings(_services.Settings);
+        _loading = false;
+    }
+
+    private void OnWidgetChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        _services.UpdateSettings(s => s with
+        {
+            Widget = s.Widget with
+            {
+                Enabled = WidgetEnabledBox.IsChecked == true,
+                Topmost = WidgetTopmostBox.IsChecked == true,
+                AutoHide = WidgetAutoHideBox.IsChecked == true,
+                ExpandMode = WidgetClick.IsChecked == true ? WidgetExpandMode.Click : WidgetExpandMode.Hover,
+            },
+        });
+    }
+
+    private void OnWidgetReset(object sender, RoutedEventArgs e) =>
+        _services.UpdateSettings(s => s with { Widget = s.Widget with { Placement = null, Enabled = true } });
+
+    private void OnDragFormatChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        int quality = int.TryParse(JpegQualityBox.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out int q) ? q : _services.Settings.DragDrop.JpegQuality;
+        var format = DragJpeg.IsChecked == true ? Core.Export.ImageFileFormat.Jpeg : Core.Export.ImageFileFormat.Png;
+        _services.UpdateSettings(s => s with { DragDrop = new DragDropSettings { Format = format, JpegQuality = quality }.Normalized() });
+        _loading = true;
+        LoadGateBSettings(_services.Settings);
+        _loading = false;
+    }
+
+    private void UpdateHotkeyStatus()
+    {
+        var lines = new List<string>();
+        foreach (HotkeyRegistration r in App.HotkeyResults)
+        {
+            lines.Add(r.Succeeded ? $"✓ {r.Gesture} — {r.Action}" : $"✗ {r.Gesture} — {r.Action}: {r.Error}");
+        }
+
+        foreach (IReadOnlyList<string> conflict in HotkeyGesture.FindConflicts(_services.Settings.HotkeyAssignments()))
+        {
+            lines.Add($"✗ Same hotkey used for: {string.Join(", ", conflict)}");
+        }
+
+        HotkeyStatus.Text = lines.Count == 0 ? "No global hotkeys are registered." : string.Join("\n", lines);
+    }
+
+    private void OnThemeChecked(object sender, RoutedEventArgs e)
+    {
+        if (!_loading && sender is FrameworkElement { Tag: string tag } && Enum.TryParse(tag, out ThemePreference theme))
+        {
+            _services.UpdateSettings(s => s with { Theme = theme });
+            ThemeManager.Apply(theme);
+        }
+    }
+
+    private void OnBehaviourChanged(object sender, RoutedEventArgs e)
+    {
+        if (!_loading)
+        {
+            _services.UpdateSettings(s => s with { CloseToNotificationArea = CloseToTrayBox.IsChecked == true, ShowCaptureWindowOnStart = ShowCaptureWindowBox.IsChecked == true, CapturePanelTopmost = PanelTopmostBox.IsChecked == true });
+        }
+    }
+
+    private void OnHotkeyKeyDown(object sender, KeyEventArgs e)
+    {
+        e.Handled = true;
+        Key key = e.Key == Key.System ? e.SystemKey : e.Key;
+        if (key is Key.LeftCtrl or Key.RightCtrl or Key.LeftShift or Key.RightShift or Key.LeftAlt or Key.RightAlt or Key.LWin or Key.RWin)
+        {
+            return;
+        }
+
+        if (key is Key.Back or Key.Delete && Keyboard.Modifiers == ModifierKeys.None)
+        {
+            OnClearHotkey(sender, e);
+            return;
+        }
+
+        HotkeyModifiers mods = HotkeyModifiers.None;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Control)) mods |= HotkeyModifiers.Control;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Alt)) mods |= HotkeyModifiers.Alt;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Shift)) mods |= HotkeyModifiers.Shift;
+        if (Keyboard.Modifiers.HasFlag(ModifierKeys.Windows)) mods |= HotkeyModifiers.Windows;
+        var gesture = new HotkeyGesture(mods, key == Key.Snapshot ? "PrintScreen" : key.ToString());
+        if (!gesture.IsValid)
+        {
+            HotkeyStatus.Text = $"{gesture}: {gesture.Problem}";
+            return;
+        }
+
+        if (IsPanelHotkey(sender))
+        {
+            _services.UpdateSettings(s => s with { ShowPanelHotkey = gesture });
+            PanelHotkeyBox.Text = gesture.ToString();
+        }
+        else
+        {
+            _services.UpdateSettings(s => s with { CaptureHotkey = gesture });
+            CaptureHotkeyBox.Text = gesture.ToString();
+        }
+
+        UpdateHotkeyStatus();
+    }
+
+    private void OnClearHotkey(object sender, RoutedEventArgs e)
+    {
+        if (IsPanelHotkey(sender))
+        {
+            _services.UpdateSettings(s => s with { ShowPanelHotkey = null });
+            PanelHotkeyBox.Text = "(none)";
+        }
+        else
+        {
+            _services.UpdateSettings(s => s with { CaptureHotkey = null });
+            CaptureHotkeyBox.Text = "(none)";
+        }
+
+        UpdateHotkeyStatus();
+    }
+
+    private static bool IsPanelHotkey(object sender) => sender is FrameworkElement { Tag: "Panel" };
+
+    private void OnOpenFolder(object sender, RoutedEventArgs e)
+    {
+        try
+        {
+            Process.Start(new ProcessStartInfo("explorer.exe", $"\"{_services.Library.Root}\"") { UseShellExecute = false });
+        }
+        catch (Exception ex) when (ex is System.ComponentModel.Win32Exception or IOException)
+        {
+            MessageBox.Show(this, ex.Message, "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+    }
+
+    private async void OnChangeLocation(object sender, RoutedEventArgs e)
+    {
+        var dialog = new OpenFolderDialog { Title = "Choose an empty folder for the Capture Library" };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        string target = dialog.FolderName;
+        if (!App.OtherProgramClosedFor(this, "move the Capture Library"))
+        {
+            return;
+        }
+
+        if (Video.RecordingController.IsActive)
+        {
+            MessageBox.Show(this, "Stop the recording first. The Library cannot be moved while recording.", "Move Capture Library", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (MessageBox.Show(this,
+                $"Move the Capture Library to:\n{target}\n\nEvery file is copied and verified byte for byte first. SnapForge then switches to the new location. " +
+                "The old copy is only deleted if you confirm afterwards — and only files that were verified at the new location.\n\n" +
+                "Avoid cloud-synced folders (OneDrive, Dropbox) unless you want your captures uploaded by that service. Keep a backup until you have checked the new location.",
+                "Move Capture Library", MessageBoxButton.OKCancel, MessageBoxImage.Question) != MessageBoxResult.OK)
+        {
+            return;
+        }
+
+        try
+        {
+            IsEnabled = false;
+            if (App.MainShell is { } main)
+            {
+                await main.FlushAllAsync().ConfigureAwait(true);
+            }
+
+            LibraryRelocationOutcome outcome = await _services.RelocateLibraryAsync(target, copy => MessageBox.Show(this,
+                    $"All {copy.Files.Count} file(s) ({copy.ItemCount} item(s), {copy.DamagedCount} damaged, {copy.InterruptedRecordingCount} interrupted recording(s)) were copied to\n{copy.TargetRoot}\nand verified. SnapForge now uses the new location." +
+                    (copy.Warnings.Count > 0 ? "\n\nNote:\n• " + string.Join("\n• ", copy.Warnings) : string.Empty) +
+                    $"\n\nDelete the old copy in\n{copy.SourceRoot}\nnow? Choose No to keep it (you can delete it yourself later).",
+                    "Move Capture Library", MessageBoxButton.YesNo, MessageBoxImage.Question, MessageBoxResult.No) == MessageBoxResult.Yes).ConfigureAwait(true);
+            if (outcome.SettingsError is { } error)
+            {
+                MessageBox.Show(this, $"The captures were copied and verified to\n{outcome.Copy.TargetRoot}\nbut the new location could not be saved:\n{error}\n\nSnapForge keeps using the old Library; nothing was deleted.",
+                    "Move Capture Library", MessageBoxButton.OK, MessageBoxImage.Warning);
+            }
+            else if (outcome.Cleanup is { } cleanup)
+            {
+                string left = cleanup.LeftInPlace.Count + cleanup.Changed.Count > 0
+                    ? $"\n\n{cleanup.LeftInPlace.Count + cleanup.Changed.Count} file(s) were left in the old location because they were not part of the verified copy or changed since:\n{outcome.Copy.SourceRoot}"
+                    : string.Empty;
+                MessageBox.Show(this, $"The Capture Library is now in:\n{_services.Library.Root}\n\n{cleanup.Deleted.Count} verified file(s) were removed from the old location.{left}",
+                    "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+            else
+            {
+                MessageBox.Show(this, $"The Capture Library is now in:\n{_services.Library.Root}\n\nThe old copy was kept in:\n{outcome.Copy.SourceRoot}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+            }
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException or ArgumentException or InvalidDataException)
+        {
+            MessageBox.Show(this, $"The library was not moved (the current Library is unchanged):\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            IsEnabled = true;
+            Load();
+        }
+    }
+
+    private void OnRetentionChanged(object sender, RoutedEventArgs e)
+    {
+        if (_loading)
+        {
+            return;
+        }
+
+        int? Parse(System.Windows.Controls.TextBox box, bool enabled) =>
+            enabled && int.TryParse(box.Text, NumberStyles.Integer, CultureInfo.CurrentCulture, out int d) && d >= 1 ? d : enabled ? 30 : null;
+
+        var policy = new RetentionPolicy
+        {
+            EmptyTrashAfterDays = Parse(TrashDaysBox, TrashDaysCheck.IsChecked == true),
+            MoveToTrashAfterDays = Parse(KeepDaysBox, KeepDaysCheck.IsChecked == true),
+        };
+        _services.UpdateSettings(s => s with { Retention = policy });
+    }
+
+    private async void OnApplyRetention(object sender, RoutedEventArgs e)
+    {
+        (int trashed, int deleted) = await _services.Writer.RunAsync(() => _services.Library.ApplyRetention(_services.Settings.Retention, DateTime.UtcNow)).ConfigureAwait(true);
+        _services.Tray.Prune(id => _services.Library.Find(id) is { IsDeleted: false });
+        MessageBox.Show(this, $"Moved {trashed} capture(s) to the Trash and permanently deleted {deleted}.", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+        Load();
+    }
+
+    private async void OnEmptyTrash(object sender, RoutedEventArgs e)
+    {
+        int count = _services.Library.Records.Count(r => r.IsDeleted);
+        if (count == 0 || MessageBox.Show(this, $"Permanently delete {count} capture(s) in the Trash?", "SnapForge", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        App.MainShell?.OnCapturesRemoved([.. _services.Library.Records.Where(r => r.IsDeleted).Select(r => r.Id)]);
+        await _services.Writer.RunAsync(() => _services.Library.EmptyTrash()).ConfigureAwait(true);
+        Load();
+    }
+
+    private async void OnBackup(object sender, RoutedEventArgs e)
+    {
+        if (!App.OtherProgramClosedFor(this, "back up the Capture Library"))
+        {
+            return;
+        }
+
+        var dialog = new SaveFileDialog { Title = "Back up Capture Library", Filter = "ZIP archive (*.zip)|*.zip", FileName = $"SnapForge Library {DateTime.Now:yyyy-MM-dd}.zip" };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            if (App.MainShell is { } main)
+            {
+                await main.FlushAllAsync().ConfigureAwait(true);
+            }
+
+            IsEnabled = false;
+            BackupResult r = await _services.Writer.RunAsync(() => _services.Library.CreateBackup(dialog.FileName)).ConfigureAwait(true);
+            string excluded = r.Excluded.Count == 0
+                ? "Nothing was left out."
+                : $"{r.Excluded.Count} item(s) could not be included:\n• " + string.Join("\n• ", r.Excluded.Take(10).Select(x => $"{x.Path}: {x.Reason}")) + (r.Excluded.Count > 10 ? "\n• …" : string.Empty);
+            string warnings = r.Warnings.Count == 0 ? string.Empty : "\n\nNotes:\n• " + string.Join("\n• ", r.Warnings.Take(10));
+            MessageBox.Show(this,
+                $"Backed up to:\n{r.Path}\n\n{r.ImageCount} image(s), {r.VideoCount} recording(s), {r.TrashCount} in the Trash, {r.DamagedOrIncompleteCount} damaged or incomplete item(s) (copied as they are, for recovery); {r.TotalBytes / (1024.0 * 1024.0):0.#} MB. Every file is listed with its SHA-256 checksum.\n\n{excluded}{warnings}\n\nKeep the backup on another drive.",
+                "SnapForge", MessageBoxButton.OK, r.Excluded.Count == 0 ? MessageBoxImage.Information : MessageBoxImage.Warning);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (ex is IOException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, $"The backup failed (any partial file was removed):\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            IsEnabled = true;
+        }
+    }
+
+    private async void OnRestore(object sender, RoutedEventArgs e)
+    {
+        if (!App.OtherProgramClosedFor(this, "restore a backup into the Capture Library"))
+        {
+            return;
+        }
+
+        var dialog = new OpenFileDialog { Title = "Restore from backup", Filter = "ZIP archive (*.zip)|*.zip" };
+        if (dialog.ShowDialog(this) != true)
+        {
+            return;
+        }
+
+        try
+        {
+            IsEnabled = false;
+            RestoreResult r = await _services.Writer.RunAsync(() => _services.Library.RestoreFromBackup(dialog.FileName)).ConfigureAwait(true);
+            string legacy = r.IsLegacyImageOnlyBackup ? "This is an older image-only backup (format 1): it never contained recordings.\n\n" : string.Empty;
+            string excludedAtBackup = r.ExcludedAtBackup.Count == 0 ? string.Empty : $"\n{r.ExcludedAtBackup.Count} item(s) had been left out when the backup was made.";
+            MessageBox.Show(this,
+                $"{legacy}Restored {r.Restored.Count} item(s). {r.SkippedExisting.Count} item(s) were already in the Library and were not changed.{excludedAtBackup}",
+                "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+        }
+        catch (OperationCanceledException)
+        {
+        }
+        catch (Exception ex) when (ex is IOException or InvalidDataException or UnauthorizedAccessException)
+        {
+            MessageBox.Show(this, $"The backup could not be restored. Nothing was added to or changed in your Library.\n\n{ex.Message}", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Warning);
+        }
+        finally
+        {
+            IsEnabled = true;
+        }
+
+        Load();
+    }
+
+    private async void OnSanitizeAll(object sender, RoutedEventArgs e)
+    {
+        Guid[] ids = [.. _services.Library.Records.Where(r => r.HasReversibleRedactions && r.Damage is null).Select(r => r.Id)];
+        if (ids.Length == 0)
+        {
+            MessageBox.Show(this, "No capture needs sanitizing.", "SnapForge", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        if (MessageBox.Show(this, $"Permanently burn in the redactions of {ids.Length} capture(s)? Original pixels and hidden annotations are removed from the Library copies. This cannot be undone.",
+                "Sanitize", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes || App.MainShell is not { } main)
+        {
+            return;
+        }
+
+        await main.SanitizeRecordsAsync(ids).ConfigureAwait(true);
+        Load();
+    }
+
+    private void OnPrivacyNotice(object sender, RoutedEventArgs e) => App.ShowPrivacyNotice(this);
+
+    private void OnDeleteDragCopies(object sender, RoutedEventArgs e)
+    {
+        long before = CaptureDragDrop.Store.TotalBytes();
+        int removed = CaptureDragDrop.Store.DeleteAll(DateTime.UtcNow);
+        long after = CaptureDragDrop.Store.TotalBytes();
+        MessageBox.Show(this, $"Removed {removed} drag-and-drop folder(s), {(before - after) / 1024} KB." +
+            (after > 0 ? $"\n{after / 1024} KB are still in use by another app and will be removed later." : string.Empty) +
+            "\n\nFiles are deleted normally (not overwritten); apps you dropped them into keep their own copies.",
+            "Drag-and-drop copies", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    private void OnResetPreferences(object sender, RoutedEventArgs e)
+    {
+        if (MessageBox.Show(this, "Reset every SnapForge preference to its default?\n\nYour captures, recordings and the Library location are kept.",
+                "Reset all preferences", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        string? library = _services.Settings.LibraryPath;
+        _services.UpdateSettings(_ => new AppSettings { LibraryPath = library, PrivacyNoticeShown = true });
+        App.RegisterHotkeys(notifyOnFailure: true);
+        Load();
+        MessageBox.Show(this, "Preferences were reset to their defaults.", "Reset all preferences", MessageBoxButton.OK, MessageBoxImage.Information);
+    }
+
+    /// <summary>
+    /// FA-002: data removal is an explicit standard-user action (the system-wide uninstaller never deletes user data).
+    /// Deletes this user's data folder (settings, Library at the default location, logs, temporary files) after two
+    /// confirmations, then exits. A Library in a custom folder is listed but not deleted.
+    /// </summary>
+    private void OnDeleteMyData(object sender, RoutedEventArgs e)
+    {
+        if (Video.RecordingController.IsActive)
+        {
+            MessageBox.Show(this, "Stop the recording first.", "Delete my SnapForge data", MessageBoxButton.OK, MessageBoxImage.Information);
+            return;
+        }
+
+        string dataRoot = Core.ProductInfo.DataRoot;
+        string library = _services.Library.Root;
+        bool customLibrary = !library.StartsWith(dataRoot.TrimEnd('\\') + "\\", StringComparison.OrdinalIgnoreCase);
+        string libraryNote = customLibrary
+            ? $"\n\nYour Library is in a folder you chose and will NOT be deleted:\n{library}\nDelete it yourself if you want to."
+            : string.Empty;
+        if (MessageBox.Show(this,
+                $"Delete all of YOUR SnapForge data on this PC?\n\n{dataRoot}\n\nThis removes your settings, captures, recordings, logs and temporary files " +
+                $"(only for this Windows user) and then exits SnapForge. Backups and files you exported are not affected.{libraryNote}\n\nMake sure you have copies of anything you want to keep.",
+                "Delete my SnapForge data", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        int count = _services.Library.Records.Count;
+        if (MessageBox.Show(this,
+                customLibrary ? "Are you sure? Your settings, logs and temporary files will be deleted permanently." : $"Are you sure? {count} capture(s) and recording(s) will be deleted permanently. This cannot be undone.",
+                "Delete my SnapForge data", MessageBoxButton.YesNo, MessageBoxImage.Stop, MessageBoxResult.No) != MessageBoxResult.Yes)
+        {
+            return;
+        }
+
+        App.DeleteDataOnExit = true;
+        Close();
+        _ = App.ExitAsync();
+    }
+
+    private void OnClose(object sender, RoutedEventArgs e) => Close();
+}

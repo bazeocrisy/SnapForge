@@ -1,0 +1,59 @@
+<!--meta {"title": "Privacy", "description": "Privacy for the SnapForge app and this website: no telemetry, no accounts, no cookies, no analytics. What is stored where, and what third parties may see."} -->
+<section class="page-hero">
+  <div class="container">
+    <p class="eyebrow">Privacy</p>
+    <h1>Privacy</h1>
+    <p class="lead">Plain-language summary of what the SnapForge app and this website do with your information.
+    Last updated <time datetime="2026-11-27">27 November 2026</time>.</p>
+  </div>
+</section>
+
+<div class="container narrow section prose">
+  <h2 id="app">The SnapForge app</h2>
+  <ul>
+    <li><strong>No network access.</strong> The app contains no code that connects to the internet: no uploads,
+    sync, accounts, update checks, crash reporting or telemetry.</li>
+    <li><strong>Local storage.</strong> Captures, recordings (including camera recordings) and settings are stored on your PC in
+    <code>%LOCALAPPDATA%\SnapForge</code> (or a Library folder you choose). Error logs contain text only — never
+    image data — and stay on your PC.</li>
+    <li><strong>Not encrypted by SnapForge.</strong> Your files are protected by your Windows account; use Windows
+    device encryption or BitLocker to protect the disk.</li>
+    <li><strong>Redaction.</strong> Exported, copied and dragged images are flattened, with redacted areas burned
+    in and no metadata. Your editable Library copy keeps original pixels until you choose <em>Sanitize</em>.
+    Videos cannot be redacted.</li>
+    <li><strong>Sharing is your choice.</strong> When you paste, drag or export a capture into another app, that
+    app keeps its own copy under its own privacy terms.</li>
+    <li><strong>Recording with SnapForge Studio</strong> (release candidate 2, in testing) uses Windows' screen
+    capture, camera and audio APIs. Windows shows a border while the screen is recorded, its microphone indicator
+    while the microphone is on and its camera indicator while the camera is on. SnapForge does not hide or bypass
+    these indicators.</li>
+    <li><strong>Camera.</strong> The camera and the microphone are <strong>off by default</strong> and are switched
+    on only by you, for a recording. The camera picture is processed only on your PC (through Windows' own camera
+    support) and is saved only into the recording you make, in your Library. It is never uploaded, streamed or
+    analysed. Windows' privacy settings (Settings → Privacy &amp; security → Camera / Microphone) control whether
+    desktop apps may use them at all.</li>
+    <li><strong>Backups</strong> you create contain your captures, recordings, Trash and their metadata. Store them
+    as carefully as the Library itself.</li>
+    <li><strong>Uninstalling keeps your data.</strong> Removing the app does not delete
+    <code>%LOCALAPPDATA%\SnapForge</code>; delete it yourself to remove captures and settings.</li>
+  </ul>
+
+  <h2 id="website">This website</h2>
+  <ul>
+    <li>No cookies, analytics, advertising, fonts or scripts from other companies. The only script is a small
+    local one for the mobile menu and the “copy checksum” button; it stores nothing.</li>
+    <li>The site is hosted on GitHub Pages. GitHub, as the host, receives the technical information every website
+    receives (such as your IP address and browser) and may keep logs under its
+    <a href="https://docs.github.com/en/site-policy/privacy-policies/github-general-privacy-statement" rel="noopener noreferrer">privacy statement<span class="visually-hidden"> (external site)</span></a>.
+    We do not receive or use those logs.</li>
+    <li>There are no forms, and the site never asks for personal or payment information.</li>
+  </ul>
+
+  <h2 id="third-party">Links to other websites</h2>
+  <p>Links to GitHub, Microsoft documentation and — once set up — donation providers take you to sites with their
+  own privacy policies. Links that leave this site are marked for screen readers as external.</p>
+
+  <h2 id="contact">Questions</h2>
+  <p>Ask on <a href="support.html#report">GitHub Issues</a>. For security problems, see
+  <a href="support.html#security">reporting a security problem</a>.</p>
+</div>

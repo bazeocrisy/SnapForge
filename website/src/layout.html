@@ -1,0 +1,65 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{{title}}</title>
+<meta name="description" content="{{description}}">
+{{robots}}
+<link rel="canonical" href="{{canonical}}">
+<meta name="theme-color" content="#0b1220">
+<meta name="referrer" content="strict-origin-when-cross-origin">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; img-src 'self'; style-src 'self'; script-src 'self'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta property="og:type" content="website">
+<meta property="og:site_name" content="SnapForge">
+<meta property="og:title" content="{{og_title}}">
+<meta property="og:description" content="{{description}}">
+<meta property="og:url" content="{{canonical}}">
+<meta property="og:image" content="{{site_url}}assets/img/og-image.png">
+<meta property="og:image:width" content="1200">
+<meta property="og:image:height" content="630">
+<meta property="og:image:alt" content="SnapForge logo with the slogan Capture. Create. Share.">
+<meta name="twitter:card" content="summary_large_image">
+<link rel="icon" href="favicon.ico" sizes="any">
+<link rel="icon" href="assets/img/logo-mark.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="assets/img/logo-mark.png">
+<link rel="stylesheet" href="assets/css/site.css">
+<script src="assets/js/site.js" defer></script>
+{{jsonld}}
+</head>
+<body class="{{body_class}}">
+<a class="skip-link" href="#main">Skip to main content</a>
+<header class="site-header">
+  <div class="container header-inner">
+    <a class="brand" href="index.html"><img src="assets/img/logo-mark.svg" alt="" width="32" height="32"><span>Snap<span class="brand-accent">Forge</span></span></a>
+    <button class="nav-toggle" type="button" aria-expanded="false" aria-controls="site-nav" hidden>
+      <span class="nav-toggle-bars" aria-hidden="true"></span><span class="nav-toggle-label">Menu</span>
+    </button>
+    <nav id="site-nav" class="site-nav" aria-label="Main">
+      <ul>
+{{nav}}
+      </ul>
+    </nav>
+  </div>
+  <p class="status-strip"><span class="container">{{status_line}} <a href="roadmap.html">Project status</a></span></p>
+</header>
+<main id="main" tabindex="-1">
+{{content}}
+</main>
+<footer class="site-footer">
+  <div class="container footer-inner">
+    <div class="footer-brand">
+      <a class="brand" href="index.html"><img src="assets/img/logo-mark.svg" alt="" width="28" height="28"><span>Snap<span class="brand-accent">Forge</span></span></a>
+      <p class="slogan">Capture. Create. Share.</p>
+      <p class="small">Free and open source under the MIT License. No subscriptions, accounts, ads or telemetry.</p>
+    </div>
+    <nav aria-label="Footer">
+      <ul>
+{{footer_nav}}
+      </ul>
+    </nav>
+  </div>
+  <p class="container small footer-legal">© 2026 bazeocrisy and SnapForge contributors. Screenshots on this site show development builds with fictional demo data.</p>
+</footer>
+</body>
+</html>

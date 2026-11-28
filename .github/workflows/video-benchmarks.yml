@@ -1,0 +1,85 @@
+# Screen-recording benchmarks (Milestone V1, VID-12 / VID-R11). Manual: Actions → Video benchmarks → Run workflow.
+# Each row records with the production recorder and reports CPU, memory, dropped/repeated frames, encode latency,
+# file size, MP4 validity and (synthetic source) A/V sync and drift. Rows the runner cannot do are reported as
+# "unsupported" with the reason — never skipped silently. GPU load is not measurable on the runner (no GPU).
+name: Video benchmarks
+
+on:
+  workflow_dispatch:
+    inputs:
+      long:
+        description: "Include the 30, 60 and 120 minute runs"
+        type: boolean
+        default: true
+  # Manual dispatch needs the workflow on the default branch; until V1 is merged, a push to the V1 branch whose
+  # commit message contains [video-benchmarks] runs the full set. Other pushes skip it.
+  push:
+    branches: [claude/video-v1]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    if: github.event_name == 'workflow_dispatch' || contains(github.event.head_commit.message, '[video-benchmarks]')
+    runs-on: windows-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v6
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+      # Same publish as ci.yml (signature-verified restore from nuget.org; see the comment there on locked mode).
+      - name: Publish portable build
+        run: >
+          dotnet publish src/SnapForge.App/SnapForge.App.csproj -c Release -r win-x64
+          --self-contained true
+          -p:PublishSingleFile=true
+          -p:EnableCompressionInSingleFile=true
+          -p:DebugType=none
+          -p:ContinuousIntegrationBuild=true
+          -p:RestoreLockedMode=false
+          -o portable
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: bench-build
+          path: portable
+          retention-days: 3
+
+  bench:
+    needs: build
+    runs-on: windows-latest
+    timeout-minutes: 300
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { label: "1080p30", rows: "1920 1080 30 300 screen;1920 1080 30 300 synthetic", long: "1920 1080 30 1800 screen;1920 1080 30 3600 synthetic;1920 1080 30 7200 screen" }
+          - { label: "1080p60", rows: "1920 1080 60 300 screen;1920 1080 60 300 synthetic", long: "1920 1080 60 1800 screen;1920 1080 60 3600 screen" }
+          - { label: "1440p",   rows: "2560 1440 30 300 screen;2560 1440 30 300 synthetic;2560 1440 60 300 screen;2560 1440 60 300 synthetic", long: "2560 1440 30 1800 synthetic" }
+          - { label: "4K",      rows: "3840 2160 30 300 screen;3840 2160 30 300 synthetic;3840 2160 60 300 screen;3840 2160 60 300 synthetic", long: "3840 2160 30 1800 synthetic" }
+    steps:
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: bench-build
+          path: portable
+      - name: Run ${{ matrix.label }}
+        shell: pwsh
+        working-directory: portable
+        run: |
+          $out = Join-Path $env:RUNNER_TEMP "video-bench"
+          $rows = "${{ matrix.rows }}".Split(';')
+          if ("${{ github.event_name }}" -ne "workflow_dispatch" -or "${{ inputs.long }}" -eq "true") { $rows += "${{ matrix.long }}".Split(';') }
+          foreach ($row in $rows) {
+            $a = $row.Trim().Split(' ')
+            Write-Output "=== $row"
+            $p = Start-Process -FilePath .\SnapForge.exe -ArgumentList (@('--video-benchmark', "`"$out`"") + $a) -Wait -PassThru
+            Write-Output "exit $($p.ExitCode)"
+          }
+          Get-ChildItem $out -Filter *.json | ForEach-Object { Write-Output "BENCH-ROW $($_.Name)"; Get-Content $_.FullName }
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        if: always()
+        with:
+          name: video-bench-${{ matrix.label }}
+          path: ${{ runner.temp }}/video-bench/*.json
+          retention-days: 30

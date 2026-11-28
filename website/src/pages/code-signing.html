@@ -1,0 +1,53 @@
+<!--meta {"title": "Code signing policy (draft)", "description": "Draft code signing policy for SnapForge. Not in effect: SnapForge is not code-signed yet.", "noindex": true} -->
+<section class="page-hero">
+  <div class="container">
+    <p class="eyebrow">Draft — not in effect</p>
+    <h1>Code signing policy</h1>
+    <p class="lead">This is a <strong>draft</strong>, prepared for a possible application to a code signing
+    programme. <strong>SnapForge is not code-signed today.</strong> Nothing on this page means that any SnapForge
+    file is signed.</p>
+  </div>
+</section>
+
+<div class="container narrow section prose">
+  <div class="note" role="note"><p><strong>Status: draft, awaiting the owner's decision.</strong> The project has
+  not applied for, or received, a code signing certificate. This page is not linked from the site's navigation. It
+  will be completed and linked only after a signing service has accepted the project, and the attribution below will
+  only be shown once it is true.</p></div>
+
+  <h2 id="what">What would be signed</h2>
+  <ul>
+    <li>Only release files built by the project's GitHub Actions workflow on GitHub-hosted runners, from a tagged
+    commit of the public repository <code>bazeocrisy/SnapForge</code>: <code>SnapForge.exe</code>, and the installer
+    <code>SnapForge-&lt;version&gt;-win-x64-setup.exe</code> (which contains the signed <code>SnapForge.exe</code>).</li>
+    <li>No file built on a personal computer, no third-party program and no file that did not come from that
+    workflow would be signed.</li>
+    <li>Every signing request would be approved manually by an approver (below) after checking that it comes from
+    the expected workflow run and commit.</li>
+  </ul>
+
+  <h2 id="roles">Team roles</h2>
+  <div class="table-wrap">
+    <table>
+      <caption>Code signing roles (to be confirmed by the owner)</caption>
+      <thead><tr><th scope="col">Role</th><th scope="col">Who</th></tr></thead>
+      <tbody>
+        <tr><th scope="row">Committers and reviewers</th><td>Repository owner (bazeocrisy); contributors' changes are reviewed before they are merged</td></tr>
+        <tr><th scope="row">Approvers (approve each signing request)</th><td>Repository owner (bazeocrisy)</td></tr>
+      </tbody>
+    </table>
+  </div>
+  <p>All team members use multi-factor authentication for GitHub and for the signing service.</p>
+
+  <h2 id="privacy">Privacy</h2>
+  <p>The SnapForge app contains no network code: it does not transfer any information to other networked systems,
+  and has no telemetry, accounts, update checks or uploads. See the <a href="privacy.html">privacy page</a>.</p>
+
+  <h2 id="attribution">Attribution</h2>
+  <p>If the project is accepted by the SignPath Foundation programme, this section will state: “Free code signing
+  provided by SignPath.io, certificate by SignPath Foundation.” <strong>That is not the case today.</strong></p>
+
+  <h2 id="warnings">Windows warnings</h2>
+  <p>Code signing identifies the publisher of a file; it does not guarantee that Windows SmartScreen never warns.
+  SmartScreen also relies on reputation that builds up over time.</p>
+</div>

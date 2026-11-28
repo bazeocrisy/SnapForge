@@ -1,0 +1,108 @@
+<!--meta {"title": "Download", "description": "Download status of SnapForge for Windows: no public release yet; release-candidate test builds for invited testers, with system requirements, installation, checksum verification and uninstall instructions."} -->
+<section class="page-hero">
+  <div class="container">
+    <p class="eyebrow">Download</p>
+    <h1>Download SnapForge for Windows</h1>
+    <p class="lead">Free, with no account or subscription. There is no public release yet; {{rc_label}} is
+    in testing.</p>
+  </div>
+</section>
+
+<div class="container narrow section prose">
+  {{release_panel}}
+
+  {{test_build_panel}}
+
+  <h2 id="before">Before you test a build</h2>
+  <ul>
+    <li><strong>Back up anything important first.</strong> Release candidates can still have bugs. If you already
+    use SnapForge, make a Library backup in Settings or copy
+    <code>%LOCALAPPDATA%\SnapForge</code> somewhere safe.</li>
+    <li>Only run a build you obtained from the project's CI run page (or, later, its GitHub Release) <strong>and</strong>
+    whose checksum you have <a href="#verify">verified</a>. If you are unsure, wait for the signed release.</li>
+  </ul>
+
+  <h2 id="requirements">System requirements</h2>
+  <ul>
+    <li><strong>Windows 11, version 24H2 or later, 64-bit (x64)</strong>. This is the only supported platform.</li>
+    <li>Windows 10, Windows on Arm and other operating systems are <strong>not supported</strong> and are not
+    tested.</li>
+    <li>No separate .NET installation is needed: SnapForge includes the runtime it uses.</li>
+    <li>Screen recording uses Windows' Media Foundation; Windows “N” editions need Microsoft's Media Feature Pack.
+    Camera recording needs a camera that Windows recognises.</li>
+  </ul>
+
+  <h2 id="package">What is in the download</h2>
+  <p>SnapForge comes in two forms with the same version and the same application:</p>
+  <ul>
+    <li><strong>Installer</strong> (<code>SnapForge-&lt;version&gt;-win-x64-setup.exe</code>) — installs for all users
+    of the PC.</li>
+    <li><strong>Portable ZIP</strong> (<code>SnapForge-&lt;version&gt;-win-x64-portable.zip</code>) — no installation;
+    contains <code>SHA256SUMS.txt</code> with a checksum for every file in it.</li>
+  </ul>
+  {{package_contents}}
+
+  <h2 id="install">Installing</h2>
+  <h3 id="install-installer">With the installer</h3>
+  <ol>
+    <li><a href="#verify">Check the installer's SHA-256 checksum</a> first.</li>
+    <li>Run <code>SnapForge-&lt;version&gt;-win-x64-setup.exe</code>. SnapForge installs <strong>for all users into
+    <code>Program Files</code></strong>, so Windows asks for <strong>administrator approval (User Account Control)
+    once</strong> for the installation — and once more if you uninstall.</li>
+    <li>SnapForge itself runs <strong>without administrator rights</strong>. Start it from the Start menu.</li>
+  </ol>
+  <h3 id="install-portable">With the portable ZIP</h3>
+  <ol>
+    <li><a href="#verify">Check the ZIP's SHA-256 checksum</a> first.</li>
+    <li>Right-click the ZIP, choose <em>Extract All…</em>, and pick a folder you own, for example
+    <code>Documents\SnapForge</code>. <strong>No administrator rights are needed.</strong></li>
+    <li>Open the folder and run <code>SnapForge.exe</code>. Keep the other files in the folder next to it.</li>
+  </ol>
+  <p>When SnapForge starts with Windows, it opens only its notification-area icon and QuickDock — no window.</p>
+
+  <h2 id="verify">Verifying the download</h2>
+  <p>Before you run anything, compare its SHA-256 checksum with the published one. In PowerShell, in the folder
+  containing the download:</p>
+  <pre><code>{{verify_command}}</code></pre>
+  <ol>
+    <li>The <code>Hash</code> it prints must match exactly (letter case does not matter) the line for that file in
+    the <code>SHA256SUMS.txt</code> that comes with the packages — for a test build, the one in the same CI
+    artifact; for a release, the checksum shown on this page and on the GitHub Release.</li>
+    <li>For the portable ZIP, after extracting, you can also check each file against the
+    <code>SHA256SUMS.txt</code> inside the ZIP: <code>Get-FileHash .\SnapForge.exe -Algorithm SHA256</code>.</li>
+    <li>If any checksum differs, <strong>do not run the file</strong>; delete it and
+    <a href="support.html#security">tell us</a>.</li>
+  </ol>
+  {{sums_sentence}}
+
+  <h2 id="smartscreen">Windows security prompts</h2>
+  <p>Test builds are <strong>not code-signed</strong>. Windows SmartScreen will probably warn that it “prevented an
+  unrecognized app from starting”, and Smart App Control may block an unsigned build altogether. A future signed
+  release may still show a warning at first, because SmartScreen also relies on reputation built up over time.</p>
+  <ul>
+    <li>Keep Microsoft Defender, SmartScreen and Smart App Control turned on. This site will never ask you to turn
+    them off.</li>
+    <li>Only run builds you obtained from the project's CI page and whose checksum you verified. <strong>If you are
+    unsure, wait for the signed release.</strong></li>
+    <li>If Defender reports the file, do not run it — please <a href="support.html#security">report it</a>.</li>
+  </ul>
+
+  <h2 id="uninstall">Uninstalling</h2>
+  <p><strong>Uninstalling keeps your captures.</strong> They live in your own Windows profile,
+  <code>%LOCALAPPDATA%\SnapForge</code> (or the Library folder you chose), not in the program folder.</p>
+  <ol>
+    <li>If you turned on <em>Launch SnapForge when I sign in to Windows</em>, turn it off in SnapForge's Settings
+    (or in Windows Settings → Apps → Startup).</li>
+    <li>Exit SnapForge from its notification-area icon.</li>
+    <li><strong>Installer:</strong> Windows Settings → Apps → Installed apps → SnapForge → Uninstall (asks for
+    administrator approval). <strong>Portable:</strong> delete the folder you extracted it to.</li>
+    <li>To remove your captures and settings as well, delete <code>%LOCALAPPDATA%\SnapForge</code> (paste it
+    into the File Explorer address bar). If you moved the Library to another folder, delete that folder too.
+    <strong>This permanently deletes your captures, recordings and backups stored there.</strong></li>
+  </ol>
+
+  <h2 id="source">Source code</h2>
+  <p>SnapForge is developed in public on
+  <a href="{{source_url}}" rel="noopener noreferrer">GitHub<span class="visually-hidden"> (external site)</span></a>.
+  {{source_note}}Build instructions (with the .NET 10 SDK) are in the project README.</p>
+</div>

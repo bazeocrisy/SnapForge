@@ -1,0 +1,25 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <!-- SnapForge Editor (RC3): the second program. The same application code as SnapForge Capture (SnapForge.dll),
+       started in the Editor role: editing, playback, trimming, Library, drag-out/export. Published self-contained
+       next to SnapForge.exe (see .github/workflows/ci.yml and installer/SnapForge.iss). -->
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net10.0-windows</TargetFramework>
+    <UseWPF>true</UseWPF>
+    <RootNamespace>SnapForge.Editor</RootNamespace>
+    <AssemblyName>SnapForgeEditor</AssemblyName>
+    <ApplicationManifest>..\SnapForge.App\app.manifest</ApplicationManifest>
+    <ApplicationIcon>..\SnapForge.App\Assets\SnapForgeEditor.ico</ApplicationIcon>
+    <Description>SnapForge Editor — edit, annotate, play and organise SnapForge captures</Description>
+    <RuntimeIdentifiers>win-x64</RuntimeIdentifiers>
+    <SelfContained>false</SelfContained>
+    <InvariantGlobalization>false</InvariantGlobalization>
+    <SatelliteResourceLanguages>en</SatelliteResourceLanguages>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SnapForge.App\SnapForge.App.csproj" />
+  </ItemGroup>
+
+</Project>
