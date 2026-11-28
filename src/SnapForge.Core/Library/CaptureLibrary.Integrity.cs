@@ -205,7 +205,7 @@ public sealed partial class CaptureLibrary
     /// <summary>Records the hash of a legacy video (computed on first verification) in its manifest.</summary>
     private void RecordVideoHash(string dir, string sha, long bytes)
     {
-        lock (_writeLock)
+        using (EnterWrite())
         {
             JsonObject m = ReadVideoManifest(dir);
             if (m[VideoHashKey] is not null || (m["videoBytes"]?.GetValue<long>() ?? -1) != bytes)

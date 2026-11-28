@@ -71,7 +71,7 @@ public sealed partial class CaptureLibrary
             throw new ArgumentException("The backup cannot be written inside the library's item folders.", nameof(zipPath));
         }
 
-        lock (_writeLock)
+        using (EnterWrite())
         {
             (List<PlannedItem> items, List<BackupExclusion> excluded) = PlanBackup(cancellationToken);
             long total = items.Sum(i => i.Files.Sum(f => f.Bytes));
@@ -180,7 +180,7 @@ public sealed partial class CaptureLibrary
     public RestoreResult RestoreFromBackup(string zipPath, IProgress<BackupProgress>? progress = null, CancellationToken cancellationToken = default)
     {
         ArgumentException.ThrowIfNullOrWhiteSpace(zipPath);
-        lock (_writeLock)
+        using (EnterWrite())
         {
             // A restore interrupted earlier is finished first, so two journals never coexist.
             if (ResumeInterruptedRestore() is { } resumed)
@@ -216,7 +216,7 @@ public sealed partial class CaptureLibrary
     /// </summary>
     internal RestoreResult? ResumeInterruptedRestore()
     {
-        lock (_writeLock)
+        using (EnterWrite())
         {
             string journalPath = Path.Combine(Root, RestoreJournalFile);
             RestoreResult? result = null;

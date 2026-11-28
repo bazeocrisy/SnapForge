@@ -102,7 +102,7 @@ public sealed partial class CaptureLibrary
             throw new ArgumentException("The new location cannot be a folder that contains the current library.", nameof(newRoot));
         }
 
-        lock (_writeLock)
+        using (EnterWrite())
         {
             // ── Plan and preflight: nothing is written until every check passed.
             var files = new List<(string Source, string Relative, long Bytes)>();
@@ -242,7 +242,7 @@ public sealed partial class CaptureLibrary
         }
 
         SourceCleanupResult result;
-        lock (_writeLock)
+        using (EnterWrite())
         {
             result = DeleteSourceAfterVerifiedMove(verifiedCopy.JournalPath, cancellationToken);
             lock (_gate)
@@ -278,6 +278,9 @@ public sealed partial class CaptureLibrary
             throw new InvalidDataException("The relocation journal is not at the location it describes.");
         }
 
+        // The whole clean-up holds the source library's write gate, so no SnapForge program sharing the old location
+        // writes there meanwhile (a file it changed before is reported as changed and left in place).
+        using LibraryWriteGate.Scope sourceGate = new LibraryWriteGate(sourceRoot).Enter();
         var deleted = new List<string>();
         var changed = new List<string>();
         var missing = new List<string>();
