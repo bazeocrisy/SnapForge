@@ -1917,4 +1917,30 @@ public partial class MainWindow : Window
     };
 
     internal static string FormatDate(DateTime utc) => utc.ToLocalTime().ToString("g", CultureInfo.CurrentCulture);
+
+    /// <summary>
+    /// QA-RC5-06: the arrow keys move through every tool in order, wrapping at the ends, also when the toolbar wraps onto
+    /// a second row at high display scaling (WPF's spatial arrow navigation stops at the end of a row). The tool that
+    /// gets focus is selected, as in any Windows option group.
+    /// </summary>
+    private void OnToolPanelArrowKey(object sender, KeyEventArgs e)
+    {
+        int step = e.Key switch { Key.Right or Key.Down => 1, Key.Left or Key.Up => -1, _ => 0 };
+        if (step == 0 || Keyboard.Modifiers != ModifierKeys.None)
+        {
+            return;
+        }
+
+        var tools = ToolButtonsPanel.Children.OfType<RadioButton>().Where(r => r.IsVisible && r.IsEnabled).ToList();
+        int at = tools.FindIndex(r => r.IsKeyboardFocusWithin);
+        if (at < 0 || tools.Count == 0)
+        {
+            return;
+        }
+
+        RadioButton next = tools[(at + step + tools.Count) % tools.Count];
+        next.Focus();
+        next.IsChecked = true;
+        e.Handled = true;
+    }
 }

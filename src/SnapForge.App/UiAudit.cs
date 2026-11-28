@@ -542,12 +542,12 @@ internal static class UiAudit
         var arrowed = new HashSet<DependencyObject>();
         foreach (RadioButton start in seen.OfType<RadioButton>().ToList())
         {
-            foreach (FocusNavigationDirection dir in new[] { FocusNavigationDirection.Down, FocusNavigationDirection.Right, FocusNavigationDirection.Up, FocusNavigationDirection.Left })
+            foreach (Key key in new[] { Key.Down, Key.Right, Key.Up, Key.Left })
             {
                 Keyboard.Focus(start);
                 for (int i = 0; i < 40; i++)
                 {
-                    if (Keyboard.FocusedElement is not UIElement u || !u.MoveFocus(new TraversalRequest(dir)) || Keyboard.FocusedElement is not RadioButton r || !arrowed.Add(r))
+                    if (Keyboard.FocusedElement is not UIElement u || !PressArrow(u, key) || Keyboard.FocusedElement is not RadioButton r || !arrowed.Add(r))
                     {
                         break;
                     }
@@ -561,6 +561,36 @@ internal static class UiAudit
             string label = AutomationProperties.GetName(c) is { Length: > 0 } n ? n : c is ContentControl { Content: string s } ? s : c.GetType().Name;
             Findings.Add(new Finding("WARN", state, $"{c.GetType().Name} \"{Short(label)}\"", $"not reachable with the Tab or arrow keys (Tab visited {seen.Count} element(s), last: {Describe(seen.LastOrDefault())})"));
         }
+    }
+
+    /// <summary>
+    /// Presses an arrow key on the focused element the way WPF routes a real key press: PreviewKeyDown and KeyDown go to
+    /// the element and its ancestors first (app handlers such as the editor toolbar's), and only an unhandled key moves
+    /// focus with WPF's directional navigation. Returns whether focus moved.
+    /// </summary>
+    private static bool PressArrow(UIElement focused, Key key)
+    {
+        if (PresentationSource.FromVisual(focused) is not { } source)
+        {
+            return false;
+        }
+
+        IInputElement before = Keyboard.FocusedElement;
+        var preview = new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, key) { RoutedEvent = Keyboard.PreviewKeyDownEvent };
+        focused.RaiseEvent(preview);
+        if (!preview.Handled)
+        {
+            var down = new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, key) { RoutedEvent = Keyboard.KeyDownEvent };
+            focused.RaiseEvent(down);
+            if (!down.Handled)
+            {
+                FocusNavigationDirection dir = key switch { Key.Down => FocusNavigationDirection.Down, Key.Up => FocusNavigationDirection.Up, Key.Left => FocusNavigationDirection.Left, _ => FocusNavigationDirection.Right };
+                focused.MoveFocus(new TraversalRequest(dir));
+            }
+        }
+
+        ScreenshotTour.Pump(10);
+        return !ReferenceEquals(before, Keyboard.FocusedElement);
     }
 
     private static bool HasToolTip(FrameworkElement e, FrameworkElement root)

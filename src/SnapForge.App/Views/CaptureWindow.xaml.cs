@@ -259,6 +259,7 @@ public partial class CaptureWindow : Window
         Update(_ => new CaptureOptions());
         UndoResetMenu.IsEnabled = true;
         ResetNotice.Visibility = Visibility.Visible;
+        UndoResetLink.Focusable = true;
         _resetNoticeTimer.Stop();
         _resetNoticeTimer.Start();
     }
@@ -278,6 +279,7 @@ public partial class CaptureWindow : Window
         _resetNoticeTimer.Stop();
         _beforeReset = null;
         UndoResetMenu.IsEnabled = false;
+        UndoResetLink.Focusable = false;
         ResetNotice.Visibility = Visibility.Collapsed;
     }
 

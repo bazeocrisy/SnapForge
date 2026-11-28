@@ -94,7 +94,8 @@
                 </Button>
                 <TextBlock x:Name="ResetNotice" VerticalAlignment="Center" Margin="8,0,0,0" FontSize="12" Foreground="{DynamicResource MutedTextBrush}" Visibility="Collapsed">
                     <Run Text="Options reset." />
-                    <Hyperlink Click="OnUndoReset" Foreground="{DynamicResource AccentBrush}">Undo</Hyperlink>
+                    <!-- Focusable only while the notice is shown: a hidden link must not take keyboard focus (QA-RC5-05). -->
+                    <Hyperlink x:Name="UndoResetLink" Click="OnUndoReset" Focusable="False" Foreground="{DynamicResource AccentBrush}">Undo</Hyperlink>
                 </TextBlock>
             </StackPanel>
             <StackPanel Orientation="Horizontal" HorizontalAlignment="Right">

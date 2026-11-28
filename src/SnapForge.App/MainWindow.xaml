@@ -284,7 +284,7 @@
                             <ColumnDefinition Width="Auto" />
                             <ColumnDefinition Width="Auto" />
                         </Grid.ColumnDefinitions>
-                        <WrapPanel x:Name="ToolButtonsPanel" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle">
+                        <WrapPanel x:Name="ToolButtonsPanel" Grid.Column="0" Orientation="Horizontal" VerticalAlignment="Center" KeyboardNavigation.TabNavigation="Once" KeyboardNavigation.DirectionalNavigation="Cycle" PreviewKeyDown="OnToolPanelArrowKey">
                             <RadioButton x:Name="SelectTool" GroupName="Tool" Style="{StaticResource HToolButton}" Tag="Select" Checked="OnToolChecked" ToolTip="Select and move (V)" AutomationProperties.Name="Select tool">
                                 <StackPanel><Path Style="{StaticResource IconPath}" Data="{StaticResource IconSelect}" /><TextBlock Text="Select" FontSize="12" HorizontalAlignment="Center" /></StackPanel>
                             </RadioButton>
