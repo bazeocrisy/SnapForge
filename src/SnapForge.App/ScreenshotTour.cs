@@ -200,7 +200,10 @@ internal static class ScreenshotTour
                     toolbar.Show();
                     toolbar.PlaceNear(recorded, work);
                     toolbar.Update(TimeSpan.FromSeconds(83), false, 0.2f, 0.45f);
-                    Pump(400);
+                    toolbar.UpdateLayout();
+                    toolbar.InvalidateVisual();
+                    Pump(1500); // run 155: the strip was photographed before it was painted (DEF-RC2-07 symptom)
+                    log.Add($"recording toolbar: {toolbar.ActualWidth:0}x{toolbar.ActualHeight:0} DIP, loaded {toolbar.IsLoaded}, visible {toolbar.IsVisible}");
                     SaveScreen(toolbar, 12, Path.Combine(outputFolder, $"recording-toolbar-{suffix}.png"), log);
                     if (Bounds(toolbar) is { } tb)
                     {
