@@ -974,7 +974,7 @@ jobs:
             if ((Get-FileHash "$machine\SnapForge.exe").Hash -ne $hash) { throw "files were replaced while another session used them" }
             Write-Output "PASS SnapForge in another Windows session (session $($other.SessionId)): setup refused (exit $($p.ExitCode)), named the session, replaced nothing"
           }
-          schtasks /Delete /TN $task /F 2>$null | Out-Null
+          if (schtasks /Query /TN $task 2>$null) { schtasks /Delete /TN $task /F | Out-Null }
 
           # 4. Interrupted setup: kill it while it replaces files, then run it again (the documented recovery path).
           $setup = Start-Process -FilePath $new -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=interrupted.log' -PassThru
@@ -988,6 +988,7 @@ jobs:
             if ($p.ExitCode -ne 0) { Get-Content $out; throw "$exe does not work after recovering from an interrupted setup" }
           }
           Write-Output "PASS after an interrupted setup, running setup again repaired the installation (both programs pass their self-test)"
+          exit 0  # every check above throws on failure; a cleanup command's exit code (run 175: schtasks) must not decide the step
 
       - name: Repair, second Windows user, uninstall with SnapForge open keeps data
         shell: pwsh
