@@ -230,11 +230,13 @@ internal static partial class VideoSelfTest
         try
         {
             double excluded = ToolbarAbsence(dir, exclude: true);
-            string? coveredExcluded = LastToolbarCovered;
+            (string? coveredExcluded, double paintedExcluded) = (LastToolbarCovered, LastToolbarPaintedMs);
             double control = ToolbarAbsence(dir, exclude: false);
-            string? coveredControl = LastToolbarCovered;
+            (string? coveredControl, double paintedControl) = (LastToolbarCovered, LastToolbarPaintedMs);
             report["toolbarExclusion"] = new { greenWhereToolbarIsWithExclusion = excluded, greenWhereToolbarIsWithoutExclusion = control, coveredExcluded, coveredControl };
-            string precondition = coveredExcluded is null && coveredControl is null ? string.Empty : $" — PRECONDITION NOT MET: test area covered by {coveredExcluded ?? coveredControl}";
+            string precondition = coveredExcluded is not null || coveredControl is not null ? $" — PRECONDITION NOT MET: test area covered by {coveredExcluded ?? coveredControl}"
+                : paintedExcluded < 0 || paintedControl < 0 ? " — PRECONDITION NOT MET: the test window was not painted within 5 s" : string.Empty;
+            precondition += $" (test window painted after {paintedExcluded:0} / {paintedControl:0} ms)";
             Check("toolbar-not-recorded", excluded >= 0.98 && control < 0.6, $"toolbar area is {excluded:P1} background in the recording (control without exclusion: {control:P1}){precondition}");
         }
 #pragma warning disable CA1031
@@ -283,6 +285,37 @@ internal static partial class VideoSelfTest
     /// Windows.Graphics.Capture, decodes a frame and returns the fraction of the toolbar's rectangle that shows the
     /// green background (1.0 = toolbar absent from the recording).
     /// </summary>
+    /// <summary>Milliseconds until the test window of the last <see cref="ToolbarAbsence"/> run was painted (−1 = not within 5 s).</summary>
+    private static double LastToolbarPaintedMs { get; set; }
+
+    /// <summary>Waits up to 5 s until the top-left corner of <paramref name="area"/> shows the lime test colour on the screen (direct GDI capture).</summary>
+    private static double WaitForLimeCorner(PixelRect area)
+    {
+        var sw = Stopwatch.StartNew();
+        var corner = new PixelRect(area.X + 4, area.Y + 4, 28, 28);
+        while (sw.ElapsedMilliseconds < 5000)
+        {
+            Core.Imaging.PixelBuffer shot = SnapForge.App.Capture.ScreenCaptureService.CaptureRegion(corner);
+            int lime = 0;
+            for (int i = 0; i < shot.Pixels.Length; i += 4)
+            {
+                if (shot.Pixels[i + 1] > 200 && shot.Pixels[i + 2] < 60 && shot.Pixels[i] < 60)
+                {
+                    lime++;
+                }
+            }
+
+            if (lime >= shot.Width * shot.Height * 9 / 10)
+            {
+                return sw.ElapsedMilliseconds;
+            }
+
+            Thread.Sleep(100);
+        }
+
+        return -1;
+    }
+
     /// <summary>Precondition result of the last <see cref="ToolbarAbsence"/> run (null = only our windows on the area).</summary>
     private static string? LastToolbarCovered { get; set; }
 
@@ -348,6 +381,10 @@ internal static partial class VideoSelfTest
         ready.Wait(TimeSpan.FromSeconds(10));
         Thread.Sleep(700);
         LastToolbarCovered = ForeignWindowsOver(area, ours);
+        // DEF-RC2-07: on some CI runners a freshly shown test window is not painted for a while (run 138: the screen
+        // showed 0 % of the test colour; run 141 here: 0 % even in the control run). Wait up to 5 s for the test
+        // window to be painted (a corner outside the outline and the toolbar), and record how long it took.
+        LastToolbarPaintedMs = WaitForLimeCorner(area);
         string path = Path.Combine(dir, exclude ? "toolbar-excluded.mp4" : "toolbar-control.mp4");
         try
         {
