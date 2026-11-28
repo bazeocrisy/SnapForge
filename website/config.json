@@ -11,11 +11,17 @@
       "verified": false
     }
   },
-  "_testBuild": "Release-candidate test packages for invited testers: only a LINK to the GitHub Actions run page, never a file on this site. runUrl: https://github.com/bazeocrisy/SnapForge/actions/runs/<run id>; commit: the full 40-character commit SHA the run built. Leave null until the maintainer has checked that run; the page then says the link will be added.",
+  "_testBuild": "Release-candidate test packages for invited testers: only LINKS to GitHub Actions, never a file on this site. runUrl: https://github.com/bazeocrisy/SnapForge/actions/runs/<run id>; commit: the full 40-character commit SHA the run built. RC4: artifactUrl (the 'Download Windows test build' button) is the run's own package https://github.com/bazeocrisy/SnapForge/actions/runs/<run id>/artifacts/<artifact id>, with build (the CI run number), fileName, sha256 (the installer's, from the run's SHA256SUMS.txt), signed (always false) and expires (the artifact's expiry date). Each verified candidate REPLACES the previous values (website/HANDOFF.md, 'Test build link'). Leave null until that run passed every Windows job.",
   "testBuild": {
-    "version": "1.0.0-rc.2",
+    "version": "1.0.0-rc.4",
+    "build": null,
     "runUrl": null,
-    "commit": null
+    "artifactUrl": null,
+    "commit": null,
+    "fileName": null,
+    "sha256": null,
+    "signed": false,
+    "expires": null
   },
   "_release": "A future public release: one GitHub Release (tag) with one or two assets of the SAME version, each verified separately by tools/verify-release.py. publisher.subject is the signing certificate's full Subject string, publisher.thumbprints the allowed SHA-1 thumbprints (40 upper-case hex); both are required for any signed asset.",
   "release": {

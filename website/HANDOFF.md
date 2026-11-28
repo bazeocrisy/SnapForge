@@ -13,6 +13,29 @@ No software branch is merged; the website sources stay on `claude/website`.
 Branch `claude/website` → `main`, **draft PR #2**. Not merged, not deployed, no release published, no software
 branch modified. Commit and CI evidence: see [Test evidence](#test-evidence).
 
+## Test build link ("Download Windows test build") — replace it for every verified candidate
+
+The home page and `download.html#test-builds` show a **Download Windows test build** button that links to the GitHub
+Actions package of the exact candidate that passed Windows CI. Nothing is hosted on the site. The public
+**Download for Windows** button stays separate and disabled until a release is approved (`release.ownerApproved`).
+
+For each new verified candidate, **replace** every field of `testBuild` in `website/config.json` (never add a second
+link), rebuild and publish:
+
+1. In the candidate's CI run, every job must be green (Windows build/tests, portable self-tests, installer job).
+2. `version` — e.g. `1.0.0-rc.4`; `build` — the CI run number (Windows file version `1.0.0.<build>`, shown in About).
+3. `runUrl` — `https://github.com/bazeocrisy/SnapForge/actions/runs/<run id>`; `commit` — the full 40-character SHA.
+4. `artifactUrl` — `https://github.com/bazeocrisy/SnapForge/actions/runs/<run id>/artifacts/<artifact id>` of the
+   `SnapForge-<version>-packages-<commit>` artifact (the build refuses any other URL or a different run).
+5. `fileName` — `SnapForge-<version>-win-x64-setup.exe`; `sha256` — that file's line in the run's `SHA256SUMS.txt`
+   (also printed in the job summary); `signed` — `false`; `expires` — the artifact's expiry date (30 days after the run).
+6. `python3 website/build.py && python3 website/build.py --check`, commit, then `bash website/tools/publish-gh-pages.sh`.
+7. Verify the live page: https://bazeocrisy.github.io/SnapForge/download.html#test-builds shows the new version, build
+   and SHA-256, and the button opens that run's package.
+
+GitHub sign-in is needed to download an Actions artifact (any free account; the repository is public). The link stops
+working when the artifact expires: publish the next verified candidate before then, or set `testBuild` back to nulls.
+
 ## Owner decisions applied
 
 | Decision | Where |

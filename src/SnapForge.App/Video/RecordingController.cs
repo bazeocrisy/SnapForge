@@ -361,6 +361,46 @@ internal static partial class RecordingController
     }
 
     /// <summary>
+    /// CI only (<c>--test-record</c> with an isolated test profile): records the primary display, screen only, no
+    /// camera or microphone, without the selection overlay or countdown. Used to test that Setup never stops an
+    /// active recording without the user's consent.
+    /// </summary>
+    internal static async Task StartForTestAsync()
+    {
+        if (Life.IsActive || AppServices.Current is not { } services || !MediaFoundationAvailable() || !GraphicsCapture.IsSupported() || !Life.TryBeginStart())
+        {
+            return;
+        }
+
+        RaiseChanged();
+        try
+        {
+            await Task.Delay(100).ConfigureAwait(true);
+            VideoSettings v = services.Settings.Video with { StudioMode = StudioMode.Screen, RecordMicrophone = false, RecordSystemAudio = false, Countdown = false };
+            CaptureSnapshot snapshot = ScreenCaptureService.TakeSnapshot(includeCursor: false);
+            MonitorInfo primary = snapshot.Layout.Monitors.FirstOrDefault(m => m.IsPrimary) ?? snapshot.Layout.Monitors[0];
+            Begin(services, v, snapshot, CaptureMode.SingleScreen, primary.Bounds, camera: null, cameraNotice: null);
+            Array.Clear(snapshot.Image.Pixels);
+            if (!Life.TryCompleteStart())
+            {
+                Life.AbortStart();
+            }
+        }
+        catch (Exception ex) when (ex is NativeCallException or IOException or UnauthorizedAccessException or InvalidOperationException)
+        {
+            RecordingLog.Write("test recording could not start: " + ex.Message);
+            if (Life.Phase == RecordingPhase.Starting)
+            {
+                Life.AbortStart();
+            }
+        }
+        finally
+        {
+            RaiseChanged();
+        }
+    }
+
+    /// <summary>
     /// Opens the camera for Screen + camera / Camera only. On a problem the user is told what happened and how to fix
     /// it (privacy settings, another app using the camera) — nothing is retried silently. Screen + camera can continue
     /// without the camera if the user agrees. Returns (camera or null, notice for the toolbar, continue?).

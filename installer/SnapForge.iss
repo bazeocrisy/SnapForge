@@ -1,4 +1,4 @@
-; SnapForge installer (Inno Setup 6). Built by CI from the published folder holding both programs:
+﻿; SnapForge installer (Inno Setup 6). Built by CI from the published folder holding both programs:
 ;   iscc /DAppVersion=1.0.0-rc.3 /DFileVersion=1.0.0.123 /DSourceDir=..\artifacts\portable\SnapForge /DOutputDir=..\artifacts\installer installer\SnapForge.iss
 ;
 ; Design decisions (FA-002 / SF-002; see docs/INSTALLATION.md):
@@ -15,8 +15,13 @@
 ; * Older per-user installations (1.0.0-rc.1 and earlier, %LOCALAPPDATA%\Programs\SnapForge) are not searched for or
 ;   removed here (setup runs as an administrator and must not touch other profiles). SnapForge itself detects the
 ;   older copy of the signed-in user on first start and offers to remove it (data kept) — see LegacyInstallMigration.
-; * A running SnapForge in this session (Local\ mutex) or any other session (Global\ mutex) must be exited first. Setup
-;   never kills it: it could be recording.
+; * RC4: a running SnapForge is closed GRACEFULLY by Setup (install, repair, upgrade) and by the uninstaller — never
+;   killed. Only SnapForge processes started from THIS installation folder count (a portable copy or an rc.1 per-user
+;   copy elsewhere is left alone). Setup asks them to close (rc.4+: Local\SnapForge-SetupExit-7c1d for every program and
+;   data profile; rc.1–rc.3: their "-exit" request), waits, and continues once they have exited and the program files
+;   can be replaced. A recording or unsaved work makes SnapForge ask the user first; if the user keeps it open, Setup
+;   offers Retry / Cancel. SnapForge running in ANOTHER Windows session cannot be asked from here: Setup names the
+;   session and stops. See docs/INSTALLATION.md.
 ; * Upgrades install over the previous version (same AppId); repair = run the same setup again.
 ; * RC3: two programs — SnapForge Capture (SnapForge.exe: QuickDock, notification-area icon, hotkeys, capture,
 ;   recording; the only one that can start with Windows) and SnapForge Editor (SnapForgeEditor.exe: editing, playback,
@@ -64,7 +69,6 @@ PrivilegesRequiredOverridesAllowed=
 ArchitecturesAllowed=x64compatible
 ArchitecturesInstallIn64BitMode=x64compatible
 MinVersion=10.0.26100
-AppMutex=Local\SnapForge-SingleInstance-7c1d,Local\SnapForge-Editor-SingleInstance-7c1d,Global\SnapForge-Running-7c1d
 CloseApplications=no
 RestartApplications=no
 LicenseFile={#SourceDir}\LICENSE.txt
@@ -81,9 +85,6 @@ SetupLogging=yes
 [Languages]
 Name: "english"; MessagesFile: "compiler:Default.isl"
 
-[Messages]
-SetupAppRunningError=SnapForge is running — in your session or in another user's session on this PC.%n%nIf it is recording, stop the recording first so it is saved. Then close SnapForge Editor and exit SnapForge Capture (right-click the SnapForge icon in the notification area next to the clock → Exit). Older versions are called just "SnapForge" and exit the same way. Every user on this PC must do this. Setup never closes SnapForge by force.%n%nClick OK to check again, or Cancel to exit Setup.
-UninstallAppRunningError=SnapForge is running — in your session or in another user's session on this PC. Stop any recording, close SnapForge Editor and exit SnapForge Capture (notification-area icon → Exit) first.%n%nClick OK to check again, or Cancel to exit.
 
 [Tasks]
 Name: "desktopicon"; Description: "Create &desktop shortcuts for all users"; GroupDescription: "Shortcuts:"; Flags: unchecked
@@ -107,6 +108,224 @@ Name: "{autodesktop}\SnapForge Editor"; Filename: "{app}\SnapForgeEditor.exe"; T
 Filename: "{app}\SnapForge.exe"; Description: "Start SnapForge Capture now"; Flags: nowait postinstall skipifsilent runasoriginaluser unchecked
 
 [Code]
+// ---------------------------------------------------------------- RC4: close SnapForge gracefully
+
+const
+  EVENT_MODIFY_STATE = $0002;
+
+function OpenEventW(dwDesiredAccess: DWORD; bInheritHandle: BOOL; lpName: String): THandle; external 'OpenEventW@kernel32.dll stdcall';
+function SetEvent(hEvent: THandle): BOOL; external 'SetEvent@kernel32.dll stdcall';
+function ResetEvent(hEvent: THandle): BOOL; external 'ResetEvent@kernel32.dll stdcall';
+function CloseHandle(hObject: THandle): BOOL; external 'CloseHandle@kernel32.dll stdcall';
+function GetCurrentProcessId(): DWORD; external 'GetCurrentProcessId@kernel32.dll stdcall';
+function ProcessIdToSessionId(dwProcessId: DWORD; var pSessionId: DWORD): BOOL; external 'ProcessIdToSessionId@kernel32.dll stdcall';
+
+var
+  ClosingPage: TOutputMarqueeProgressPage;
+
+function MySession(): Integer;
+var
+  Sid: DWORD;
+begin
+  Sid := 0;
+  if ProcessIdToSessionId(GetCurrentProcessId(), Sid) then Result := Sid else Result := -1;
+end;
+
+// SnapForge processes started from Dir. Here = in Setup's own Windows session, Away = in other sessions.
+procedure ListSnapForge(Dir: String; var Here, Away: Integer; var Lines: String);
+var
+  Locator, Service, Items, Item: Variant;
+  I, Sid, Pid, Me: Integer;
+  Path, Name: String;
+begin
+  Here := 0; Away := 0; Lines := '';
+  Me := MySession();
+  try
+    Locator := CreateOleObject('WbemScripting.SWbemLocator');
+    Service := Locator.ConnectServer('.', 'root\CIMV2');
+    Items := Service.ExecQuery('SELECT ProcessId, Name, ExecutablePath, SessionId FROM Win32_Process WHERE Name=''SnapForge.exe'' OR Name=''SnapForgeEditor.exe''');
+    for I := 0 to Items.Count - 1 do
+    begin
+      Item := Items.ItemIndex(I);
+      Name := Item.Name;
+      Pid := Item.ProcessId;
+      Sid := Item.SessionId;
+      try
+        Path := Item.ExecutablePath;
+      except
+        Path := '';
+      end;
+      // Only this installation: a portable copy or an rc.1 per-user copy elsewhere does not hold these files.
+      if (Path <> '') and (CompareText(RemoveBackslashUnlessRoot(ExtractFileDir(Path)), RemoveBackslashUnlessRoot(Dir)) <> 0) then
+        Continue;
+      if Name = 'SnapForgeEditor.exe' then Name := 'SnapForge Editor' else Name := 'SnapForge Capture (or an older SnapForge)';
+      if Sid = Me then
+        Here := Here + 1
+      else
+        Away := Away + 1;
+      Lines := Lines + '  - ' + Name + ' (process ' + IntToStr(Pid) + ', Windows session ' + IntToStr(Sid) + ')' + #13#10;
+    end;
+  except
+    Log('SnapForge close: could not list processes: ' + GetExceptionMessage);
+  end;
+end;
+
+// Sets a named event in this session. Returns the handle (to reset later) or 0.
+function SignalEvent(Name: String): THandle;
+begin
+  Result := OpenEventW(EVENT_MODIFY_STATE, False, Name);
+  if Result <> 0 then
+  begin
+    SetEvent(Result);
+    Log('SnapForge close: requested via ' + Name);
+  end;
+end;
+
+// Older builds and other administrator accounts: ask as the signed-in user (their events are always reachable).
+procedure SignalAsOriginalUser();
+var
+  Code: Integer;
+begin
+  if IsUninstaller() then Exit;
+  ExecAsOriginalUser(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -NonInteractive -WindowStyle Hidden -Command "foreach ($n in ''Local\SnapForge-SingleInstance-7c1d-exit'',''Local\SnapForge-Editor-SingleInstance-7c1d-exit'') { try { [void][Threading.EventWaitHandle]::OpenExisting($n).Set() } catch {} }"',
+    '', SW_HIDE, ewWaitUntilTerminated, Code);
+  Log('SnapForge close: requested as the signed-in user (exit ' + IntToStr(Code) + ')');
+end;
+
+// True if no other program has the file open (Windows refuses an exclusive open of a running .exe).
+function CanReplace(FileName: String; var Reason: String): Boolean;
+var
+  F: TFileStream;
+begin
+  Result := True;
+  if not FileExists(FileName) then Exit;
+  try
+    F := TFileStream.Create(FileName, fmOpenReadWrite or fmShareExclusive);
+    F.Free;
+  except
+    Result := False;
+    Reason := 'The file ' + FileName + ' is still in use by another program, so Setup cannot replace it.' + #13#10 +
+      'Close SnapForge everywhere (also in other signed-in Windows accounts) and try again. If nothing is open, ' +
+      'an antivirus scan may be holding the file: wait a minute and click Retry.';
+  end;
+end;
+
+procedure Animate(Ms: Integer);
+var
+  T: Integer;
+begin
+  T := 0;
+  while T < Ms do
+  begin
+    if (ClosingPage <> nil) and not IsUninstaller() then ClosingPage.Animate();
+    Sleep(100);
+    T := T + 100;
+  end;
+end;
+
+// Closes every SnapForge of the installation in Dir gracefully. False (with Reason) if it cannot be done safely.
+function CloseSnapForge(Dir: String; Interactive: Boolean; var Reason: String): Boolean;
+var
+  Here, Away, Waited, Limit: Integer;
+  Lines: String;
+  Broadcast: THandle;
+  Retry: Boolean;
+begin
+  Result := False;
+  Reason := '';
+  Limit := StrToIntDef(ExpandConstant('{param:SNAPFORGEWAIT|60}'), 60) * 1000;
+  if Interactive then Limit := 90000;
+  ListSnapForge(Dir, Here, Away, Lines);
+  if Here + Away > 0 then
+    Log('SnapForge close: running from ' + Dir + ':' + #13#10 + Lines);
+  repeat
+    Retry := False;
+    if Here > 0 then
+    begin
+      if (ClosingPage <> nil) and not IsUninstaller() then
+      begin
+        ClosingPage.SetText('Closing SnapForge…', 'Setup has asked SnapForge Capture and SnapForge Editor to close. If SnapForge asks about a recording or unsaved work, answer it there (it may be behind this window).');
+        ClosingPage.Show();
+      end;
+      Broadcast := SignalEvent('Local\SnapForge-SetupExit-7c1d');      // rc.4 and later, every data profile
+      Animate(2000);
+      ListSnapForge(Dir, Here, Away, Lines);
+      if Here > 0 then
+      begin
+        if (SignalEvent('Local\SnapForge-SingleInstance-7c1d-exit') = 0) and (SignalEvent('Local\SnapForge-Editor-SingleInstance-7c1d-exit') = 0) then
+          SignalAsOriginalUser();                                       // rc.1–rc.3, or a different administrator account
+      end;
+      Waited := 0;
+      while (Here > 0) and (Waited < Limit) do
+      begin
+        Animate(500);
+        Waited := Waited + 500;
+        ListSnapForge(Dir, Here, Away, Lines);
+      end;
+      if Broadcast <> 0 then
+      begin
+        ResetEvent(Broadcast);
+        CloseHandle(Broadcast);
+      end;
+      if (ClosingPage <> nil) and not IsUninstaller() then ClosingPage.Hide();
+      if Here > 0 then
+      begin
+        Reason := 'SnapForge is still open and did not close:' + #13#10 + Lines + #13#10 +
+          'It may be recording, or asking whether to keep unsaved work (look for its message, possibly behind this window ' +
+          'or on the taskbar). Finish or save your work in SnapForge, close it, then click Retry. ' +
+          'Setup never closes SnapForge by force, and your captures, recordings and settings are not touched.';
+        Log('SnapForge close: blocked (still running in this session)');
+        if Interactive then
+          Retry := MsgBox(Reason, mbError, MB_RETRYCANCEL) = IDRETRY;
+        if not Retry then Exit;
+      end
+      else
+        Log('SnapForge close: every SnapForge in this session has exited');
+    end;
+  until not Retry;
+  if Away > 0 then
+  begin
+    Reason := 'SnapForge is running in another Windows session on this PC (another signed-in or disconnected account):' + #13#10 + Lines + #13#10 +
+      'Setup can only ask SnapForge in your own session to close. Ask that user to stop any recording and exit SnapForge ' +
+      '(SnapForge icon next to the clock → Exit), or sign that account out, then run Setup again. Nothing has been changed.';
+    Log('SnapForge close: blocked (running in another session)');
+    Exit;
+  end;
+  if not CanReplace(AddBackslash(Dir) + 'SnapForge.exe', Reason) then begin Log('SnapForge close: blocked (' + Reason + ')'); Exit; end;
+  if not CanReplace(AddBackslash(Dir) + 'SnapForgeEditor.exe', Reason) then begin Log('SnapForge close: blocked (' + Reason + ')'); Exit; end;
+  Result := True;
+end;
+
+procedure InitializeWizard();
+begin
+  ClosingPage := CreateOutputMarqueeProgressPage('Closing SnapForge', 'Setup is closing SnapForge so it can update the program files.');
+end;
+
+function PrepareToInstall(var NeedsRestart: Boolean): String;
+var
+  Reason: String;
+begin
+  Result := '';
+  if not DirExists(ExpandConstant('{app}')) then Exit;
+  if not CloseSnapForge(ExpandConstant('{app}'), not WizardSilent(), Reason) then
+    Result := Reason;
+end;
+
+function InitializeUninstall(): Boolean;
+var
+  Reason: String;
+begin
+  Result := CloseSnapForge(ExpandConstant('{app}'), not UninstallSilent(), Reason);
+  if not Result then
+  begin
+    Log(Reason);
+    if not UninstallSilent() then MsgBox(Reason, mbError, MB_OK);
+  end;
+end;
+
+// ---------------------------------------------------------------- system requirements
+
 function InitializeSetup(): Boolean;
 var
   Version: TWindowsVersion;

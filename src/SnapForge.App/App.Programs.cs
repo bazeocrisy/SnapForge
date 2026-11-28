@@ -400,9 +400,12 @@ public partial class App
     }
 
     /// <summary>About box of the running program (SnapForge Capture or SnapForge Editor): version, build and paths.</summary>
+    /// <summary>RC4: "SnapForge Capture 1.0.0-rc.4 (build 160)" — the first line of About in both programs.</summary>
+    internal static string AboutHeadline => $"{ProgramName} {InstanceInfo.ProductVersion} (build {InstanceInfo.BuildNumber})";
+
     internal static void ShowAbout(Window? owner)
     {
-        string text = $"{ProgramName} — Capture. Create. Share.\n\n{InstanceInfo.Describe()}\n\n" +
+        string text = $"{AboutHeadline}\nCapture. Create. Share.\n\n{InstanceInfo.Describe()}\n\n" +
             $"Program: {Environment.ProcessPath}\nLibrary: {AppServices.Current?.Library.Root}\n\n" +
             "Free and open source under the MIT License — Copyright (c) 2026 bazeocrisy. Third-party notices: THIRD-PARTY-NOTICES.md.\n" +
             "No network access, no telemetry, no account.";

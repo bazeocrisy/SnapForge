@@ -66,6 +66,16 @@ jobs:
           --collect "XPlat Code Coverage"
           --blame-hang-timeout 5m
 
+      - name: Blue-screen diagnostics script runs (read-only; DEF-RC3-07)
+        shell: pwsh
+        run: |
+          $out = powershell -NoProfile -ExecutionPolicy Bypass -File tools/diagnostics/collect-snapforge-diagnostics.ps1
+          $out
+          $file = ($out | Select-String -Pattern '^Written: (.+)$').Matches[0].Groups[1].Value
+          if (-not (Test-Path $file)) { throw "the diagnostics script did not write its report" }
+          foreach ($section in 'Windows', 'Installed SnapForge', 'stop errors', 'application errors', 'graphics adapters') { if (-not (Select-String -Path $file -Pattern $section -SimpleMatch -Quiet)) { throw "section missing: $section" } }
+          Write-Output "PASS diagnostics report written ($((Get-Item $file).Length) bytes)"
+
       - name: Vulnerable package check
         shell: pwsh
         run: |
@@ -644,9 +654,46 @@ jobs:
           retention-days: 7
           if-no-files-found: error
 
+  rc3-baseline:
+    # RC4: the owner's current build — the real system-wide 1.0.0-rc.3 installer (both programs), built from its exact
+    # package commit (3a986b4, CI run 159), for the rc.3 → rc.4 upgrade with both programs running.
+    name: Build the previous release candidate (rc.3) for upgrade testing
+    runs-on: windows-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
+        with:
+          persist-credentials: false
+          ref: 3a986b42fbefd4fc2f9942482e4adc5f48e0be4b
+
+      - uses: actions/setup-dotnet@26b0ec14cb23fa6904739307f278c14f94c95bf1 # v5
+        with:
+          global-json-file: global.json
+
+      - name: Publish rc.3 (both programs) and build its system-wide installer
+        shell: pwsh
+        run: |
+          foreach ($project in 'src/SnapForge.Editor/SnapForge.Editor.csproj', 'src/SnapForge.App/SnapForge.App.csproj') {
+            dotnet publish $project -c Release -r win-x64 --self-contained true -p:PublishSingleFile=true -p:EnableCompressionInSingleFile=true -p:DebugType=none -p:ContinuousIntegrationBuild=true -p:RestoreLockedMode=false -p:SnapForgeBuildNumber=159 -o artifacts/portable/SnapForge
+            if ($LASTEXITCODE -ne 0) { throw "rc.3 publish failed: $project" }
+          }
+          Copy-Item LICENSE artifacts/portable/SnapForge/LICENSE.txt
+          $iscc = @("${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe", "$env:ProgramFiles\Inno Setup 6\ISCC.exe") | Where-Object { Test-Path $_ } | Select-Object -First 1
+          if (-not $iscc) { choco install innosetup --version=6.4.3 -y --no-progress | Out-Null; $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" }
+          & $iscc /Qp "/DAppVersion=1.0.0-rc.3" "/DFileVersion=1.0.0.159" "/DSourceDir=$PWD\artifacts\portable\SnapForge" "/DOutputDir=$PWD\artifacts\rc3" installer\SnapForge.iss
+          if ($LASTEXITCODE -ne 0) { throw "rc.3 installer build failed" }
+          Get-ChildItem artifacts/rc3
+
+      - uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6
+        with:
+          name: rc3-baseline-setup-${{ github.sha }}
+          path: artifacts/rc3
+          retention-days: 7
+          if-no-files-found: error
+
   installer:
-    name: Installer — clean install, rc.2 → rc.3 and rc.1 → rc.3 upgrades, running copies, interrupted setup, repair, two users, uninstall keeps data
-    needs: [windows, rc1-baseline, rc2-baseline]
+    name: Installer — clean install, rc.1/rc.2/rc.3 → rc.4 upgrades with SnapForge open, graceful close, recording, other session, interrupted setup, repair, two users, uninstall keeps data
+    needs: [windows, rc1-baseline, rc2-baseline, rc3-baseline]
     if: ${{ !cancelled() && needs.windows.outputs.packaged == 'true' }}
     runs-on: windows-latest
     timeout-minutes: 40
@@ -654,7 +701,11 @@ jobs:
       - uses: actions/checkout@fbc6f3992d24b796d5a048ff273f7fcc4a7b6c09 # v5
         with:
           persist-credentials: false
-          sparse-checkout: tests/fixtures
+          sparse-checkout: |
+            /tests/fixtures/
+            /installer/tests/
+            /Directory.Build.props
+          sparse-checkout-cone-mode: false
 
       - name: Download the release-candidate package
         uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
@@ -674,6 +725,12 @@ jobs:
           name: rc2-baseline-setup-${{ github.sha }}
           path: rc2
 
+      - name: Download the rc.3 baseline installer
+        uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6
+        with:
+          name: rc3-baseline-setup-${{ github.sha }}
+          path: rc3
+
       - name: Verify package checksums
         shell: pwsh
         working-directory: packages
@@ -689,7 +746,7 @@ jobs:
         run: |
           foreach ($p in "$env:ProgramFiles\dotnet", "${env:ProgramFiles(x86)}\dotnet") { if (Test-Path $p) { Rename-Item $p "$p-hidden-for-test" } }
 
-      - name: Clean install of rc.3 (both programs, two shortcuts, HKLM entry, protected folder), then uninstall
+      - name: Clean install of rc.4 (both programs, two shortcuts, HKLM entry, protected folder, version in About), then uninstall
         shell: pwsh
         env:
           DOTNET_ROOT: C:\does-not-exist
@@ -703,7 +760,7 @@ jobs:
           foreach ($exe in 'SnapForge.exe', 'SnapForgeEditor.exe') {
             if (-not (Test-Path "$machine\$exe")) { throw "$exe not installed" }
             $v = (Get-Item "$machine\$exe").VersionInfo
-            if ($v.ProductVersion -notlike '1.0.0-rc.3*') { throw "$exe has product version $($v.ProductVersion)" }
+            if ($v.ProductVersion -notlike '1.0.0-rc.4*') { throw "$exe has product version $($v.ProductVersion)" }
             Write-Output "PASS $exe installed: $($v.ProductVersion) (file $($v.FileVersion))"
           }
           foreach ($lnk in 'SnapForge Capture.lnk', 'SnapForge Editor.lnk') { if (-not (Test-Path "$programs\$lnk")) { throw "Start menu shortcut $lnk missing" } }
@@ -727,123 +784,192 @@ jobs:
           foreach ($lnk in 'SnapForge Capture.lnk', 'SnapForge Editor.lnk') { if (Test-Path "$programs\$lnk") { throw "uninstall left $lnk" } }
           Write-Output "PASS uninstall after a clean install removed both programs and both shortcuts"
 
-      - name: Real upgrade rc.2 (system-wide) → rc.3 with user data and a start-with-Windows entry
+      - name: Real upgrade rc.2 → rc.4 while rc.2 SnapForge is running (closed gracefully); custom Library location and settings kept
         shell: pwsh
         env:
           DOTNET_ROOT: C:\does-not-exist
         run: |
           $ErrorActionPreference = 'Stop'
+          . "$env:GITHUB_WORKSPACE\installer\tests\installer-test-helpers.ps1"
           $old = (Get-ChildItem rc2\*-setup.exe | Select-Object -First 1).FullName
-          $new = (Get-ChildItem packages\*-setup.exe | Select-Object -First 1).FullName
-          $machine = Join-Path $env:ProgramFiles "SnapForge"
-          $data = Join-Path $env:LOCALAPPDATA "SnapForge"
-          $programs = Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs"
-          $runKey = 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run'
-          function Setup([string]$exe, [string]$a) { $p = Start-Process -FilePath $exe -ArgumentList $a -Wait -PassThru; return $p.ExitCode }
-          function DataHash { Get-ChildItem $data -Recurse -File | Where-Object { $_.FullName -notmatch '\\(logs|Temp|Handoff)\\' } | Sort-Object FullName | ForEach-Object { "$($_.FullName.Substring($data.Length)) $((Get-FileHash $_.FullName).Hash)" } }
-
           if ((Setup $old '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=rc2-install.log') -ne 0) { Get-Content rc2-install.log -Tail 40; throw "rc.2 install failed" }
           if ((Get-Item "$machine\SnapForge.exe").VersionInfo.ProductVersion -notlike '1.0.0-rc.2*') { throw "rc.2 not installed" }
           if (-not (Test-Path "$programs\SnapForge.lnk")) { throw "rc.2 shortcut missing" }
           Write-Output "PASS real rc.2 installed system-wide (single SnapForge shortcut)"
 
-          # Representative data in the rc.2 user's profile: the legacy fixture Library (captures with annotations and
-          # redactions, Trash, tags/folders, a video, a damaged item), a marker, and rc.2's start-with-Windows entry.
-          New-Item -ItemType Directory -Force "$data\Library" | Out-Null
-          Copy-Item tests\fixtures\legacy-v1-library\library\* "$data\Library" -Recurse -Force
-          New-Item -ItemType Directory -Force "$data\Library\keep-me" | Out-Null
-          Set-Content "$data\Library\keep-me\marker.txt" "user data"
-          $p = Start-Process -FilePath "$machine\SnapForge.exe" -ArgumentList '--library-check', "`"$env:RUNNER_TEMP\rc2-library-check.txt`"", '--expect-images', '3', '--expect-videos', '1' -Wait -PassThru
-          Get-Content "$env:RUNNER_TEMP\rc2-library-check.txt"
-          if ($p.ExitCode -ne 0) { throw "rc.2 could not open the seeded Library" }
+          # Representative data of the rc.2 user: the legacy fixture Library (annotations, redactions, Trash, tags, a
+          # video, a damaged item) at a CUSTOM Library location, the fixture's settings (hotkeys, presets) pointing at
+          # it, a marker file, and rc.2's start-with-Windows entry.
+          New-Item -ItemType Directory -Force $lib, $data | Out-Null
+          Copy-Item tests\fixtures\legacy-v1-library\library\* $lib -Recurse -Force
+          New-Item -ItemType Directory -Force "$lib\keep-me" | Out-Null
+          Set-Content "$lib\keep-me\marker.txt" "user data"
+          $s = Get-Content tests\fixtures\legacy-v1-library\settings.json -Raw | ConvertFrom-Json
+          $s.LibraryPath = $lib
+          $s | ConvertTo-Json -Depth 30 | Set-Content "$data\settings.json" -Encoding utf8
+          LibraryCheck 'SnapForge.exe' 'rc2-before'
           if (-not (Test-Path $runKey)) { New-Item -Path $runKey -Force | Out-Null } # absent on a fresh runner profile
           Set-ItemProperty $runKey -Name 'SnapForge' -Value "`"$machine\SnapForge.exe`" --background"
-          $before = DataHash
 
-          if ((Setup $new '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=upgrade-rc2.log') -ne 0) { Get-Content upgrade-rc2.log -Tail 40; throw "upgrade from rc.2 failed" }
-          foreach ($exe in 'SnapForge.exe', 'SnapForgeEditor.exe') {
-            if ((Get-Item "$machine\$exe").VersionInfo.ProductVersion -notlike '1.0.0-rc.3*') { throw "$exe was not upgraded" }
-          }
-          foreach ($lnk in 'SnapForge Capture.lnk', 'SnapForge Editor.lnk') { if (-not (Test-Path "$programs\$lnk")) { throw "Start menu shortcut $lnk missing after upgrade" } }
-          if (Test-Path "$programs\SnapForge.lnk") { throw "the old rc.2 shortcut was not removed" }
-          $entries = @(@("HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall\{6E0C3B1A-58A2-4E39-9F3B-0D6F4C1C7A51}_is1") | Where-Object { Test-Path $_ })
-          if ($entries.Count -ne 1 -or (Get-ItemProperty $entries[0]).DisplayVersion -ne '1.0.0-rc.3') { throw "Installed apps entry not upgraded in place" }
-          $run = Get-ItemProperty $runKey
-          $snap = $run.PSObject.Properties | Where-Object { "$($_.Value)" -like '*SnapForge*' }
+          $app = StartApp "$machine\SnapForge.exe" @('--background')
+          Start-Sleep -Seconds 8
+          if ($app.HasExited) { throw "rc.2 SnapForge did not stay running" }
+          $before = LibHash; $keys = SettingsKeys
+          Write-Output "INFO rc.2 SnapForge running (process $($app.Id)); settings $keys"
+
+          if ((Setup $new '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=upgrade-rc2.log') -ne 0) { Get-Content upgrade-rc2.log -Tail 60; throw "upgrade from rc.2 with rc.2 running failed" }
+          AssertClosedGracefully $app 'rc.2 SnapForge' 'upgrade-rc2.log'
+          AssertInstalledRc4
+          $snap = (Get-ItemProperty $runKey).PSObject.Properties | Where-Object { "$($_.Value)" -like '*SnapForge*' }
           if (@($snap).Count -ne 1 -or $snap.Value -ne "`"$machine\SnapForge.exe`" --background") { $snap | Format-List; throw "start-with-Windows entry changed or duplicated" }
-          if (Compare-Object $before (DataHash)) { throw "UPGRADING FROM rc.2 CHANGED USER DATA" }
-          Write-Output "PASS rc.2 → rc.3: both programs upgraded in place, two shortcuts (old one removed), one Installed apps entry (1.0.0-rc.3), one start-with-Windows entry still starting SnapForge Capture, user data byte-identical"
-          foreach ($exe in 'SnapForge.exe', 'SnapForgeEditor.exe') {
-            $report = Join-Path $env:RUNNER_TEMP "upgraded-$exe-library-check.txt"
-            $p = Start-Process -FilePath "$machine\$exe" -ArgumentList '--library-check', "`"$report`"", '--expect-images', '3', '--expect-videos', '1' -Wait -PassThru
-            Get-Content $report
-            if ($p.ExitCode -ne 0) { throw "$exe could not open the upgraded user's Library" }
-          }
-          if (Compare-Object $before (DataHash)) { throw "OPENING THE LIBRARY AFTER THE UPGRADE CHANGED USER DATA" }
-          Write-Output "PASS after the upgrade both programs open the rc.2 user's Library with all items; data still byte-identical"
+          if (Compare-Object $before (LibHash)) { throw "UPGRADING FROM rc.2 CHANGED THE LIBRARY" }
+          if ((SettingsKeys) -ne $keys) { throw "settings changed: $(SettingsKeys) (was $keys)" }
+          Write-Output "PASS rc.2 → rc.4 with rc.2 running: rc.2 closed gracefully, both programs upgraded in place, two shortcuts (old one removed), one Installed apps entry, one start-with-Windows entry, Library byte-identical at its custom location, settings kept"
+          foreach ($exe in 'SnapForge.exe', 'SnapForgeEditor.exe') { LibraryCheck $exe "rc4-after-rc2-$exe" }
+          if (Compare-Object $before (LibHash)) { throw "OPENING THE LIBRARY AFTER THE UPGRADE CHANGED IT" }
+          Write-Output "PASS after the upgrade both programs open the rc.2 user's Library at $lib with all items; still byte-identical"
 
-      - name: Real upgrade rc.1 (per-user) → rc.3, migrated as the signed-in user
+      - name: Real upgrade rc.1 (per-user) → rc.4, migrated as the signed-in user
         shell: pwsh
         env:
           DOTNET_ROOT: C:\does-not-exist
         run: |
           $ErrorActionPreference = 'Stop'
+          . "$env:GITHUB_WORKSPACE\installer\tests\installer-test-helpers.ps1"
           $old = (Get-ChildItem rc1\*-setup.exe | Select-Object -First 1).FullName
           $perUser = Join-Path $env:LOCALAPPDATA "Programs\SnapForge"
-          $machine = Join-Path $env:ProgramFiles "SnapForge"
-          $data = Join-Path $env:LOCALAPPDATA "SnapForge"
           $userShortcut = Join-Path $env:APPDATA "Microsoft\Windows\Start Menu\Programs\SnapForge.lnk"
-          function DataHash { Get-ChildItem $data -Recurse -File | Where-Object { $_.FullName -notmatch '\\(logs|Temp|Handoff)\\' } | Sort-Object FullName | ForEach-Object { "$($_.FullName.Substring($data.Length)) $((Get-FileHash $_.FullName).Hash)" } }
           $p = Start-Process -FilePath $old -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /CURRENTUSER /LOG=rc1-install.log' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "rc.1 install failed" }
           if (-not (Test-Path "$perUser\SnapForge.exe")) { throw "rc.1 not installed per-user" }
-          if (-not (Test-Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run')) { New-Item -Path 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' | Out-Null }
-          Set-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run' -Name 'SnapForge' -Value "`"$perUser\SnapForge.exe`" --background"
-          $before = DataHash
-          Write-Output "PASS real rc.1 installed per-user next to the system-wide rc.3, with a start-with-Windows entry pointing at it"
+          Set-ItemProperty $runKey -Name 'SnapForge' -Value "`"$perUser\SnapForge.exe`" --background"
+          $before = LibHash; $keys = SettingsKeys
+          Write-Output "PASS real rc.1 installed per-user next to the system-wide rc.4, with a start-with-Windows entry pointing at it"
           $p = Start-Process -FilePath "$machine\SnapForge.exe" -ArgumentList '--migrate-per-user-install', '--yes' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "migration exited $($p.ExitCode)" }
           if (Test-Path "$perUser\SnapForge.exe") { throw "old per-user copy still present" }
           if (Test-Path $userShortcut) { throw "old per-user Start menu shortcut still present" }
           if (Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Uninstall | Where-Object { (Get-ItemProperty $_.PSPath).DisplayName -eq 'SnapForge' }) { throw "old per-user Installed apps entry still present" }
-          $run = (Get-ItemProperty 'HKCU:\Software\Microsoft\Windows\CurrentVersion\Run').SnapForge
-          if ($run -ne "`"$machine\SnapForge.exe`" --background") { throw "start-with-Windows entry not moved to the new SnapForge Capture: $run" }
-          if (Compare-Object $before (DataHash)) { throw "MIGRATION CHANGED USER DATA" }
-          Write-Output "PASS rc.1 per-user copy, shortcut and Installed apps entry removed as the signed-in user; start-with-Windows now starts the installed SnapForge Capture; user data byte-identical"
+          $snap = (Get-ItemProperty $runKey).PSObject.Properties | Where-Object { "$($_.Value)" -like '*SnapForge*' }
+          if (@($snap).Count -ne 1 -or $snap.Value -ne "`"$machine\SnapForge.exe`" --background") { $snap | Format-List; throw "start-with-Windows entry not moved to the installed SnapForge Capture" }
+          if (Compare-Object $before (LibHash)) { throw "MIGRATION CHANGED THE LIBRARY" }
+          if ((SettingsKeys) -ne $keys) { throw "migration changed settings" }
+          Write-Output "PASS rc.1 per-user copy, shortcut and Installed apps entry removed as the signed-in user; exactly one start-with-Windows entry (SnapForge Capture); Library and settings unchanged"
 
-      - name: Running Capture or Editor blocks setup (never killed); interrupted setup recovers by running setup again
+      - name: Real upgrade rc.3 → rc.4 with SnapForge Capture AND SnapForge Editor open (both closed gracefully)
         shell: pwsh
         env:
           DOTNET_ROOT: C:\does-not-exist
         run: |
           $ErrorActionPreference = 'Stop'
-          $new = (Get-ChildItem packages\*-setup.exe | Select-Object -First 1).FullName
-          $machine = Join-Path $env:ProgramFiles "SnapForge"
-          foreach ($exe in 'SnapForge.exe', 'SnapForgeEditor.exe') {
-            $arguments = if ($exe -eq 'SnapForge.exe') { @('--profile', 'ci-running', '--background') } else { @('--profile', 'ci-running') }
-            $app = Start-Process -FilePath "$machine\$exe" -ArgumentList $arguments -PassThru
-            Start-Sleep -Seconds 6
-            if ($app.HasExited) { throw "$exe test copy did not stay running" }
-            $hash = (Get-FileHash "$machine\$exe").Hash
-            $setup = Start-Process -FilePath $new -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=blocked.log' -PassThru
-            if (-not $setup.WaitForExit(90000)) { $setup.Kill(); Write-Output "INFO setup kept waiting for $exe to exit (killed setup after 90 s)" }
-            elseif ($setup.ExitCode -eq 0) { throw "setup replaced files while $exe was running" }
-            else { Write-Output "INFO setup refused while $exe was running (exit $($setup.ExitCode))" }
-            if ($app.HasExited) { throw "SETUP STOPPED THE RUNNING $exe" }
-            if ((Get-FileHash "$machine\$exe").Hash -ne $hash) { throw "files replaced while $exe was running" }
-            $name = if ($exe -eq 'SnapForge.exe') { 'SnapForge-SingleInstance-7c1d' } else { 'SnapForge-Editor-SingleInstance-7c1d' }
-            [System.Threading.EventWaitHandle]::OpenExisting("Local\$name-p-ci-running-exit").Set() | Out-Null
-            if (-not $app.WaitForExit(30000)) { throw "$exe test copy did not exit on request" }
-            Write-Output "PASS a running $exe blocks setup, is not stopped, and exits on request"
-          }
+          . "$env:GITHUB_WORKSPACE\installer\tests\installer-test-helpers.ps1"
+          $old = (Get-ChildItem rc3\*-setup.exe | Select-Object -First 1).FullName
+          # Put the owner's current build back (rc.3 over rc.4), exactly as the owner has it.
+          if ((Setup $old '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=rc3-install.log') -ne 0) { Get-Content rc3-install.log -Tail 40; throw "rc.3 install failed" }
+          foreach ($exe in 'SnapForge.exe', 'SnapForgeEditor.exe') { if ((Get-Item "$machine\$exe").VersionInfo.ProductVersion -notlike '1.0.0-rc.3*') { throw "rc.3 $exe not installed" } }
+          Write-Output "PASS real rc.3 (CI run 159 build) installed"
+          $capture = StartApp "$machine\SnapForge.exe" @('--background')
+          $editor = StartApp "$machine\SnapForgeEditor.exe"
+          Start-Sleep -Seconds 10
+          if ($capture.HasExited -or $editor.HasExited) { throw "rc.3 programs did not stay running" }
+          $before = LibHash; $keys = SettingsKeys
+          Write-Output "INFO rc.3 SnapForge Capture (process $($capture.Id)) and SnapForge Editor (process $($editor.Id)) open and idle"
+          if ((Setup $new '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=upgrade-rc3.log') -ne 0) { Get-Content upgrade-rc3.log -Tail 60; throw "upgrade from rc.3 with both programs open failed" }
+          AssertClosedGracefully $capture 'rc.3 SnapForge Capture' 'upgrade-rc3.log'
+          AssertClosedGracefully $editor 'rc.3 SnapForge Editor' 'upgrade-rc3.log'
+          AssertInstalledRc4
+          $snap = (Get-ItemProperty $runKey).PSObject.Properties | Where-Object { "$($_.Value)" -like '*SnapForge*' }
+          if (@($snap).Count -ne 1) { throw "start-with-Windows entries: $(@($snap).Count)" }
+          if (Compare-Object $before (LibHash)) { throw "UPGRADING FROM rc.3 CHANGED THE LIBRARY" }
+          if ((SettingsKeys) -ne $keys) { throw "settings changed" }
+          foreach ($exe in 'SnapForge.exe', 'SnapForgeEditor.exe') { LibraryCheck $exe "rc4-after-rc3-$exe" }
+          Write-Output "PASS rc.3 → rc.4 with both programs open: both closed gracefully, upgraded, About/version shows 1.0.0-rc.4 build $env:GITHUB_RUN_NUMBER in both, two shortcuts, one start-up entry, Library and settings kept"
 
-          # Interrupted setup: kill it while it replaces files, then run it again (the documented recovery path).
+      - name: Reinstall with both programs open; an active recording is never stopped without consent; another Windows session; interrupted setup
+        shell: pwsh
+        env:
+          DOTNET_ROOT: C:\does-not-exist
+        run: |
+          $ErrorActionPreference = 'Stop'
+          . "$env:GITHUB_WORKSPACE\installer\tests\installer-test-helpers.ps1"
+
+          # 1. Reinstall (same version) with SnapForge Capture and SnapForge Editor open and idle.
+          $capture = StartApp "$machine\SnapForge.exe" @('--background')
+          $editor = StartApp "$machine\SnapForgeEditor.exe"
+          Start-Sleep -Seconds 8
+          if ($capture.HasExited -or $editor.HasExited) { throw "rc.4 programs did not stay running" }
+          $before = LibHash
+          if ((Setup $new '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=reinstall-open.log') -ne 0) { Get-Content reinstall-open.log -Tail 60; throw "reinstall with both programs open failed" }
+          AssertClosedGracefully $capture 'SnapForge Capture' 'reinstall-open.log'
+          AssertClosedGracefully $editor 'SnapForge Editor' 'reinstall-open.log'
+          AssertInstalledRc4
+          if (Compare-Object $before (LibHash)) { throw "REINSTALL CHANGED THE LIBRARY" }
+          Write-Output "PASS reinstall with SnapForge Capture and SnapForge Editor open and idle: both closed gracefully, installation replaced, Library unchanged"
+
+          # 2. Active recording (isolated test profile; screen only): Setup asks, SnapForge asks the user, Setup never
+          #    stops the recording. While the question is unanswered Setup gives up with a clear reason; after the user
+          #    answers Yes the recording is saved and Setup succeeds.
+          $rec = StartApp "$machine\SnapForge.exe" @('--profile', 'ci-rec', '--background', '--test-record')
+          $recLib = Join-Path $env:LOCALAPPDATA 'SnapForge-Profiles\ci-rec\Library'
+          $deadline = (Get-Date).AddSeconds(30)
+          do { Start-Sleep -Seconds 1; $mp4 = Get-ChildItem $recLib -Recurse -Filter *.mp4 -ErrorAction SilentlyContinue | Select-Object -First 1 } while (-not $mp4 -and (Get-Date) -lt $deadline)
+          if (-not $mp4) { throw "the test recording did not start" }
+          $size1 = (Get-Item $mp4.FullName).Length; Start-Sleep -Seconds 4; $size2 = (Get-Item $mp4.FullName).Length
+          Write-Output "INFO recording active: $($mp4.Name) $size1 → $size2 bytes"
+          $p = Start-Process -FilePath $new -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SNAPFORGEWAIT=15 /LOG=recording-blocked.log' -Wait -PassThru
+          if ($p.ExitCode -eq 0) { throw "SETUP CONTINUED WHILE A RECORDING WAS ACTIVE AND UNANSWERED" }
+          if (-not (Select-String -Path recording-blocked.log -Pattern 'blocked \(still running in this session\)' -Quiet)) { Get-Content recording-blocked.log -Tail 40; throw "setup log does not explain the block" }
+          if ($rec.HasExited) { throw "SETUP STOPPED SNAPFORGE WHILE IT WAS RECORDING" }
+          $size3 = (Get-Item $mp4.FullName).Length
+          if ($size3 -le $size2) { throw "the recording stopped growing ($size2 → $size3 bytes)" }
+          Write-Output "PASS setup refused (exit $($p.ExitCode)) and explained why; SnapForge kept recording ($size2 → $size3 bytes)"
+          Add-Type -AssemblyName UIAutomationClient, UIAutomationTypes
+          $root = [System.Windows.Automation.AutomationElement]::RootElement
+          $byName = { param($n) New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::NameProperty, $n) }
+          $dlg = $null
+          for ($i = 0; $i -lt 40 -and -not $dlg; $i++) { $dlg = $root.FindFirst([System.Windows.Automation.TreeScope]::Children, (& $byName 'SnapForge Setup')); if (-not $dlg) { Start-Sleep -Milliseconds 250 } }
+          if (-not $dlg) { throw "SnapForge did not ask the user about the recording" }
+          Write-Output "PASS SnapForge asked the user: '$($dlg.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (New-Object System.Windows.Automation.PropertyCondition([System.Windows.Automation.AutomationElement]::ControlTypeProperty, [System.Windows.Automation.ControlType]::Text))).Current.Name)'"
+          $yes = $dlg.FindFirst([System.Windows.Automation.TreeScope]::Descendants, (& $byName 'Yes'))
+          $yes.GetCurrentPattern([System.Windows.Automation.InvokePattern]::Pattern).Invoke()
+          if (-not $rec.WaitForExit(60000)) { throw "SnapForge did not close after the user agreed" }
+          if ($rec.ExitCode -ne 0) { throw "SnapForge did not exit normally after saving the recording (exit $($rec.ExitCode))" }
+          $report = Join-Path $env:RUNNER_TEMP 'ci-rec-library-check.txt'
+          $p = Start-Process -FilePath "$machine\SnapForge.exe" -ArgumentList '--profile', 'ci-rec', '--library-check', "`"$report`"", '--expect-videos', '1' -Wait -PassThru
+          Get-Content $report
+          if ($p.ExitCode -ne 0) { throw "THE RECORDING WAS NOT SAVED TO THE LIBRARY" }
+          if ((Setup $new '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=after-recording.log') -ne 0) { throw "setup failed after the recording was saved" }
+          Write-Output "PASS after the user agreed, the recording was stopped and saved (1 video in the Library) and setup completed"
+
+          # 3. SnapForge in ANOTHER Windows session (session 0, started by the Task Scheduler as SYSTEM — the runner has
+          #    no second interactive session): Setup cannot ask it, names the session and changes nothing.
+          $task = 'SnapForge-other-session-test'
+          schtasks /Create /TN $task /TR "`"$machine\SnapForge.exe`" --profile ci-session0 --background" /SC ONCE /ST 23:59 /RU SYSTEM /F | Out-Null
+          schtasks /Run /TN $task | Out-Null
+          $other = $null; $deadline = (Get-Date).AddSeconds(30)
+          do { Start-Sleep -Seconds 1; $other = Get-CimInstance Win32_Process -Filter "Name='SnapForge.exe'" | Where-Object { $_.SessionId -ne (Get-Process -Id $PID).SessionId } | Select-Object -First 1 } while (-not $other -and (Get-Date) -lt $deadline)
+          if (-not $other) {
+            Write-Output "UNAVAILABLE other-session: SnapForge could not be started in session 0 on this runner; this case needs a physical PC with two signed-in users"
+          } else {
+            Start-Sleep -Seconds 5
+            $hash = (Get-FileHash "$machine\SnapForge.exe").Hash
+            $p = Start-Process -FilePath $new -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=other-session.log' -Wait -PassThru
+            $blocked = Select-String -Path other-session.log -Pattern 'blocked \(running in another session\)' -Quiet
+            Stop-Process -Id $other.ProcessId -Force -ErrorAction SilentlyContinue  # test cleanup of the test's own process
+            schtasks /Delete /TN $task /F | Out-Null
+            if ($p.ExitCode -eq 0) { throw "SETUP CONTINUED WHILE SNAPFORGE RAN IN ANOTHER SESSION" }
+            if (-not $blocked) { Get-Content other-session.log -Tail 40; throw "setup log does not name the other session" }
+            if ((Get-FileHash "$machine\SnapForge.exe").Hash -ne $hash) { throw "files were replaced while another session used them" }
+            Write-Output "PASS SnapForge in another Windows session (session $($other.SessionId)): setup refused (exit $($p.ExitCode)), named the session, replaced nothing"
+          }
+          schtasks /Delete /TN $task /F 2>$null | Out-Null
+
+          # 4. Interrupted setup: kill it while it replaces files, then run it again (the documented recovery path).
           $setup = Start-Process -FilePath $new -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=interrupted.log' -PassThru
           Start-Sleep -Milliseconds 2500
           if (-not $setup.HasExited) { Stop-Process -Id $setup.Id -Force; Get-Process | Where-Object { $_.Path -like "$env:TEMP\is-*" } | Stop-Process -Force -ErrorAction SilentlyContinue; Write-Output "INFO setup killed while running" } else { Write-Output "INFO setup finished before it could be interrupted (exit $($setup.ExitCode))" }
           Start-Sleep -Seconds 3
-          $p = Start-Process -FilePath $new -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=repair-after-interrupt.log' -Wait -PassThru
-          if ($p.ExitCode -ne 0) { Get-Content repair-after-interrupt.log -Tail 40; throw "setup after an interrupted setup failed" }
+          if ((Setup $new '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=repair-after-interrupt.log') -ne 0) { Get-Content repair-after-interrupt.log -Tail 40; throw "setup after an interrupted setup failed" }
           foreach ($exe in 'SnapForge.exe', 'SnapForgeEditor.exe') {
             $out = Join-Path $env:RUNNER_TEMP "repaired-$exe-self-test.txt"
             $p = Start-Process -FilePath "$machine\$exe" -ArgumentList '--profile', 'ci-repair', '--self-test', "`"$out`"" -Wait -PassThru
@@ -851,22 +977,20 @@ jobs:
           }
           Write-Output "PASS after an interrupted setup, running setup again repaired the installation (both programs pass their self-test)"
 
-      - name: Repair, second Windows user, uninstall keeps data
+      - name: Repair, second Windows user, uninstall with SnapForge open keeps data
         shell: pwsh
         env:
           DOTNET_ROOT: C:\does-not-exist
         run: |
           $ErrorActionPreference = 'Stop'
-          $new = (Get-ChildItem packages\*-setup.exe | Select-Object -First 1).FullName
-          $machine = Join-Path $env:ProgramFiles "SnapForge"
-          $data = Join-Path $env:LOCALAPPDATA "SnapForge"
+          . "$env:GITHUB_WORKSPACE\installer\tests\installer-test-helpers.ps1"
 
           $p = Start-Process -FilePath $new -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=repair.log' -Wait -PassThru
           if ($p.ExitCode -ne 0) { throw "repair failed" }
           Write-Output "PASS repair (same version over itself)"
 
           # A second Windows user: own data folder, the first user's data untouched.
-          $before = Get-ChildItem $data -Recurse -File | Where-Object { $_.FullName -notmatch '\\(logs|Temp|Handoff)\\' } | ForEach-Object { (Get-FileHash $_.FullName).Hash } | Sort-Object
+          $before = (LibHash) + (Get-ChildItem $data -Recurse -File | Where-Object { $_.FullName -notmatch '\\(logs|Temp|Handoff)\\' } | ForEach-Object { (Get-FileHash $_.FullName).Hash } | Sort-Object)
           $pw = [Convert]::ToBase64String([Security.Cryptography.RandomNumberGenerator]::GetBytes(18)) + 'aA1!'
           net user sftest2 $pw /add /y | Out-Null
           $cred = New-Object System.Management.Automation.PSCredential('sftest2', (ConvertTo-SecureString $pw -AsPlainText -Force))
@@ -881,23 +1005,28 @@ jobs:
             if ($p.ExitCode -ne 0) { throw "second user could not run $exe" }
             if (-not ((Get-Content $report) -match 'C:\\Users\\sftest2\\AppData\\Local\\SnapForge')) { throw "second user's data folder is not in their own profile ($exe)" }
           }
-          $after = Get-ChildItem $data -Recurse -File | Where-Object { $_.FullName -notmatch '\\(logs|Temp|Handoff)\\' } | ForEach-Object { (Get-FileHash $_.FullName).Hash } | Sort-Object
+          $after = (LibHash) + (Get-ChildItem $data -Recurse -File | Where-Object { $_.FullName -notmatch '\\(logs|Temp|Handoff)\\' } | ForEach-Object { (Get-FileHash $_.FullName).Hash } | Sort-Object)
           if (Compare-Object $before $after) { throw "second user's run changed the first user's data" }
           Write-Output "PASS a second Windows user runs both installed programs with their own data folder; first user's data untouched"
 
-          # Uninstall (elevated): programs, entry and shortcuts removed; nobody's data touched.
+          # Uninstall (elevated) while SnapForge Capture is open: it is closed gracefully; programs, entry and shortcuts
+          # removed; nobody's data touched.
+          $capture = StartApp "$machine\SnapForge.exe" @('--background')
+          Start-Sleep -Seconds 8
           $uninst = Get-ChildItem $machine -Filter "unins*.exe" | Select-Object -First 1
-          $p = Start-Process -FilePath $uninst.FullName -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -Wait -PassThru
+          $p = Start-Process -FilePath $uninst.FullName -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /LOG=uninstall-open.log' -Wait -PassThru
+          if (-not $capture.HasExited -or $capture.ExitCode -ne 0) { throw "uninstall did not close SnapForge Capture gracefully" }
           $deadline = (Get-Date).AddSeconds(60)
           while ((Test-Path "$machine\SnapForge.exe") -and (Get-Date) -lt $deadline) { Start-Sleep -Seconds 1 }
           if ((Test-Path "$machine\SnapForge.exe") -or (Test-Path "$machine\SnapForgeEditor.exe")) { throw "uninstall left a program" }
-          foreach ($lnk in 'SnapForge Capture.lnk', 'SnapForge Editor.lnk') { if (Test-Path (Join-Path $env:ProgramData "Microsoft\Windows\Start Menu\Programs\$lnk")) { throw "uninstall left $lnk" } }
+          foreach ($lnk in 'SnapForge Capture.lnk', 'SnapForge Editor.lnk') { if (Test-Path "$programs\$lnk") { throw "uninstall left $lnk" } }
           foreach ($k in 'HKLM:\SOFTWARE\Microsoft\Windows\CurrentVersion\Uninstall', 'HKLM:\SOFTWARE\WOW6432Node\Microsoft\Windows\CurrentVersion\Uninstall') {
             if (Test-Path "$k\{6E0C3B1A-58A2-4E39-9F3B-0D6F4C1C7A51}_is1") { throw "uninstall left the Installed apps entry under $k" }
           }
-          if (-not (Test-Path "$data\Library\keep-me\marker.txt")) { throw "UNINSTALL DELETED USER DATA" }
+          if (-not (Test-Path "$lib\keep-me\marker.txt")) { throw "UNINSTALL DELETED USER DATA" }
+          if (-not (Test-Path "$data\settings.json")) { throw "UNINSTALL DELETED SETTINGS" }
           if (-not (Test-Path 'C:\Users\sftest2\AppData\Local\SnapForge')) { throw "UNINSTALL DELETED THE SECOND USER'S DATA" }
-          Write-Output "PASS uninstall removed both programs, the entry and the shortcuts; both users' data kept"
+          Write-Output "PASS uninstall with SnapForge Capture open closed it gracefully, removed both programs, the entry and the shortcuts; both users' data and settings kept"
           net user sftest2 /delete | Out-Null
 
       - name: Upload installer logs

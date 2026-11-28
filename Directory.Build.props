@@ -15,7 +15,7 @@
     <Company>bazeocrisy</Company>
     <Product>SnapForge</Product>
     <!-- Product version. Release candidates are 1.0.0-rc.N; the final release drops the suffix. -->
-    <Version>1.0.0-rc.3</Version>
+    <Version>1.0.0-rc.4</Version>
     <!-- Windows file version: 1.0.0.<CI run number> (0 for local builds) — shown in Explorer → Properties → Details. -->
     <SnapForgeBuildNumber Condition="'$(GITHUB_RUN_NUMBER)' != ''">$(GITHUB_RUN_NUMBER)</SnapForgeBuildNumber>
     <SnapForgeBuildNumber Condition="'$(SnapForgeBuildNumber)' == ''">0</SnapForgeBuildNumber>

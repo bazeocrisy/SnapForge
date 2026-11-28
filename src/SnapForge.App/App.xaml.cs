@@ -48,6 +48,8 @@ public partial class App : Application
     private Mutex? _instanceMutex;
     private EventWaitHandle? _activateSignal;
     private EventWaitHandle? _exitSignal;
+    private EventWaitHandle? _setupExitSignal;
+    private static bool _exitInProgress;
     private System.IO.MemoryMappedFiles.MemoryMappedFile? _instanceInfo;
 
     internal static MainWindow? MainShell => Current?.MainWindow as MainWindow;
@@ -127,6 +129,15 @@ public partial class App : Application
             return;
         }
 
+        if (args.Length >= 2 && args[0] == "--version-info")
+        {
+            // RC4: which program, version and build this executable is (CI checks both installed programs).
+            ShutdownMode = ShutdownMode.OnExplicitShutdown;
+            File.WriteAllText(args[1], $"Program: {ProgramName}\nVersion: {InstanceInfo.ProductVersion}\nBuild: {InstanceInfo.BuildNumber}\nCommit: {InstanceInfo.Commit}\nAbout: {AboutHeadline}\n");
+            Shutdown(0);
+            return;
+        }
+
         if (args.Length >= 1 && args[0] is "--self-test" or "--screenshots")
         {
             ShutdownMode = ShutdownMode.OnExplicitShutdown;
@@ -164,6 +175,10 @@ public partial class App : Application
         _instanceInfo = InstanceInfo.Publish(InstanceInfoName, InstanceInfo.Current());
         ThreadPool.RegisterWaitForSingleObject(_activateSignal, (_, _) => Dispatcher.BeginInvoke(OnActivated), null, Timeout.Infinite, executeOnlyOnce: false);
         ThreadPool.RegisterWaitForSingleObject(_exitSignal, (_, _) => Dispatcher.BeginInvoke(() => _ = ExitAsync()), null, Timeout.Infinite, executeOnlyOnce: false);
+        // RC4: SnapForge Setup asks every SnapForge in this Windows session (both programs, any data profile) to close
+        // before it replaces the program files. Manual-reset: Setup sets it while it waits and resets it afterwards.
+        _setupExitSignal = new EventWaitHandle(false, EventResetMode.ManualReset, SetupExitEventName);
+        WatchSetupExitRequest();
         DispatcherUnhandledException += OnDispatcherUnhandledException;
 
         AppServices services;
@@ -194,6 +209,13 @@ public partial class App : Application
             // SnapForge Editor: its window only — no notification-area icon, hotkeys, QuickDock or recording.
             StartEditor(services, args);
             return;
+        }
+
+        if (args.Contains("--test-record") && ProductInfo.Profile is not null)
+        {
+            // CI only (requires an isolated test profile): start a screen-only recording of the primary display
+            // without the selection step, so Setup's handling of an ACTIVE recording can be tested.
+            Dispatcher.BeginInvoke(() => _ = Video.RecordingController.StartForTestAsync(), DispatcherPriority.ApplicationIdle);
         }
 
         // SnapForge Capture (RC3): no Editor window in this process — captures are handed to SnapForge Editor.
@@ -435,6 +457,7 @@ public partial class App : Application
         AppServices.Current?.Dispose();
         _activateSignal?.Dispose();
         _exitSignal?.Dispose();
+        _setupExitSignal?.Dispose();
         _instanceInfo?.Dispose();
         if (_instanceMutex is not null)
         {
@@ -772,21 +795,74 @@ public partial class App : Application
         settings.ShowDialog();
     }
 
-    internal static async Task ExitAsync()
+    internal static async Task ExitAsync(bool forSetup = false)
     {
-        if (Video.RecordingController.IsActive && !ConfirmExitWhileRecording())
+        if (_exitInProgress)
         {
-            return;
+            return; // Setup may send both its own request and the older "-exit" request: ask only once
         }
 
-        if (MainShell is { } main && !await main.CloseForRealAsync().ConfigureAwait(true))
+        _exitInProgress = true;
+        try
         {
-            return;
-        }
+            if (forSetup)
+            {
+                MainShell?.Activate(); // any question about unsaved work appears in front of Setup
+            }
 
-        _captureWindow?.Close();
-        Current.Shutdown();
+            if (Video.RecordingController.IsActive && !(forSetup ? ConfirmSetupWhileRecording() : ConfirmExitWhileRecording()))
+            {
+                return;
+            }
+
+            if (MainShell is { } main && !await main.CloseForRealAsync().ConfigureAwait(true))
+            {
+                return;
+            }
+
+            _captureWindow?.Close();
+            Current.Shutdown();
+        }
+        finally
+        {
+            _exitInProgress = false;
+        }
     }
+
+    /// <summary>RC4: name of the event SnapForge Setup sets to ask every SnapForge in this session to close.</summary>
+    internal const string SetupExitEventName = @"Local\SnapForge-SetupExit-7c1d";
+
+    /// <summary>Waits for Setup's close request; after the user keeps SnapForge open, waits until Setup gives up.</summary>
+    private void WatchSetupExitRequest()
+    {
+        if (_setupExitSignal is not { } signal)
+        {
+            return;
+        }
+
+        ThreadPool.RegisterWaitForSingleObject(signal, (_, _) => Dispatcher.BeginInvoke(async () =>
+        {
+            await ExitAsync(forSetup: true).ConfigureAwait(true);
+            // Still running (the user kept a recording or work open): listen again once Setup has reset the request.
+            _ = Task.Run(async () =>
+            {
+                while (signal.WaitOne(0))
+                {
+                    await Task.Delay(1000).ConfigureAwait(false);
+                }
+
+                await Dispatcher.BeginInvoke(WatchSetupExitRequest);
+            });
+        }), null, Timeout.Infinite, executeOnlyOnce: true);
+    }
+
+    /// <summary>RC4: Setup wants to update SnapForge while a recording runs — the user decides (shown in front).</summary>
+    internal static bool ConfirmSetupWhileRecording() =>
+        MessageBox.Show(
+            "SnapForge Setup wants to update SnapForge, but a recording is in progress.\n\n" +
+            "Yes: stop the recording, save it to the Library and close SnapForge so Setup can continue.\n" +
+            "No: keep recording. Setup will wait; you can cancel Setup or click Retry there later.",
+            "SnapForge Setup", MessageBoxButton.YesNo, MessageBoxImage.Warning, MessageBoxResult.No, MessageBoxOptions.DefaultDesktopOnly) == MessageBoxResult.Yes;
 
     /// <summary>A running recording is never stopped without the user's consent (SF-008 / SF-014).</summary>
     internal static bool ConfirmExitWhileRecording() =>

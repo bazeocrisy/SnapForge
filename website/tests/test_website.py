@@ -621,9 +621,12 @@ class BuildGateTests(unittest.TestCase):
         self.assertIn("Private reporting is not set up yet", (out / "support.html").read_text())
 
     def test_sf012_test_build_section_is_honest(self):
-        loaded = build.load_config(WEBSITE / "config.json", self.tmp / "none.json")
+        # The neutral state (no CI run checked yet), whatever the shipped config currently links to.
+        cfg = json.loads((WEBSITE / "config.json").read_text())
+        cfg["testBuild"] = {"version": "1.0.0-rc.2", "runUrl": None, "commit": None}
+        c, v = self.write(cfg)
         out = self.tmp / "site"
-        build.build(loaded, out)
+        build.build(build.load_config(c, v), out)
         page = (out / "download.html").read_text()
         self.assertIn('id="test-builds"', page)
         self.assertIn("1.0.0-rc.2", page)
@@ -652,6 +655,51 @@ class BuildGateTests(unittest.TestCase):
         self.assertIn('href="https://github.com/bazeocrisy/SnapForge/actions/runs/123"', page)
         self.assertIn("a" * 40, page)
         self.assertEqual(build.validate(out), [])
+
+    def _rc4_test_build(self) -> dict:
+        return {"version": "1.0.0-rc.4", "build": 161, "commit": "b" * 40,
+                "runUrl": "https://github.com/bazeocrisy/SnapForge/actions/runs/456",
+                "artifactUrl": "https://github.com/bazeocrisy/SnapForge/actions/runs/456/artifacts/789",
+                "fileName": "SnapForge-1.0.0-rc.4-win-x64-setup.exe", "sha256": "c" * 64, "signed": False,
+                "expires": "2026-12-30"}
+
+    def test_rc4_download_windows_test_build_link_shows_every_detail(self):
+        cfg = json.loads((WEBSITE / "config.json").read_text())
+        cfg["testBuild"] = self._rc4_test_build()
+        c, v = self.write(cfg)
+        out = self.tmp / "site"
+        build.build(build.load_config(c, v), out)
+        page = (out / "download.html").read_text()
+        home = (out / "index.html").read_text()
+        for p in (page, home):
+            self.assertIn('href="https://github.com/bazeocrisy/SnapForge/actions/runs/456/artifacts/789"', p)
+            self.assertIn("Download Windows test build", p)
+            self.assertIn("1.0.0-rc.4", p)
+            self.assertIn("build 161", p)
+            self.assertIn("SnapForge-1.0.0-rc.4-win-x64-setup.exe", p)
+            self.assertIn("not code-signed", p)
+            self.assertIn("sign-in", p)
+        self.assertIn("c" * 64, page)
+        self.assertIn("2026-12-30", page)
+        self.assertIn("release candidate 4", home)
+        # The public download stays separate and disabled.
+        self.assertIn('disabled aria-describedby="dl-status-note"', home)
+        self.assertNotIn("releases/download", page + home)
+        self.assertEqual(build.validate(out), [])
+
+    def test_rc4_test_build_link_must_be_the_runs_own_package_with_all_details(self):
+        cfg = json.loads((WEBSITE / "config.json").read_text())
+        for change, message in (
+            ({"artifactUrl": "https://example.com/SnapForge.exe"}, "testBuild.artifactUrl must be"),
+            ({"artifactUrl": "https://github.com/bazeocrisy/SnapForge/actions/runs/999/artifacts/1"}, "must belong to the run"),
+            ({"fileName": "setup.exe"}, "testBuild.fileName must be"),
+            ({"sha256": "abc"}, "testBuild.sha256 must be"),
+            ({"signed": True}, "testBuild.signed must be false"),
+            ({"build": None}, "testBuild.build must be"),
+            ({"expires": None}, "testBuild.expires must be"),
+        ):
+            cfg["testBuild"] = {**self._rc4_test_build(), **change}
+            self.refused(cfg, None, message)
 
     def test_sf012_test_build_url_must_be_a_run_page(self):
         cfg = json.loads((WEBSITE / "config.json").read_text())

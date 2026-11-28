@@ -60,6 +60,8 @@ NOTES_URL = re.compile(r"^https://github\.com/bazeocrisy/SnapForge/releases/tag/
 PRIVATE_REPORTING_URL = "https://github.com/bazeocrisy/SnapForge/security/advisories/new"
 DOWNLOAD_PREFIX = "https://github.com/bazeocrisy/SnapForge/releases/download/"
 RUN_URL = re.compile(r"^https://github\.com/bazeocrisy/SnapForge/actions/runs/\d+$")
+# The CI package (artifact) of exactly that run: https://github.com/bazeocrisy/SnapForge/actions/runs/<run>/artifacts/<id>
+ARTIFACT_URL = re.compile(r"^https://github\.com/bazeocrisy/SnapForge/actions/runs/(\d+)/artifacts/\d+$")
 SOURCE_URL = re.compile(r"^https://github\.com/bazeocrisy/SnapForge(/tree/[A-Za-z0-9._/-]+)?$")
 VERSION_RX = re.compile(r"^\d+\.\d+\.\d+([-+][0-9A-Za-z.-]+)?$")
 # Fields that must be identical in config.json and the verification record — kept equal to
@@ -177,6 +179,24 @@ def load_config(path: Path, verification_path: Path = VERIFICATION) -> dict:
         errors.append("testBuild.commit must be a full 40-character lower-case commit SHA")
     if tb.get("runUrl") and not (tb.get("commit") and tb.get("version")):
         errors.append("testBuild.runUrl needs testBuild.version and testBuild.commit")
+    if tb.get("artifactUrl"):
+        # RC4: a direct "Download Windows test build" link — still only a link to the GitHub Actions package of the
+        # exact CI run that passed, never a file hosted here, and only with every identifying detail.
+        m = ARTIFACT_URL.match(tb["artifactUrl"])
+        if not m:
+            errors.append("testBuild.artifactUrl must be https://github.com/bazeocrisy/SnapForge/actions/runs/<run>/artifacts/<id>")
+        elif not tb.get("runUrl") or not tb["runUrl"].endswith("/runs/" + m.group(1)):
+            errors.append("testBuild.artifactUrl must belong to the run in testBuild.runUrl")
+        if not isinstance(tb.get("build"), int) or tb["build"] <= 0:
+            errors.append("testBuild.build must be the CI run number (a positive integer)")
+        if tb.get("fileName") != f"SnapForge-{tb.get('version')}-win-x64-setup.exe":
+            errors.append("testBuild.fileName must be SnapForge-<version>-win-x64-setup.exe for testBuild.version")
+        if not re.fullmatch(r"[0-9a-f]{64}", tb.get("sha256") or ""):
+            errors.append("testBuild.sha256 must be the installer's 64-character lower-case SHA-256")
+        if tb.get("signed") is not False:
+            errors.append("testBuild.signed must be false: CI test builds are never code-signed")
+        if not re.fullmatch(r"\d{4}-\d{2}-\d{2}", tb.get("expires") or ""):
+            errors.append("testBuild.expires must be the artifact's expiry date (YYYY-MM-DD)")
     cfg["_verification"] = None
     if rel.get("ownerApproved"):
         # ownerApproved alone is not proof that a safe release exists: require the record written by
@@ -254,8 +274,25 @@ def download_cta(cfg: dict, large: bool = True) -> str:
                 f'<p class="cta-note">Version {esc(r["version"])} · Windows 11 x64 · {esc(kinds)} · free</p>')
     return (f'<button class="btn btn-primary{size}" type="button" disabled aria-describedby="dl-status-note">'
             f'<img src="assets/icons/download.svg" alt="" width="20" height="20"> Download for Windows</button>'
-            f'<p class="cta-note" id="dl-status-note">No public release yet — release candidate 2 is in testing. '
-            f'<a href="download.html">See download status</a>.</p>')
+            f'<p class="cta-note" id="dl-status-note">No public release yet — {esc(rc_label(cfg))} is in testing. '
+            f'<a href="download.html">See download status</a>.</p>' + test_build_cta(cfg))
+
+
+def rc_label(cfg: dict) -> str:
+    """'release candidate 4' for testBuild.version 1.0.0-rc.4."""
+    m = re.search(r"-rc\.(\d+)$", (cfg.get("testBuild") or {}).get("version") or "")
+    return f"release candidate {m.group(1)}" if m else "a release candidate"
+
+
+def test_build_cta(cfg: dict) -> str:
+    """RC4: the clearly labelled test-build link on the home page (only when a verified CI package is configured)."""
+    tb = cfg.get("testBuild") or {}
+    if not tb.get("artifactUrl"):
+        return ""
+    return (f'<p class="cta-test">{ext_link(tb["artifactUrl"], "Download Windows test build", "btn btn-secondary")}</p>'
+            f'<p class="cta-note">SnapForge {esc(tb["version"])} · build {esc(tb["build"])} · {esc(tb["fileName"])} · '
+            f'<strong>not code-signed</strong> · GitHub sign-in needed · '
+            f'<a href="download.html#test-builds">SHA-256 and details</a></p>')
 
 
 def release_panel(cfg: dict) -> str:
@@ -312,29 +349,42 @@ def release_panel(cfg: dict) -> str:
 
 
 def test_build_panel(cfg: dict) -> str:
-    """FA-014/024, SF-012: honest description of the CI test packages; only a link to the run page."""
+    """FA-014/024, SF-012, RC4: honest description of the CI test packages; only links to the CI run / its package."""
     tb = cfg.get("testBuild") or {}
     version = esc(tb.get("version") or "the current release candidate")
-    if tb.get("runUrl"):
+    if tb.get("artifactUrl"):
+        link = f"""
+  <p>{ext_link(tb["artifactUrl"], "Download Windows test build", "btn btn-primary")}</p>
+  <dl class="facts">
+    <div><dt>Version</dt><dd>SnapForge {version}</dd></div>
+    <div><dt>Build number</dt><dd>{esc(tb["build"])} (Windows file version 1.0.0.{esc(tb["build"])}; About in SnapForge Capture and SnapForge Editor shows “{version} (build {esc(tb["build"])})”)</dd></div>
+    <div><dt>Installer</dt><dd><code>{esc(tb["fileName"])}</code>, inside the downloaded package (.zip) with an SBOM and <code>SHA256SUMS.txt</code></dd></div>
+    <div><dt>SHA-256 of the installer</dt><dd><code class="hash">{esc(tb["sha256"])}</code></dd></div>
+    <div><dt>Signing</dt><dd><strong>Not code-signed.</strong> Windows SmartScreen shows a blue “Windows protected your PC” window for unsigned programs. Check the SHA-256 first; do not install a file whose checksum differs.</dd></div>
+    <div><dt>Built from</dt><dd>commit <code>{esc(tb["commit"])}</code> — {ext_link(tb["runUrl"], "the CI run that built and tested it")}</dd></div>
+    <div><dt>Link valid until</dt><dd>{esc(tb["expires"])} (GitHub deletes the package then; this page will point to the next tested build)</dd></div>
+  </dl>"""
+    elif tb.get("runUrl"):
         link = (f'<p>{ext_link(tb["runUrl"], "Open the CI run for " + version, "btn btn-secondary")}</p>'
                 f'<p class="small">Built from commit <code>{esc(tb["commit"])}</code>. The package names on that '
                 f'page contain this commit.</p>')
     else:
         link = ('<div class="note" role="note"><p><strong>The link to the CI run for this test build will be added here</strong> '
                 'once the maintainer has checked the run. Until then, invited testers receive the link directly.</p></div>')
+    badge = esc(rc_label(cfg)[0].upper() + rc_label(cfg)[1:])
     return f"""
 <section class="status-card" aria-labelledby="test-builds">
-  <span class="badge badge-exp">Release candidate 2 (in testing)</span>
-  <h2 id="test-builds">Test builds for invited testers</h2>
+  <span class="badge badge-exp">{badge} (in testing)</span>
+  <h2 id="test-builds">Windows test build for invited testers</h2>
   <p>Test packages of <strong>SnapForge {version}</strong> are produced automatically by the project's continuous
   integration (CI) on GitHub. They are <strong>not a release</strong>:</p>
   <ul>
-    <li>They are GitHub Actions <em>artifacts</em> on the CI run page. Downloading them needs a GitHub sign-in.</li>
+    <li>They are GitHub Actions <em>artifacts</em> of the CI run. Downloading them needs a GitHub sign-in.</li>
     <li><strong>Sign-in is not owner-only access.</strong> The repository is public, so anyone with a free GitHub
     account can download these artifacts. Treat them as public test files.</li>
     <li>They <strong>expire</strong> (normally after 30 days) and are then gone.</li>
     <li>They are <strong>not code-signed</strong> and have not been approved for general use.</li>
-    <li>Nothing is hosted on this website: it only links to the CI run.</li>
+    <li>Nothing is hosted on this website: it only links to the CI package.</li>
   </ul>
   {link}
 </section>"""
@@ -505,7 +555,8 @@ def build(cfg: dict, out: Path) -> list[str]:
         "{{donate_teaser}}": donate_teaser(cfg),
         "{{repo}}": REPO,
         "{{status_line}}": ("Version " + esc(cfg["release"]["version"]) + " is available.") if release_live(cfg)
-        else "No public release yet — release candidate 2 is in testing.",
+        else f"No public release yet — {rc_label(cfg)} is in testing.",
+        "{{rc_label}}": esc(rc_label(cfg)),
     }
     pages = []
     for src in sorted((SRC / "pages").glob("*.html")):
